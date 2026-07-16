@@ -1,0 +1,8 @@
+{
+  "template": "ryan-alexander-zhang/ai-native-project-template",
+  "ref": "main",
+  "commit": "17d5e20e56da3381868a11a3eb41dcaefce83e4e",
+  "vars": {
+    "PROJECT_NAME": "event-storming"
+  }
+}
