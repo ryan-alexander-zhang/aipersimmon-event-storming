@@ -281,3 +281,7 @@ __marimo__/
 # Project
 #   File lock
 .idea-number.lock
+
+# web/ is a TypeScript app; the Python `lib/` rule above must not ignore its
+# source directory (see docs/issue/issue-00001-gitignore-swallows-web-lib.md).
+!web/lib/
