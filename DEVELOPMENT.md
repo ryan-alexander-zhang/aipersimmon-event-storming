@@ -72,13 +72,14 @@ Use this stage when the change needs durable docs, notes, or decisions.
 
 ## Commands
 
-Canonical commands for this repo (fill in for the project):
+The app lives in `web/`. Run these from `web/` (package manager: `bun`).
 
-- Setup: `<command>`
-- Test: `<command>`
-- Lint: `<command>`
-- Build: `<command>`
-- Run: `<command>`
+- Setup: `bun install`
+- Test: `bun run test` (unit — Vitest; see [UNIT_TESTING.md](UNIT_TESTING.md))
+- E2E: `bun run test:e2e` (Playwright; see [E2E_TESTING.md](E2E_TESTING.md))
+- Lint: `bun run lint`
+- Build: `bun run build`
+- Run: `bun run dev` (dev server at http://localhost:3000)
 
 ## Development Matrix
 

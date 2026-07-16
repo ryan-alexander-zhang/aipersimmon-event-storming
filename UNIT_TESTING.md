@@ -1,27 +1,37 @@
 # Unit Testing
 
-Use this file to record the project-specific unit testing choice for this repo.
+Project-specific unit testing guide for this repo.
 
 ## Test Framework
 
-Framework: `<fill in for this project>`. Note the short reason it is the chosen default.
-
-This level has no template default. The repo template only pins
-[INTEGRATION_TESTING.md](INTEGRATION_TESTING.md) to Testcontainers; pick the
-unit framework that fits the project's language and toolchain.
+Framework: **Vitest** + **React Testing Library** (`@testing-library/react`),
+run in `web/`. Chosen because Vitest is fast, ESM/TypeScript-native, and the
+standard fit for a Vite/Next + React 19 toolchain; RTL covers behavior of custom
+node and panel components.
 
 ## Command
 
-List the command used to run unit tests locally and in CI.
+```bash
+# from web/
+bun run test            # run once
+bun run test --watch    # watch mode
+bun run test --coverage # with coverage
+```
 
 ## Scope
 
-Define what unit tests must cover and what should stay out of unit tests.
+- **In scope**: the DSL layer (Zod schema, export/import round-trip), the
+  connection-rule logic (which relations are valid between which element types),
+  Zustand store reducers, and pure component behavior (rendering, edit callbacks).
+- **Out of scope**: full canvas drag/zoom interaction and multi-view flows —
+  those belong to E2E (see [E2E_TESTING.md](E2E_TESTING.md)).
 
 ## Gate
 
-Define the minimum rule that must pass for unit testing at this repo.
+`bun run test` exits 0 and meets the coverage bar in [TESTING.md](TESTING.md)
+(90% line/branch/function for executable changes).
 
 ## Report
 
-Describe where to check unit test results, coverage, or CI output.
+Vitest prints per-file results and coverage to the terminal; coverage HTML is
+written under `web/coverage/`. CI publishes the same run.

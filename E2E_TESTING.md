@@ -1,31 +1,44 @@
 # E2E Testing
 
-Use this file to record the project-specific E2E testing choice for this repo.
+Project-specific E2E testing guide for this repo.
 
 ## Test Framework
 
-Framework: `<fill in for this project>`. Note the short reason it is the chosen default.
-
-This level has no template default. The repo template only pins
-[INTEGRATION_TESTING.md](INTEGRATION_TESTING.md) to Testcontainers; pick the
-E2E framework that fits the project's UI or surface under test.
+Framework: **Playwright**, run in `web/`. Chosen because it drives real browsers
+against the running app, which is what an infinite-canvas editor needs (drag,
+zoom, keyboard, download/upload for export/import), and it has first-class
+Next.js support and CI reporters.
 
 ## Command
 
-List the command used to run E2E tests locally and in CI.
+```bash
+# from web/
+bun run test:e2e            # headless
+bun run test:e2e --ui       # interactive UI mode
+bun run test:e2e --headed   # watch the browser
+```
 
 ## Scope
 
-Define what E2E tests must cover and what should stay out of E2E tests.
+- **In scope**: critical happy-path flows — drag an element onto the canvas,
+  connect two elements with a valid relation, annotate a hotspot, export the
+  model to JSON and re-import it (round-trip), and autosave surviving a reload.
+- **Out of scope**: exhaustive per-element/per-relation permutations (unit
+  tests) and pixel-level styling.
 
 ## Environment
 
-Describe the browsers, services, data, and runtime setup required for E2E tests.
+- Browsers: Chromium (add Firefox/WebKit only if a bug warrants it).
+- Playwright starts the app via `webServer` (`bun run dev` / preview build). No
+  external services, database, or network — the app is client-only.
+- Test data is created in-test on a fresh browser context (empty local storage).
 
 ## Gate
 
-Define the minimum rule that must pass for E2E testing at this repo.
+`bun run test:e2e` exits 0 — all critical-flow specs green — before merging a
+change to a critical user flow (per the [TESTING.md](TESTING.md) matrix).
 
 ## Report
 
-Describe where to check E2E test results, screenshots, videos, or CI output.
+Playwright HTML report under `web/playwright-report/`; traces/screenshots/videos
+on failure under `web/test-results/`. CI publishes the HTML report as an artifact.
