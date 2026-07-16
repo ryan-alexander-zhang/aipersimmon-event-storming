@@ -5,6 +5,8 @@ import {
   Background,
   type Connection,
   Controls,
+  type IsValidConnection,
+  MarkerType,
   MiniMap,
   type NodeTypes,
   ReactFlow,
@@ -15,12 +17,21 @@ import type { DragEvent } from "react";
 import { useCallback, useMemo } from "react";
 import { ElementNode } from "@/components/nodes/element-node";
 import { ELEMENT_DND_MIME, Palette } from "@/components/palette";
+import { PropertyPanel } from "@/components/property-panel";
+import { Toolbar } from "@/components/toolbar";
 import {
   ELEMENT_DEFINITIONS,
   ELEMENT_TYPES,
   type ElementType,
 } from "@/lib/eventstorming/elements";
+import { isValidConnection as canConnect } from "@/lib/eventstorming/relations";
 import { useESStore } from "@/lib/store/store";
+
+const defaultEdgeOptions = {
+  markerEnd: { type: MarkerType.ArrowClosed },
+  labelBgPadding: [4, 2] as [number, number],
+  labelBgStyle: { fill: "#ffffff", fillOpacity: 0.85 },
+};
 
 function Canvas() {
   const nodes = useESStore((s) => s.nodes);
@@ -40,6 +51,17 @@ function Canvas() {
 
   const onConnect = useCallback((c: Connection) => void connect(c), [connect]);
 
+  // Live feedback: React Flow refuses the drop (invalid styling) when no rule
+  // matches the source/target element types.
+  const isValidConnection = useCallback<IsValidConnection>(
+    (c) => {
+      const s = nodes.find((n) => n.id === c.source);
+      const t = nodes.find((n) => n.id === c.target);
+      return !!s?.type && !!t?.type && canConnect(s.type, t.type);
+    },
+    [nodes],
+  );
+
   const onDragOver = useCallback((e: DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
@@ -57,26 +79,32 @@ function Canvas() {
   );
 
   return (
-    <div className="flex min-h-0 flex-1">
-      <Palette />
-      <div className="flex-1" onDrop={onDrop} onDragOver={onDragOver}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={(_, n) => setSelected(n.id)}
-          onPaneClick={() => setSelected(null)}
-          fitView
-        >
-          <Background />
-          <MiniMap
-            nodeColor={(n) => ELEMENT_DEFINITIONS[n.type as ElementType]?.color ?? "#ccc"}
-          />
-          <Controls />
-        </ReactFlow>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <Toolbar />
+      <div className="flex min-h-0 flex-1">
+        <Palette />
+        <div className="flex-1" onDrop={onDrop} onDragOver={onDragOver}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            defaultEdgeOptions={defaultEdgeOptions}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            isValidConnection={isValidConnection}
+            onNodeClick={(_, n) => setSelected(n.id)}
+            onPaneClick={() => setSelected(null)}
+            fitView
+          >
+            <Background />
+            <MiniMap
+              nodeColor={(n) => ELEMENT_DEFINITIONS[n.type as ElementType]?.color ?? "#ccc"}
+            />
+            <Controls />
+          </ReactFlow>
+        </div>
+        <PropertyPanel />
       </div>
     </div>
   );
