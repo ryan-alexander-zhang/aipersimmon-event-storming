@@ -14,7 +14,7 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import type { DragEvent } from "react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { ElementNode } from "@/components/nodes/element-node";
 import { ELEMENT_DND_MIME, Palette } from "@/components/palette";
 import { PropertyPanel } from "@/components/property-panel";
@@ -25,7 +25,27 @@ import {
   type ElementType,
 } from "@/lib/eventstorming/elements";
 import { isValidConnection as canConnect } from "@/lib/eventstorming/relations";
+import { loadModel, saveModel } from "@/lib/store/persistence";
 import { useESStore } from "@/lib/store/store";
+
+/** Hydrate from local storage on mount, then debounce-save on every change. */
+function useAutosave() {
+  useEffect(() => {
+    const loaded = loadModel();
+    if (loaded && (loaded.nodes.length > 0 || loaded.edges.length > 0)) {
+      useESStore.getState().setModel(loaded);
+    }
+    let timer: ReturnType<typeof setTimeout>;
+    const unsubscribe = useESStore.subscribe((s) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => saveModel(s.nodes, s.edges), 400);
+    });
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, []);
+}
 
 const defaultEdgeOptions = {
   markerEnd: { type: MarkerType.ArrowClosed },
@@ -42,6 +62,8 @@ function Canvas() {
   const addNode = useESStore((s) => s.addNode);
   const setSelected = useESStore((s) => s.setSelected);
   const { screenToFlowPosition } = useReactFlow();
+
+  useAutosave();
 
   const nodeTypes = useMemo<NodeTypes>(() => {
     const map: NodeTypes = {};

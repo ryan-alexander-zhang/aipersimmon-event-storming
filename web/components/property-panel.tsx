@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { Flame, Trash2 } from "lucide-react";
 import { ELEMENT_DEFINITIONS } from "@/lib/eventstorming/elements";
 import { useESStore } from "@/lib/store/store";
 
@@ -9,6 +9,7 @@ export function PropertyPanel() {
   const node = useESStore((s) => s.nodes.find((n) => n.id === s.selectedId) ?? null);
   const updateNodeData = useESStore((s) => s.updateNodeData);
   const removeNode = useESStore((s) => s.removeNode);
+  const addHotspot = useESStore((s) => s.addHotspot);
 
   const wrap = "w-64 shrink-0 overflow-y-auto border-l border-zinc-200 bg-zinc-50 p-3";
 
@@ -64,13 +65,30 @@ export function PropertyPanel() {
         </label>
       )}
 
-      <button
-        type="button"
-        className="mt-4 flex items-center gap-1.5 rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-        onClick={() => removeNode(node.id)}
-      >
-        <Trash2 size={14} /> Delete
-      </button>
+      <div className="mt-4 flex flex-col gap-2">
+        {!isHotspot && (
+          <button
+            type="button"
+            className="flex items-center gap-1.5 rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+            onClick={() =>
+              addHotspot(
+                node.id,
+                { x: node.position.x + 40, y: node.position.y + 120 },
+                "Hotspot?",
+              )
+            }
+          >
+            <Flame size={14} /> Add hotspot
+          </button>
+        )}
+        <button
+          type="button"
+          className="flex items-center gap-1.5 rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+          onClick={() => removeNode(node.id)}
+        >
+          <Trash2 size={14} /> Delete
+        </button>
+      </div>
     </aside>
   );
 }
