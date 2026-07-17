@@ -49,6 +49,40 @@ test("places a typed node by dragging from the palette [us-00001-AC-1.1]", async
   await expect(page.locator(".react-flow__node-domainEvent")).toContainText("Domain Event");
 });
 
+test("placed node shows its conventional color [us-00001-AC-1.1]", async ({ page }) => {
+  await page.goto("/");
+  await dropElement(page, "domainEvent", 300, 200);
+  const body = page.locator(".react-flow__node-domainEvent [data-testid=node-body]");
+  const bg = await body.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(bg).toBe("rgb(246, 166, 35)"); // #F6A623
+});
+
+test("editing the label updates the node on the canvas [us-00001-AC-2.1]", async ({ page }) => {
+  await page.goto("/");
+  await dropElement(page, "command", 300, 200);
+  await page.locator(".react-flow__node-command").click();
+  await page.getByLabel("Label", { exact: true }).fill("Place Order");
+  await expect(page.locator(".react-flow__node-command")).toContainText("Place Order");
+});
+
+test("toggling pivotal shows the marker on the node [us-00001-AC-3.1]", async ({ page }) => {
+  await page.goto("/");
+  await dropElement(page, "domainEvent", 300, 200);
+  await page.locator(".react-flow__node-domainEvent").click();
+  await page.getByLabel("Pivotal event").check();
+  await expect(page.locator(".react-flow__node-domainEvent [aria-label=pivotal]")).toBeVisible();
+});
+
+test("editing hotspot text updates the node [us-00003-AC-2.1]", async ({ page }) => {
+  await page.goto("/");
+  await dropElement(page, "command", 300, 200);
+  await page.locator(".react-flow__node-command").click();
+  await page.getByRole("button", { name: "Add hotspot" }).click();
+  await page.locator(".react-flow__node-hotspot").click();
+  await page.getByLabel("Text", { exact: true }).fill("Reserve stock when?");
+  await expect(page.locator(".react-flow__node-hotspot")).toContainText("Reserve stock when?");
+});
+
 test("connects Actor -> Command with an issues edge [us-00002-AC-1.1]", async ({ page }) => {
   await page.goto("/");
   await dropElement(page, "actor", 200, 220);

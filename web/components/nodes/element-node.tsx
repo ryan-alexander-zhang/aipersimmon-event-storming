@@ -53,6 +53,7 @@ export function ElementNode({ id, type, data, selected }: NodeProps<ESNode>) {
 
   return (
     <div
+      data-testid="node-body"
       className="relative min-w-[120px] max-w-[200px] rounded-md px-3 py-2 text-sm text-zinc-900 shadow-sm"
       style={{ background: def.color, outline: selected ? "2px solid #111827" : "none" }}
     >
