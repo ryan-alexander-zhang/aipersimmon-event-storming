@@ -99,6 +99,21 @@ test("shows an error on invalid import and keeps the model [spec-00001-XAC-2.1]"
   await expect(page.locator(".react-flow__node")).toHaveCount(1);
 });
 
+test("keeps the model local — no request carries it [spec-00001-XAC-1.1]", async ({ page }) => {
+  const mutating: string[] = [];
+  page.on("request", (req) => {
+    if (["POST", "PUT", "PATCH"].includes(req.method())) {
+      mutating.push(`${req.method()} ${req.url()}`);
+    }
+  });
+  await page.goto("/");
+  await dropElement(page, "actor", 200, 220);
+  await dropElement(page, "command", 520, 220);
+  await connect(page, ".react-flow__node-actor", ".react-flow__node-command");
+  await page.waitForTimeout(700); // allow autosave (local only) to run
+  expect(mutating).toEqual([]);
+});
+
 test("autosaves and restores on reload [us-00005-AC-1.1]", async ({ page }) => {
   await page.goto("/");
   await dropElement(page, "policy", 300, 200);
