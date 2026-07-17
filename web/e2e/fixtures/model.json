@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "meta": { "name": "Order", "level": "process", "createdAt": "2026-07-16T00:00:00Z" },
+  "nodes": [
+    { "id": "a1", "type": "actor", "label": "Customer", "position": { "x": -320, "y": 0 }, "properties": {} },
+    { "id": "c1", "type": "command", "label": "Place Order", "position": { "x": -90, "y": 0 }, "properties": {} },
+    { "id": "ag1", "type": "aggregate", "label": "Order", "position": { "x": 140, "y": 0 }, "properties": {} },
+    { "id": "e1", "type": "domainEvent", "label": "Order Placed", "position": { "x": 370, "y": 0 }, "properties": { "pivotal": true } }
+  ],
+  "edges": [
+    { "id": "r1", "source": "a1", "target": "c1", "relation": "issues" },
+    { "id": "r2", "source": "c1", "target": "ag1", "relation": "handledBy" },
+    { "id": "r3", "source": "ag1", "target": "e1", "relation": "emits" }
+  ]
+}

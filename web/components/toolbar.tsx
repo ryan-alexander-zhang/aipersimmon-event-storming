@@ -43,7 +43,12 @@ export function Toolbar() {
       <span className="text-sm font-semibold text-zinc-800">Event Storming</span>
       <div className="ml-auto flex items-center gap-2">
         {error && (
-          <span className="max-w-xs truncate text-xs text-red-600" role="alert" title={error}>
+          <span
+            className="max-w-xs truncate text-xs text-red-600"
+            role="alert"
+            data-testid="import-error"
+            title={error}
+          >
             {error}
           </span>
         )}
