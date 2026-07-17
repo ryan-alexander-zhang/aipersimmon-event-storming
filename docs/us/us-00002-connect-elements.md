@@ -8,16 +8,20 @@ parent: spec-00001-mvp-editor
 
 # User Story: connect elements with semantic relations
 
+> Re-scoped by [decision-00002](../decision/decision-00002-structured-board-not-free-canvas.md):
+> most relations are created automatically by slice actions (us-00007); manual
+> connections remain possible for cross-context/ambiguous links and are still
+> validated by the rule table.
+
 As a Modeler,
-I want to connect elements with semantic relations that follow the Event
-Storming grammar,
+I want relations to follow the Event Storming grammar,
 so that the model captures causal flow, not just lines.
 
 ## Requirements (EARS)
 
-- **us-00002-FR-1** (Event) When the Modeler connects two elements whose types
-  match a rule in the connection-rule table, the system shall create an edge
-  carrying that relation and show its relation label.
+- **us-00002-FR-1** (Event) When two elements are connected — by a slice action
+  or a manual link — whose types match a rule in the connection-rule table, the
+  system shall create an edge carrying that relation and show its relation label.
 - **us-00002-FR-2** (Unwanted) If the Modeler attempts a connection that matches
   no rule, then the system shall reject it and give non-blocking feedback,
   creating no edge.

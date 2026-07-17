@@ -6,17 +6,21 @@ status: active
 parent: spec-00001-mvp-editor
 ---
 
-# User Story: place and edit elements
+# User Story: add and edit elements
+
+> Re-scoped by [decision-00002](../decision/decision-00002-structured-board-not-free-canvas.md):
+> elements are added into their fixed row-band (via the slice builder, see
+> us-00007), not free-dropped at a cursor position.
 
 As a Modeler,
-I want to place typed Event Storming elements on the canvas and edit them,
+I want to add typed Event Storming elements and edit them,
 so that I can build the model with the correct domain semantics.
 
 ## Requirements (EARS)
 
-- **us-00001-FR-1** (Event) When the Modeler drags an element type from the
-  palette onto the canvas, the system shall create a node of that type at the
-  drop position, in the type's conventional color.
+- **us-00001-FR-1** (Event) When the Modeler adds an element of a given type, the
+  system shall create a node of that type in the type's row-band, in the type's
+  conventional color.
 - **us-00001-FR-2** (Event) When the Modeler edits a node's label or description,
   the system shall update the node in the model.
 - **us-00001-FR-3** (Event) When the Modeler marks a Domain Event as Pivotal, the
@@ -27,9 +31,9 @@ so that I can build the model with the correct domain semantics.
 ## Acceptance (GWT)
 
 - **us-00001-AC-1.1** (us-00001-FR-1)
-  Given an empty canvas
-  When the Modeler drags a "Domain Event" from the palette onto the canvas
-  Then a domainEvent node appears at the drop position with the orange color
+  Given an empty board
+  When the Modeler adds a "Domain Event"
+  Then a domainEvent node appears in the Domain Events band with the orange color
   And it exists in the model
 - **us-00001-AC-2.1** (us-00001-FR-2)
   Given a node on the canvas

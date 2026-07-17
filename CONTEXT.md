@@ -60,8 +60,21 @@ Edges carry a **semantic type**, not just a geometric connection:
 **emits**: Aggregate → Domain Event (also External System → Domain Event).
 **triggers**: Domain Event → Policy.
 **invokes**: Policy → Command.
+**updates**: Domain Event → Read Model.
 **informs**: Read Model → Actor.
 **annotates**: Hotspot → any element.
+
+### Structure
+
+**Bounded Context**:
+A named grouping of a slice of the model that forms one column group along the
+timeline (e.g. Ordering, Payment). The board's columns are organized by it.
+_Avoid_: module, service, area.
+
+**Timeline**:
+The left→right ordering of Domain Events that forms the board's spine; every
+other element is placed relative to the event it serves.
+_Avoid_: flow, sequence (when precision matters).
 
 ### Artifacts
 

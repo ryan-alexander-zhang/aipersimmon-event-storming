@@ -19,7 +19,7 @@ so that I can version, share, and reuse the model outside the app.
   `version`.
 - **us-00004-FR-2** (Event) When the Modeler imports a valid DSL JSON file, the
   system shall replace the current model with its contents, preserving nodes,
-  edges, and positions.
+  edges, bounded contexts, and timeline order (positions are derived, not stored).
 - **us-00004-FR-3** (Complex) While a model has been exported, when it is
   re-imported, the system shall restore a model equal to the original.
 
@@ -35,7 +35,8 @@ so that I can version, share, and reuse the model outside the app.
 - **us-00004-AC-3.1** (us-00004-FR-2, us-00004-FR-3)
   Given a model that was exported to JSON
   When the Modeler imports that file
-  Then the restored model equals the original in nodes, edges, and positions
+  Then the restored model equals the original in nodes, edges, bounded contexts,
+  and timeline order
 
 ## Links
 - Spec: spec-00001-mvp-editor · Plan: plan-00001-mvp-editor

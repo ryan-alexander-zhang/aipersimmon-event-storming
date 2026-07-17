@@ -2,9 +2,14 @@
 id: design-00001-editor-model-and-architecture
 type: design
 role: main
-status: active
+status: archived
 parent: spec-00001-mvp-editor
 ---
+
+> **Superseded by [design-00002-structured-board](design-00002-structured-board.md)**
+> per [decision-00002](../decision/decision-00002-structured-board-not-free-canvas.md).
+> This free-canvas design produced an unreadable board; the editor was rebuilt as
+> a deterministic structured board. Kept for history.
 
 # Design: editor model and architecture
 
