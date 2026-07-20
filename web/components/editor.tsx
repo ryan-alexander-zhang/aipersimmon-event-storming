@@ -130,6 +130,9 @@ function Canvas() {
         return {
           ...e,
           type: "relation",
+          // Focused edges flow (marching-ants); reduced-motion falls back to
+          // the thicker static line via a CSS override in globals.css.
+          animated: focusState === "on",
           data: e.data ? { ...e.data, focusState, curvature: curvature.get(e.id) } : e.data,
           markerEnd: relation
             ? { type: MarkerType.ArrowClosed, color: RELATION_STYLE[relation].color }

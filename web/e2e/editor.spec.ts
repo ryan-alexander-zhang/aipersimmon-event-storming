@@ -202,6 +202,17 @@ test("focusing a node dims the rest of the board [design-00003]", async ({ page 
   expect(await opacity(nodes(page, "externalSystem"))).toBeLessThan(1);
 });
 
+test("focused edges flow (animated); the rest stay static [design-00003]", async ({ page }) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await expect(nodes(page, "readModel")).toHaveCount(1);
+  // Nothing focused → no edge flows.
+  await expect(page.locator(".react-flow__edge.animated")).toHaveCount(0);
+  // Focusing rm1 flows its single incident edge (the "updates" from the event).
+  await nodes(page, "readModel").click();
+  await expect(page.locator(".react-flow__edge.animated")).toHaveCount(1);
+});
+
 test("New clears the model and does not restore it on reload", async ({ page }) => {
   await page.goto("/");
   await addContext(page);

@@ -24,3 +24,12 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Focused edges flow via React Flow's animated dashes. Honour reduced-motion:
+   stop the animation and show a solid (not static-dashed) thick line instead. */
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__edge.animated path {
+    animation: none;
+    stroke-dasharray: none;
+  }
+}

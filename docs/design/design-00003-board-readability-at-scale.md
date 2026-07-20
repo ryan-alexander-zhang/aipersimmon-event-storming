@@ -59,7 +59,9 @@ change); Tier B changes edge geometry; Tier C is structural.
   (~15%). This is the primary readability lever — it collapses the hairball to
   the one chain under attention. Derivable from the existing `edges` (match
   `source`/`target` against the selected id); the store already tracks
-  `selectedId`.
+  `selectedId`. Focused edges are further emphasised — **thickened** and given a
+  **directional flow** (marching-ants animation along the causal direction),
+  honouring `prefers-reduced-motion` (a static thick line when motion is reduced).
 - **On-demand edge labels.** Hide relation labels by default; show a label only
   when its edge is in the focused set (or on edge hover). Removes label
   collisions directly. The relation is still carried on every edge (`edge.data.relation`).

@@ -10,6 +10,7 @@ import { RELATION_STYLE } from "@/lib/eventstorming/edge-style";
 import type { ESEdge } from "@/lib/store/types";
 
 const DIM_OPACITY = 0.12;
+const FOCUS_WIDTH_BOOST = 1.5;
 
 /** Semantic edge: coloured/weighted by relation type, dimmed when a focus set is
  *  active and this edge is outside it, and labelled only when it is in the
@@ -39,7 +40,8 @@ export function RelationEdge({
   const style = relation ? RELATION_STYLE[relation] : undefined;
   const focusState = data?.focusState ?? "none";
   const dimmed = focusState === "off";
-  const showLabel = focusState === "on";
+  const focused = focusState === "on";
+  const baseWidth = style?.width ?? 1.5;
 
   return (
     <>
@@ -49,11 +51,13 @@ export function RelationEdge({
         markerEnd={markerEnd}
         style={{
           stroke: style?.color ?? "#94a3b8",
-          strokeWidth: style?.width ?? 1.5,
+          // Focused edges thicken; the flowing dashes come from the `animated`
+          // flag set on the edge (React Flow's stroke-dashoffset animation).
+          strokeWidth: focused ? baseWidth + FOCUS_WIDTH_BOOST : baseWidth,
           opacity: dimmed ? DIM_OPACITY : 1,
         }}
       />
-      {showLabel && relation && (
+      {focused && relation && (
         <EdgeLabelRenderer>
           <div
             className="nodrag nopan pointer-events-none absolute rounded bg-white/85 px-1 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm"
