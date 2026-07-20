@@ -142,8 +142,10 @@ function Canvas() {
     return routedEdges.filter((e) => ids.has(e.source) && ids.has(e.target));
   }, [routedEdges, visibleNodes]);
 
-  // Center offset per edge so siblings sharing a corridor bump apart instead of overlapping.
-  const offsets = useMemo(() => computeEdgeOffsets(visibleEdges), [visibleEdges]);
+  // Center offset per edge so edges sharing a column/row corridor bow apart
+  // instead of overlapping on one centreline (needs node positions).
+  const nodePos = useMemo(() => new Map(nodes.map((n) => [n.id, n.position])), [nodes]);
+  const offsets = useMemo(() => computeEdgeOffsets(visibleEdges, nodePos), [visibleEdges, nodePos]);
 
   // Colour/weight each edge by relation, colour its arrow to match, spread
   // parallel edges, and tag its focus state so the custom edge dims off-focus

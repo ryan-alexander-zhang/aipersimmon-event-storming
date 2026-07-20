@@ -1,79 +1,97 @@
 import { describe, expect, it } from "vitest";
 import type { ESEdge } from "@/lib/store/types";
 import { computeEdgeOffsets } from "./edge-spread";
+import type { RelationType } from "@/lib/eventstorming/relations";
 
-const edge = (
-  id: string,
-  source: string,
-  target: string,
-  sourceHandle: string,
-  targetHandle: string,
-): ESEdge => ({ id, source, target, sourceHandle, targetHandle, data: { relation: "updates" } });
+// One column at x = 100, bands stacked top→bottom.
+const pos = new Map<string, { x: number; y: number }>([
+  ["actor", { x: 100, y: 0 }],
+  ["cmd", { x: 100, y: 132 }],
+  ["agg", { x: 100, y: 264 }],
+  ["event", { x: 100, y: 396 }],
+  ["rm", { x: 100, y: 660 }],
+  ["hot", { x: 100, y: 792 }],
+]);
 
-describe("computeEdgeOffsets (RA6 → TB2)", () => {
+const e = (id: string, source: string, target: string, relation: RelationType): ESEdge => ({
+  id,
+  source,
+  target,
+  data: { relation },
+});
+
+const off = (m: Map<string, number>, id: string) => m.get(id) ?? 0;
+
+describe("computeEdgeOffsets (issue-00003: corridor lanes)", () => {
   it("leaves a lone edge untouched", () => {
-    const out = computeEdgeOffsets([edge("a", "e", "rm1", "s-bottom", "t-top")]);
-    expect(out.size).toBe(0);
+    expect(computeEdgeOffsets([e("hb", "cmd", "agg", "handledBy")], pos).size).toBe(0);
   });
 
-  it("spreads a fan-out (same source handle) into distinct offsets", () => {
-    const out = computeEdgeOffsets([
-      edge("a", "e", "rm1", "s-bottom", "t-top"),
-      edge("b", "e", "rm2", "s-bottom", "t-top"),
-    ]);
-    expect(out.size).toBe(2);
-    expect(out.get("a")).not.toBe(out.get("b"));
+  it("keeps a touching causal chain on the centre line", () => {
+    const out = computeEdgeOffsets(
+      [e("hb", "cmd", "agg", "handledBy"), e("em", "agg", "event", "emits")],
+      pos,
+    );
+    expect(off(out, "hb")).toBe(0);
+    expect(off(out, "em")).toBe(0);
   });
 
-  it("spreads a convergence (same target handle) into distinct offsets", () => {
-    const out = computeEdgeOffsets([
-      edge("a", "rm1", "actor", "s-top", "t-bottom"),
-      edge("b", "rm2", "actor", "s-top", "t-bottom"),
-    ]);
-    expect(out.size).toBe(2);
-    expect(out.get("a")).not.toBe(out.get("b"));
+  it("pushes an annotation edge off the chain it overlaps", () => {
+    const out = computeEdgeOffsets(
+      [e("hb", "cmd", "agg", "handledBy"), e("an", "hot", "cmd", "annotates")],
+      pos,
+    );
+    expect(off(out, "hb")).toBe(0); // spine centred
+    expect(out.get("an")).toBeDefined();
+    expect(off(out, "an")).not.toBe(0);
   });
 
-  it("does not spread edges in unrelated corridors", () => {
-    const out = computeEdgeOffsets([
-      edge("a", "e1", "rm1", "s-bottom", "t-top"),
-      edge("b", "e2", "rm2", "s-bottom", "t-top"),
-    ]);
-    expect(out.size).toBe(0);
+  it("separates two overlapping back-edges from the chain and from each other", () => {
+    const out = computeEdgeOffsets(
+      [
+        e("hb", "cmd", "agg", "handledBy"),
+        e("an", "hot", "cmd", "annotates"),
+        e("in", "rm", "actor", "informs"),
+      ],
+      pos,
+    );
+    expect(off(out, "hb")).toBe(0);
+    expect(off(out, "an")).not.toBe(0);
+    expect(off(out, "in")).not.toBe(0);
+    expect(off(out, "an")).not.toBe(off(out, "in")); // different lanes
   });
 
-  it("groups edges with no handles by node alone", () => {
-    const bare = (id: string, source: string, target: string): ESEdge => ({
-      id,
-      source,
-      target,
-      data: { relation: "updates" },
-    });
-    const out = computeEdgeOffsets([bare("a", "e", "rm1"), bare("b", "e", "rm2")]);
-    expect(out.size).toBe(2);
-    expect(out.get("a")).not.toBe(out.get("b"));
+  it("separates a fan-out to stacked targets", () => {
+    const p = new Map(pos);
+    p.set("rm2", { x: 100, y: 730 });
+    const out = computeEdgeOffsets(
+      [e("u1", "event", "rm", "updates"), e("u2", "event", "rm2", "updates")],
+      p,
+    );
+    expect(off(out, "u1")).not.toBe(off(out, "u2"));
   });
 
-  it("fans a group out symmetrically around 0", () => {
-    const out = computeEdgeOffsets([
-      edge("a", "e", "rm1", "s-bottom", "t-top"),
-      edge("b", "e", "rm2", "s-bottom", "t-top"),
-      edge("c", "e", "rm3", "s-bottom", "t-top"),
-    ]);
-    const vals = ["a", "b", "c"].map((id) => out.get(id)!);
-    expect(vals.reduce((s, v) => s + v, 0)).toBe(0); // symmetric
-    expect(new Set(vals).size).toBe(3); // all distinct
-    expect(vals[1]).toBe(0); // middle sibling stays straight
+  it("does not offset edges in different columns against each other", () => {
+    const p = new Map(pos);
+    p.set("cmd2", { x: 400, y: 132 });
+    p.set("agg2", { x: 400, y: 264 });
+    const out = computeEdgeOffsets(
+      [e("hb", "cmd", "agg", "handledBy"), e("hb2", "cmd2", "agg2", "handledBy")],
+      p,
+    );
+    expect(off(out, "hb")).toBe(0);
+    expect(off(out, "hb2")).toBe(0);
   });
 
   it("is deterministic across input order", () => {
     const es = [
-      edge("a", "e", "rm1", "s-bottom", "t-top"),
-      edge("b", "e", "rm2", "s-bottom", "t-top"),
+      e("hb", "cmd", "agg", "handledBy"),
+      e("an", "hot", "cmd", "annotates"),
+      e("in", "rm", "actor", "informs"),
     ];
-    const first = computeEdgeOffsets(es);
-    const second = computeEdgeOffsets([...es].reverse());
-    expect(first.get("a")).toBe(second.get("a"));
-    expect(first.get("b")).toBe(second.get("b"));
+    const a = computeEdgeOffsets(es, pos);
+    const b = computeEdgeOffsets([...es].reverse(), pos);
+    expect(a.get("an")).toBe(b.get("an"));
+    expect(a.get("in")).toBe(b.get("in"));
   });
 });

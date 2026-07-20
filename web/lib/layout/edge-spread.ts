@@ -1,43 +1,67 @@
-// Parallel-edge separation. When several edges leave the same handle (a fan-out,
-// e.g. one Domain Event `updates` two Read Models) or arrive at the same handle
-// (a convergence, e.g. two Read Models `inform` one Actor), their orthogonal
-// paths overlap. Giving each sibling a symmetric center offset (px) bumps them
-// apart so they no longer render on top of each other (design-00003 §3 Tier B).
-// Pure — returns a per-edge offset only for edges that share a corridor.
+// Parallel-edge separation by corridor. The banded layout puts a whole slice in
+// one column, so orthogonal edges that run along the same column (or the same
+// row) land on one centreline and overlap — a fan-out, a convergence, or a long
+// back-edge (informs / invokes / annotates) crossing the causal chain. We group
+// edges into corridors (a column for vertical edges, a row for horizontal ones)
+// and assign lanes so overlapping spans get a small side offset while the
+// touching causal chain stays on the centre. Pure; needs node positions.
+// (design-00003 §3 Tier B; generalises the earlier shared-handle version —
+// issue-00003.)
 
 import type { ESEdge } from "@/lib/store/types";
 
-const GAP = 26; // px between sibling paths
-
-const key = (node: string | undefined, handle: string | null | undefined) =>
-  `${node ?? ""}|${handle ?? ""}`;
-
-function group(edges: ESEdge[], keyOf: (e: ESEdge) => string): Map<string, ESEdge[]> {
-  const m = new Map<string, ESEdge[]>();
-  for (const e of edges) {
-    const k = keyOf(e);
-    const arr = m.get(k);
-    if (arr) arr.push(e);
-    else m.set(k, [e]);
-  }
-  return m;
+interface Pt {
+  x: number;
+  y: number;
 }
 
-/** edgeId → center offset (px), only for edges that share a source or target
- *  handle with a sibling. Offsets are symmetric around 0 so the group fans out
- *  both ways; deterministic (siblings ordered by id). */
-export function computeEdgeOffsets(edges: ESEdge[]): Map<string, number> {
+const GAP = 26; // px between lanes; stays well within a column
+
+/** lane 0 = centre; higher lanes fan out symmetrically (+G, −G, +2G, −2G, …). */
+function laneOffset(lane: number): number {
+  if (lane === 0) return 0;
+  const step = Math.ceil(lane / 2);
+  return lane % 2 === 1 ? step * GAP : -step * GAP;
+}
+
+const overlaps = (a: { lo: number; hi: number }, b: { lo: number; hi: number }) =>
+  !(a.hi <= b.lo || b.hi <= a.lo); // touching endpoints do not count as overlap
+
+/** edgeId → centre offset (px), only for edges pushed off their corridor's
+ *  centreline. Deterministic; shorter edges keep the centre so the causal chain
+ *  stays straight and only long/crossing edges bow aside. */
+export function computeEdgeOffsets(edges: ESEdge[], pos: Map<string, Pt>): Map<string, number> {
   const out = new Map<string, number>();
-  const assign = (siblings: ESEdge[]) => {
-    if (siblings.length < 2) return;
-    const sorted = [...siblings].sort((a, b) => a.id.localeCompare(b.id));
-    const mid = (sorted.length - 1) / 2;
-    sorted.forEach((e, i) => out.set(e.id, Math.round((i - mid) * GAP)));
-  };
-  // Fan-out first (share source handle), then convergence (share target handle)
-  // for edges not already spread.
-  for (const g of group(edges, (e) => key(e.source, e.sourceHandle)).values()) assign(g);
-  const remaining = edges.filter((e) => !out.has(e.id));
-  for (const g of group(remaining, (e) => key(e.target, e.targetHandle)).values()) assign(g);
+  const corridors = new Map<string, Array<{ id: string; lo: number; hi: number }>>();
+  for (const e of edges) {
+    const s = pos.get(e.source);
+    const t = pos.get(e.target);
+    if (!s || !t) continue;
+    const vertical = Math.abs(t.y - s.y) >= Math.abs(t.x - s.x);
+    const key = vertical ? `V:${Math.round((s.x + t.x) / 2)}` : `H:${Math.round((s.y + t.y) / 2)}`;
+    const [a, b] = vertical ? [s.y, t.y] : [s.x, t.x];
+    const item = { id: e.id, lo: Math.min(a, b), hi: Math.max(a, b) };
+    const arr = corridors.get(key);
+    if (arr) arr.push(item);
+    else corridors.set(key, [item]);
+  }
+  for (const items of corridors.values()) {
+    if (items.length < 2) continue;
+    // shorter edges claim the centre first; stable tie-break for determinism
+    items.sort(
+      (p, q) => p.hi - p.lo - (q.hi - q.lo) || p.lo - q.lo || p.id.localeCompare(q.id),
+    );
+    const lanes: Array<Array<{ lo: number; hi: number }>> = [];
+    for (const it of items) {
+      let lane = lanes.findIndex((occ) => occ.every((o) => !overlaps(it, o)));
+      if (lane === -1) {
+        lane = lanes.length;
+        lanes.push([]);
+      }
+      lanes[lane].push(it);
+      const offset = laneOffset(lane);
+      if (offset !== 0) out.set(it.id, offset);
+    }
+  }
   return out;
 }
