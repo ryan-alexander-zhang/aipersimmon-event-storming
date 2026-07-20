@@ -1,13 +1,9 @@
 "use client";
 
-import { Plus } from "lucide-react";
 import { useViewport } from "@xyflow/react";
-import {
-  BAND_ORDER,
-  type Band,
-  ELEMENT_DEFINITIONS,
-} from "@/lib/eventstorming/elements";
-import { BAND_H, contextExtents } from "@/lib/layout/layout";
+import { Plus, X } from "lucide-react";
+import { BAND_ORDER, type Band, ELEMENT_DEFINITIONS } from "@/lib/eventstorming/elements";
+import { BAND_H, computeContextBoxes } from "@/lib/layout/layout";
 import { useESStore } from "@/lib/store/store";
 
 const BAND_LABEL: Record<Band, string> = {
@@ -35,11 +31,15 @@ const BAND_COLOR: Record<Band, string> = {
 export function BoardChrome() {
   const { x: vx, y: vy, zoom } = useViewport();
   const nodes = useESStore((s) => s.nodes);
+  const edges = useESStore((s) => s.edges);
   const contexts = useESStore((s) => s.contexts);
   const addNode = useESStore((s) => s.addNode);
+  const renameContext = useESStore((s) => s.renameContext);
+  const removeContext = useESStore((s) => s.removeContext);
   const setSelected = useESStore((s) => s.setSelected);
 
-  const extents = contextExtents(nodes);
+  const boxes = new Map(computeContextBoxes(nodes, edges, contexts).map((b) => [b.id, b]));
+  const nameOf = new Map(contexts.map((c) => [c.id, c.name]));
 
   const addEvent = (ctxId: string) => setSelected(addNode("domainEvent", ctxId));
 
@@ -68,23 +68,37 @@ export function BoardChrome() {
         .slice()
         .sort((a, b) => a.order - b.order)
         .map((c) => {
-          const ext = extents.get(c.id);
-          const left = (ext ? ext.x : 0) * zoom + vx;
-          const width = (ext ? ext.width : 180) * zoom;
+          const box = boxes.get(c.id);
+          const left = (box ? box.x : 0) * zoom + vx;
+          const width = (box ? box.width : 180) * zoom;
           return (
             <div
               key={c.id}
-              className="pointer-events-auto absolute top-2 flex items-center gap-2 rounded-md border border-dashed border-zinc-400 bg-white/85 px-2.5 py-1 shadow-sm backdrop-blur-sm"
-              style={{ left, minWidth: Math.max(width, 140) }}
+              className="pointer-events-auto absolute top-2 flex items-center gap-1.5 rounded-md border border-dashed border-zinc-400 bg-white/85 px-2 py-1 shadow-sm backdrop-blur-sm"
+              style={{ left, width: Math.max(width, 150) }}
             >
-              <span className="truncate text-xs font-bold text-zinc-700">{c.name}</span>
+              <input
+                className="min-w-0 flex-1 bg-transparent text-xs font-bold text-zinc-700 outline-none focus:bg-white/60"
+                value={nameOf.get(c.id) ?? c.name}
+                onChange={(e) => renameContext(c.id, e.target.value)}
+                aria-label="Context name"
+              />
               <button
                 type="button"
-                className="ml-auto flex items-center gap-1 rounded border border-zinc-300 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 hover:bg-zinc-100"
+                className="flex items-center gap-1 rounded border border-zinc-300 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 hover:bg-zinc-100"
                 onClick={() => addEvent(c.id)}
                 title="Add a Domain Event to this context"
               >
                 <Plus size={11} /> Event
+              </button>
+              <button
+                type="button"
+                className="flex items-center rounded p-0.5 text-zinc-400 hover:bg-red-50 hover:text-red-600"
+                onClick={() => removeContext(c.id)}
+                title="Remove context"
+                aria-label="Remove context"
+              >
+                <X size={13} />
               </button>
             </div>
           );

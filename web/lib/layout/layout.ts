@@ -3,15 +3,16 @@
 //   x = column(context, order) (timeline slot; a Domain Event's slice shares its column)
 // The user never sets positions — this is what keeps the board readable.
 
+import type { Context } from "@/lib/dsl/schema";
 import { bandIndex } from "@/lib/eventstorming/elements";
 import type { RelationType } from "@/lib/eventstorming/relations";
-import type { Context } from "@/lib/dsl/schema";
 import type { ESEdge, ESNode } from "@/lib/store/types";
 
 export const COL_W = 230;
 export const BAND_H = 132;
 export const STACK_H = 70;
-export const CTX_GAP_COLS = 0.35; // extra spacing between contexts, in columns
+export const CTX_GAP_COLS = 0.5; // extra spacing between contexts, in columns
+export const NODE_W = 190;
 
 interface Placement {
   col: number; // local column within the node's context
@@ -25,27 +26,16 @@ function targetsOf(edges: ESEdge[], source: string, rel: RelationType): string[]
   return edges.filter((e) => e.source === source && e.data?.relation === rel).map((e) => e.target);
 }
 
-export const NODE_W = 190;
-
-/** Flow-space horizontal extent of each bounded context, from laid-out nodes. */
-export function contextExtents(nodes: ESNode[]): Map<string, { x: number; width: number }> {
-  const acc = new Map<string, { min: number; max: number }>();
-  for (const n of nodes) {
-    const c = n.data.context;
-    if (!c) continue;
-    const e = acc.get(c) ?? { min: Infinity, max: -Infinity };
-    e.min = Math.min(e.min, n.position.x);
-    e.max = Math.max(e.max, n.position.x + NODE_W);
-    acc.set(c, e);
-  }
-  const out = new Map<string, { x: number; width: number }>();
-  for (const [c, e] of acc) out.set(c, { x: e.min, width: e.max - e.min });
-  return out;
+interface Placed {
+  place: Map<string, Placement>;
+  ctxIds: string[];
+  base: Map<string, number>; // context id → base column
+  width: Map<string, number>; // context id → column span
 }
 
-/** Compute a new node array with positions derived from the model. Pure and
- *  deterministic: the same (nodes, edges, contexts) always yields the same layout. */
-export function computeLayout(nodes: ESNode[], edges: ESEdge[], contexts: Context[]): ESNode[] {
+// Assign every node a (context, local column) and reserve an ordered column slot
+// per context — including empty contexts, so their headers never pile up.
+function computePlacement(nodes: ESNode[], edges: ESEdge[], contexts: Context[]): Placed {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const ctxOf = (id: string) => byId.get(id)?.data.context ?? "__none";
   const place = new Map<string, Placement>();
@@ -91,23 +81,32 @@ export function computeLayout(nodes: ESNode[], edges: ESEdge[], contexts: Contex
   // 4. anything still unplaced → column 0 of its context
   for (const n of nodes) if (!place.has(n.id)) set(n.id, ctxOf(n.id), 0);
 
-  // 5. context base column (contexts ordered; each as wide as its max local column)
+  // 5. ordered contexts (declared first, then any referenced-only) each reserve
+  //    a slot; an empty context still gets width 1.
   const ordered = [...contexts].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
   const ctxIds = ordered.map((c) => c.id);
   for (const p of place.values()) if (!ctxIds.includes(p.ctx)) ctxIds.push(p.ctx);
-  const widthOf = (ctx: string) => {
+
+  const width = new Map<string, number>();
+  for (const id of ctxIds) {
     let max = 0;
-    for (const p of place.values()) if (p.ctx === ctx) max = Math.max(max, p.col);
-    return max + 1;
-  };
+    for (const p of place.values()) if (p.ctx === id) max = Math.max(max, p.col);
+    width.set(id, max + 1);
+  }
   const base = new Map<string, number>();
   let acc = 0;
   for (const id of ctxIds) {
     base.set(id, acc);
-    acc += widthOf(id) + CTX_GAP_COLS;
+    acc += (width.get(id) ?? 1) + CTX_GAP_COLS;
   }
 
-  // 6. stack multiple nodes that land in the same (band, global column)
+  return { place, ctxIds, base, width };
+}
+
+/** Compute a new node array with positions derived from the model. Pure and
+ *  deterministic: the same (nodes, edges, contexts) always yields the same layout. */
+export function computeLayout(nodes: ESNode[], edges: ESEdge[], contexts: Context[]): ESNode[] {
+  const { place, base } = computePlacement(nodes, edges, contexts);
   const cellCount = new Map<string, number>();
   return nodes.map((n) => {
     const p = place.get(n.id)!;
@@ -121,4 +120,19 @@ export function computeLayout(nodes: ESNode[], edges: ESEdge[], contexts: Contex
       position: { x: Math.round(globalCol * COL_W), y: row * BAND_H + stack * STACK_H },
     };
   });
+}
+
+/** Flow-space horizontal box of each context (including empty ones), for the
+ *  context headers — reserved by order, never piled at the origin. */
+export function computeContextBoxes(
+  nodes: ESNode[],
+  edges: ESEdge[],
+  contexts: Context[],
+): Array<{ id: string; x: number; width: number }> {
+  const { ctxIds, base, width } = computePlacement(nodes, edges, contexts);
+  return ctxIds.map((id) => ({
+    id,
+    x: (base.get(id) ?? 0) * COL_W,
+    width: (width.get(id) ?? 1) * COL_W - (COL_W - NODE_W),
+  }));
 }

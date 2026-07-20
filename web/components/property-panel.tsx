@@ -23,6 +23,7 @@ const SLICE: Partial<Record<ElementType, SliceAction[]>> = {
   command: [
     { label: "+ Actor (issues)", type: "actor", dir: "from" },
     { label: "+ Aggregate (acts on)", type: "aggregate", dir: "to" },
+    { label: "+ External System (acts on)", type: "externalSystem", dir: "to" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
   ],
   policy: [

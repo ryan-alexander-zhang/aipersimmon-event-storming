@@ -29,6 +29,43 @@ const ICONS: Record<ElementType, LucideIcon> = {
   hotspot: Flame,
 };
 
+const HANDLE_STYLE = {
+  width: 7,
+  height: 7,
+  background: "#94a3b8",
+  border: "1px solid #fff",
+  opacity: 0.5,
+} as const;
+
+const HANDLES = [
+  { id: "s-top", type: "source", position: Position.Top },
+  { id: "t-top", type: "target", position: Position.Top },
+  { id: "s-bottom", type: "source", position: Position.Bottom },
+  { id: "t-bottom", type: "target", position: Position.Bottom },
+  { id: "s-left", type: "source", position: Position.Left },
+  { id: "t-left", type: "target", position: Position.Left },
+  { id: "s-right", type: "source", position: Position.Right },
+  { id: "t-right", type: "target", position: Position.Right },
+] as const;
+
+/** Pick the handle pair matching the relation's geometry: vertical slice chains
+ *  connect bottom↔top, timeline / cross-column relations connect left↔right. */
+export function routeHandles(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): { sourceHandle: string; targetHandle: string } {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  if (Math.abs(dy) >= Math.abs(dx)) {
+    return dy >= 0
+      ? { sourceHandle: "s-bottom", targetHandle: "t-top" }
+      : { sourceHandle: "s-top", targetHandle: "t-bottom" };
+  }
+  return dx >= 0
+    ? { sourceHandle: "s-right", targetHandle: "t-left" }
+    : { sourceHandle: "s-left", targetHandle: "t-right" };
+}
+
 export function ElementNode({ id, type, data, selected }: NodeProps<ESNode>) {
   const def = ELEMENT_DEFINITIONS[type];
   const Icon = ICONS[type];
@@ -54,10 +91,16 @@ export function ElementNode({ id, type, data, selected }: NodeProps<ESNode>) {
   return (
     <div
       data-testid="node-body"
-      className="relative min-w-[120px] max-w-[200px] rounded-md px-3 py-2 text-sm text-zinc-900 shadow-sm"
+      className={`relative rounded-md px-3 py-2 text-sm text-zinc-900 shadow-sm ${
+        type === "externalSystem" ? "min-w-[168px] max-w-[230px]" : "min-w-[120px] max-w-[200px]"
+      }`}
       style={{ background: def.color, outline: selected ? "2px solid #111827" : "none" }}
     >
-      <Handle type="target" position={Position.Left} />
+      {/* Anchor points on all four sides; edges pick the pair that matches the
+          slice direction (vertical chain top↔bottom, timeline left↔right). */}
+      {HANDLES.map(({ id, type, position }) => (
+        <Handle key={id} id={id} type={type} position={position} style={HANDLE_STYLE} />
+      ))}
       <div className="flex items-center gap-1.5">
         <Icon size={14} className="shrink-0 opacity-70" />
         <span className="text-[10px] font-semibold uppercase tracking-wide opacity-60">
@@ -84,7 +127,6 @@ export function ElementNode({ id, type, data, selected }: NodeProps<ESNode>) {
           {data.label}
         </div>
       )}
-      <Handle type="source" position={Position.Right} />
     </div>
   );
 }

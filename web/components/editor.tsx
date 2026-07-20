@@ -14,7 +14,7 @@ import {
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo } from "react";
 import { BoardChrome } from "@/components/board-chrome";
-import { ElementNode } from "@/components/nodes/element-node";
+import { ElementNode, routeHandles } from "@/components/nodes/element-node";
 import { PropertyPanel } from "@/components/property-panel";
 import { Toolbar } from "@/components/toolbar";
 import { ELEMENT_DEFINITIONS, ELEMENT_TYPES, type ElementType } from "@/lib/eventstorming/elements";
@@ -63,6 +63,17 @@ function Canvas() {
     return map;
   }, []);
 
+  // Attach handle anchors per edge from current node positions, so the vertical
+  // slice chain draws top↔bottom and timeline links left↔right.
+  const routedEdges = useMemo(() => {
+    const pos = new Map(nodes.map((n) => [n.id, n.position]));
+    return edges.map((e) => {
+      const a = pos.get(e.source);
+      const b = pos.get(e.target);
+      return a && b ? { ...e, ...routeHandles(a, b) } : e;
+    });
+  }, [nodes, edges]);
+
   const onConnect = useCallback((c: Connection) => void connect(c), [connect]);
 
   // Manual links stay possible for cross-context/ambiguous relations; the rule
@@ -83,7 +94,7 @@ function Canvas() {
         <div className="relative flex-1">
           <ReactFlow
             nodes={nodes}
-            edges={edges}
+            edges={routedEdges}
             nodeTypes={nodeTypes}
             defaultEdgeOptions={defaultEdgeOptions}
             nodesDraggable={false}

@@ -30,6 +30,9 @@ export interface ESState {
 
   /** Add a bounded context; returns its id. */
   addContext: (name: string) => string;
+  renameContext: (id: string, name: string) => void;
+  /** Remove a context along with its member nodes and their edges. */
+  removeContext: (id: string) => void;
   /** Add a node of `type` in `context`; Domain Events get the next timeline order. */
   addNode: (type: ElementType, context: string, data?: Partial<ESNodeData>) => string;
   updateNodeData: (id: string, patch: Partial<ESNodeData>) => void;
@@ -67,6 +70,17 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     const order = get().contexts.reduce((m, c) => Math.max(m, c.order), -1) + 1;
     set({ contexts: [...get().contexts, { id, name, order }] });
     return id;
+  },
+
+  renameContext: (id, name) =>
+    set({ contexts: get().contexts.map((c) => (c.id === id ? { ...c, name } : c)) }),
+
+  removeContext: (id) => {
+    const nodes = get().nodes.filter((n) => n.data.context !== id);
+    const keep = new Set(nodes.map((n) => n.id));
+    const edges = get().edges.filter((e) => keep.has(e.source) && keep.has(e.target));
+    const contexts = get().contexts.filter((c) => c.id !== id);
+    set({ nodes: laidOut(nodes, edges, contexts), edges, contexts, selectedId: null });
   },
 
   addNode: (type, context, data) => {
