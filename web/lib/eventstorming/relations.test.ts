@@ -12,6 +12,7 @@ const VALID: Array<[ElementType, string, ElementType]> = [
   ["externalSystem", "emits", "domainEvent"],
   ["domainEvent", "triggers", "policy"],
   ["policy", "invokes", "command"],
+  ["domainEvent", "updates", "readModel"],
   ["readModel", "informs", "actor"],
 ];
 

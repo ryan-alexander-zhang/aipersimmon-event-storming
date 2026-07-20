@@ -6,23 +6,28 @@ import { z } from "zod";
 import { ELEMENT_TYPES } from "@/lib/eventstorming/elements";
 import { RELATION_TYPES } from "@/lib/eventstorming/relations";
 
-export const DSL_VERSION = "1.0";
-
-export const positionSchema = z.object({
-  x: z.number(),
-  y: z.number(),
-});
+export const DSL_VERSION = "2.0";
 
 export const propertiesSchema = z.object({
   description: z.string().optional(),
   pivotal: z.boolean().optional(),
 });
 
+// A bounded context: a column group along the timeline.
+export const contextSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  order: z.number(),
+});
+
 export const nodeSchema = z.object({
   id: z.string().min(1),
   type: z.enum(ELEMENT_TYPES),
   label: z.string(),
-  position: positionSchema,
+  // bounded context membership (optional for global actors/systems)
+  context: z.string().optional(),
+  // timeline index within the context (Domain Events carry it)
+  order: z.number().optional(),
   properties: propertiesSchema.default({}),
 });
 
@@ -42,12 +47,13 @@ export const metaSchema = z.object({
 export const modelSchema = z.object({
   version: z.literal(DSL_VERSION),
   meta: metaSchema,
+  contexts: z.array(contextSchema).default([]),
   nodes: z.array(nodeSchema),
   edges: z.array(edgeSchema),
 });
 
-export type Position = z.infer<typeof positionSchema>;
 export type NodeProperties = z.infer<typeof propertiesSchema>;
+export type Context = z.infer<typeof contextSchema>;
 export type ModelNode = z.infer<typeof nodeSchema>;
 export type ModelEdge = z.infer<typeof edgeSchema>;
 export type Meta = z.infer<typeof metaSchema>;

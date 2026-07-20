@@ -4,15 +4,17 @@ import { DSL_VERSION, type Model, modelSchema } from "./schema";
 function validModel(): unknown {
   return {
     version: DSL_VERSION,
-    meta: { name: "Order flow", level: "process", createdAt: "2026-07-16T00:00:00Z" },
+    meta: { name: "Order flow", level: "process", createdAt: "2026-07-20T00:00:00Z" },
+    contexts: [{ id: "ord", name: "Ordering", order: 0 }],
     nodes: [
-      { id: "a1", type: "actor", label: "Customer", position: { x: 0, y: 0 }, properties: {} },
-      { id: "c1", type: "command", label: "Place Order", position: { x: 100, y: 0 }, properties: {} },
+      { id: "a1", type: "actor", label: "Customer", context: "ord", properties: {} },
+      { id: "c1", type: "command", label: "Place Order", context: "ord", properties: {} },
       {
         id: "e1",
         type: "domainEvent",
         label: "Order Placed",
-        position: { x: 200, y: 0 },
+        context: "ord",
+        order: 0,
         properties: { pivotal: true, description: "the order exists" },
       },
     ],
@@ -20,17 +22,24 @@ function validModel(): unknown {
   };
 }
 
-describe("DSL model schema", () => {
+describe("DSL model schema (v2)", () => {
   it("accepts a valid model", () => {
-    const result = modelSchema.safeParse(validModel());
-    expect(result.success).toBe(true);
+    expect(modelSchema.safeParse(validModel()).success).toBe(true);
   });
 
-  it("defaults missing node properties to an empty object", () => {
-    const model = validModel() as { nodes: Array<Record<string, unknown>> };
+  it("defaults missing node properties and contexts", () => {
+    const model = validModel() as { nodes: Array<Record<string, unknown>>; contexts?: unknown };
     delete model.nodes[0].properties;
+    delete model.contexts;
     const parsed = modelSchema.parse(model) as Model;
     expect(parsed.nodes[0].properties).toEqual({});
+    expect(parsed.contexts).toEqual([]);
+  });
+
+  it("accepts the new updates relation", () => {
+    const model = validModel() as { edges: Array<Record<string, unknown>> };
+    model.edges.push({ id: "r2", source: "e1", target: "rm1", relation: "updates" });
+    expect(modelSchema.safeParse(model).success).toBe(true);
   });
 
   it("rejects an unknown element type", () => {

@@ -31,3 +31,30 @@ export const ELEMENT_DEFINITIONS: Record<ElementType, ElementDefinition> = {
   externalSystem: { type: "externalSystem", label: "External System", color: "#F48FB1" },
   hotspot: { type: "hotspot", label: "Hotspot", color: "#FF4081" },
 };
+
+// Fixed row-bands, top→bottom. Actors and External Systems share the top band.
+export const BAND_ORDER = [
+  "actorSystem",
+  "command",
+  "aggregate",
+  "domainEvent",
+  "policy",
+  "readModel",
+  "hotspot",
+] as const;
+
+export type Band = (typeof BAND_ORDER)[number];
+
+export const ELEMENT_BAND: Record<ElementType, Band> = {
+  actor: "actorSystem",
+  externalSystem: "actorSystem",
+  command: "command",
+  aggregate: "aggregate",
+  domainEvent: "domainEvent",
+  policy: "policy",
+  readModel: "readModel",
+  hotspot: "hotspot",
+};
+
+export const bandIndex = (type: ElementType): number =>
+  BAND_ORDER.indexOf(ELEMENT_BAND[type]);

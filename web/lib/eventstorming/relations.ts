@@ -10,6 +10,7 @@ export const RELATION_TYPES = [
   "emits",
   "triggers",
   "invokes",
+  "updates",
   "informs",
   "annotates",
 ] as const;
@@ -28,6 +29,7 @@ export const CONNECTION_RULES: ConnectionRule[] = [
   { relation: "emits", sources: ["aggregate", "externalSystem"], targets: ["domainEvent"] },
   { relation: "triggers", sources: ["domainEvent"], targets: ["policy"] },
   { relation: "invokes", sources: ["policy"], targets: ["command"] },
+  { relation: "updates", sources: ["domainEvent"], targets: ["readModel"] },
   { relation: "informs", sources: ["readModel"], targets: ["actor"] },
   { relation: "annotates", sources: ["hotspot"], targets: [...ELEMENT_TYPES] },
 ];

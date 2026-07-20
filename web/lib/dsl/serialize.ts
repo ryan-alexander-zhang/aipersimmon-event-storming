@@ -1,25 +1,34 @@
-// Serialize between the React Flow canvas (nodes + edges) and the DSL Model.
-// Export validates with the schema (parse); import validates untrusted JSON
-// (safeParse) before it can touch the app state.
+// Serialize between the runtime canvas (React Flow nodes + edges + contexts) and
+// the DSL Model. Positions are runtime-only (computed by the layout engine) and
+// never stored. Export validates with the schema (parse); import migrates older
+// documents then validates untrusted JSON (safeParse).
 
 import type { ESEdge, ESNode } from "@/lib/store/types";
-import { DSL_VERSION, type Model, modelSchema } from "./schema";
+import { migrateToLatest } from "./migrate";
+import { type Context, DSL_VERSION, type Model, modelSchema } from "./schema";
 
 export interface ModelMeta {
   name: string;
   createdAt: string;
 }
 
-/** Canvas → DSL. Throws (via schema.parse) if the canvas is somehow invalid. */
-export function toModel(nodes: ESNode[], edges: ESEdge[], meta: ModelMeta): Model {
+/** Canvas → DSL. Throws (via schema.parse) if the model is somehow invalid. */
+export function toModel(
+  nodes: ESNode[],
+  edges: ESEdge[],
+  contexts: Context[],
+  meta: ModelMeta,
+): Model {
   const draft = {
     version: DSL_VERSION,
     meta: { name: meta.name, level: "process", createdAt: meta.createdAt },
+    contexts,
     nodes: nodes.map((n) => ({
       id: n.id,
       type: n.type,
       label: n.data.label,
-      position: { x: n.position.x, y: n.position.y },
+      ...(n.data.context !== undefined ? { context: n.data.context } : {}),
+      ...(n.data.order !== undefined ? { order: n.data.order } : {}),
       properties: {
         ...(n.data.description !== undefined ? { description: n.data.description } : {}),
         ...(n.data.pivotal !== undefined ? { pivotal: n.data.pivotal } : {}),
@@ -35,15 +44,22 @@ export function toModel(nodes: ESNode[], edges: ESEdge[], meta: ModelMeta): Mode
   return modelSchema.parse(draft);
 }
 
-/** DSL → canvas. */
-export function fromModel(model: Model): { nodes: ESNode[]; edges: ESEdge[] } {
+/** DSL → canvas. Positions are placeholders; the layout engine computes them. */
+export function fromModel(model: Model): {
+  nodes: ESNode[];
+  edges: ESEdge[];
+  contexts: Context[];
+} {
   return {
+    contexts: model.contexts,
     nodes: model.nodes.map((n) => ({
       id: n.id,
       type: n.type,
-      position: { x: n.position.x, y: n.position.y },
+      position: { x: 0, y: 0 },
       data: {
         label: n.label,
+        ...(n.context !== undefined ? { context: n.context } : {}),
+        ...(n.order !== undefined ? { order: n.order } : {}),
         ...(n.properties.description !== undefined
           ? { description: n.properties.description }
           : {}),
@@ -60,15 +76,18 @@ export function fromModel(model: Model): { nodes: ESNode[]; edges: ESEdge[] } {
   };
 }
 
-export function exportJSON(nodes: ESNode[], edges: ESEdge[], meta: ModelMeta): string {
-  return JSON.stringify(toModel(nodes, edges, meta), null, 2);
+export function exportJSON(
+  nodes: ESNode[],
+  edges: ESEdge[],
+  contexts: Context[],
+  meta: ModelMeta,
+): string {
+  return JSON.stringify(toModel(nodes, edges, contexts, meta), null, 2);
 }
 
-export type ImportResult =
-  | { ok: true; model: Model }
-  | { ok: false; error: string };
+export type ImportResult = { ok: true; model: Model } | { ok: false; error: string };
 
-/** Parse and validate untrusted JSON into a Model, or return a readable error. */
+/** Migrate + validate untrusted JSON into a Model, or return a readable error. */
 export function importJSON(json: string): ImportResult {
   let raw: unknown;
   try {
@@ -76,7 +95,7 @@ export function importJSON(json: string): ImportResult {
   } catch {
     return { ok: false, error: "The file is not valid JSON." };
   }
-  const result = modelSchema.safeParse(raw);
+  const result = modelSchema.safeParse(migrateToLatest(raw));
   if (!result.success) {
     const first = result.error.issues[0];
     const path = first?.path.join(".") || "(root)";

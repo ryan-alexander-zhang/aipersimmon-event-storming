@@ -10,6 +10,9 @@ export type ESNodeData = {
   label: string;
   description?: string;
   pivotal?: boolean;
+  // bounded context membership; timeline index (Domain Events carry order).
+  context?: string;
+  order?: number;
 };
 
 export type ESNode = Node<ESNodeData, ElementType>;
