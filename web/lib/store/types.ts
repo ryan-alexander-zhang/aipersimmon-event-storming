@@ -22,8 +22,9 @@ export type ESEdgeData = {
   // View-only focus state injected at render time (never serialized):
   //   "none" = no focus active · "on" = in the focused set · "off" = dimmed.
   focusState?: "none" | "on" | "off";
-  // View-only bezier curvature for parallel-edge separation (never serialized).
-  curvature?: number;
+  // View-only center offset (px) for parallel-edge separation of the orthogonal
+  // path; siblings in one corridor bump apart. Never serialized.
+  pathOffset?: number;
 };
 
 export type ESEdge = Edge<ESEdgeData>;

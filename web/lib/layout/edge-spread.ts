@@ -1,14 +1,13 @@
 // Parallel-edge separation. When several edges leave the same handle (a fan-out,
 // e.g. one Domain Event `updates` two Read Models) or arrive at the same handle
-// (a convergence, e.g. two Read Models `inform` one Actor), their bezier paths
-// overlap. Giving each sibling a distinct curvature bows them apart so they no
-// longer render on top of each other (design-00003 §3 Tier A). Pure — returns a
-// per-edge curvature only for edges that share a corridor.
+// (a convergence, e.g. two Read Models `inform` one Actor), their orthogonal
+// paths overlap. Giving each sibling a symmetric center offset (px) bumps them
+// apart so they no longer render on top of each other (design-00003 §3 Tier B).
+// Pure — returns a per-edge offset only for edges that share a corridor.
 
 import type { ESEdge } from "@/lib/store/types";
 
-const BASE = 0.15;
-const STEP = 0.28;
+const GAP = 26; // px between sibling paths
 
 const key = (node: string | undefined, handle: string | null | undefined) =>
   `${node ?? ""}|${handle ?? ""}`;
@@ -24,15 +23,16 @@ function group(edges: ESEdge[], keyOf: (e: ESEdge) => string): Map<string, ESEdg
   return m;
 }
 
-/** edgeId → curvature, only for edges that share a source or target handle with
- *  a sibling. Deterministic: siblings are ordered by id so the spread is stable. */
-export function computeEdgeCurvature(edges: ESEdge[]): Map<string, number> {
+/** edgeId → center offset (px), only for edges that share a source or target
+ *  handle with a sibling. Offsets are symmetric around 0 so the group fans out
+ *  both ways; deterministic (siblings ordered by id). */
+export function computeEdgeOffsets(edges: ESEdge[]): Map<string, number> {
   const out = new Map<string, number>();
   const assign = (siblings: ESEdge[]) => {
     if (siblings.length < 2) return;
-    [...siblings]
-      .sort((a, b) => a.id.localeCompare(b.id))
-      .forEach((e, i) => out.set(e.id, BASE + i * STEP));
+    const sorted = [...siblings].sort((a, b) => a.id.localeCompare(b.id));
+    const mid = (sorted.length - 1) / 2;
+    sorted.forEach((e, i) => out.set(e.id, Math.round((i - mid) * GAP)));
   };
   // Fan-out first (share source handle), then convergence (share target handle)
   // for edges not already spread.

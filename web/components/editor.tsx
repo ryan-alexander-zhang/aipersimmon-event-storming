@@ -22,7 +22,7 @@ import { RELATION_STYLE } from "@/lib/eventstorming/edge-style";
 import { ELEMENT_DEFINITIONS, ELEMENT_TYPES, type ElementType } from "@/lib/eventstorming/elements";
 import { isVisibleAt } from "@/lib/eventstorming/levels";
 import { isValidConnection as canConnect } from "@/lib/eventstorming/relations";
-import { computeEdgeCurvature } from "@/lib/layout/edge-spread";
+import { computeEdgeOffsets } from "@/lib/layout/edge-spread";
 import { computeFocus, focusSource } from "@/lib/store/focus";
 import { loadModel, saveModel } from "@/lib/store/persistence";
 import { useESStore } from "@/lib/store/store";
@@ -116,8 +116,8 @@ function Canvas() {
     return routedEdges.filter((e) => ids.has(e.source) && ids.has(e.target));
   }, [routedEdges, visibleNodes]);
 
-  // Curvature per edge so siblings sharing a corridor bow apart instead of overlapping.
-  const curvature = useMemo(() => computeEdgeCurvature(visibleEdges), [visibleEdges]);
+  // Center offset per edge so siblings sharing a corridor bump apart instead of overlapping.
+  const offsets = useMemo(() => computeEdgeOffsets(visibleEdges), [visibleEdges]);
 
   // Colour/weight each edge by relation, colour its arrow to match, spread
   // parallel edges, and tag its focus state so the custom edge dims off-focus
@@ -133,13 +133,13 @@ function Canvas() {
           // Focused edges flow (marching-ants); reduced-motion falls back to
           // the thicker static line via a CSS override in globals.css.
           animated: focusState === "on",
-          data: e.data ? { ...e.data, focusState, curvature: curvature.get(e.id) } : e.data,
+          data: e.data ? { ...e.data, focusState, pathOffset: offsets.get(e.id) } : e.data,
           markerEnd: relation
             ? { type: MarkerType.ArrowClosed, color: RELATION_STYLE[relation].color }
             : e.markerEnd,
         };
       }),
-    [visibleEdges, focus, curvature],
+    [visibleEdges, focus, offsets],
   );
 
   const onConnect = useCallback((c: Connection) => void connect(c), [connect]);

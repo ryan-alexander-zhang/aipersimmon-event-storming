@@ -4,17 +4,20 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   type EdgeProps,
-  getBezierPath,
+  getSmoothStepPath,
+  Position,
 } from "@xyflow/react";
 import { RELATION_STYLE } from "@/lib/eventstorming/edge-style";
 import type { ESEdge } from "@/lib/store/types";
 
 const DIM_OPACITY = 0.12;
 const FOCUS_WIDTH_BOOST = 1.5;
+const CORNER_RADIUS = 8;
 
-/** Semantic edge: coloured/weighted by relation type, dimmed when a focus set is
- *  active and this edge is outside it, and labelled only when it is in the
- *  focused set — so the un-focused board stays label-free (design-00003 Tier A). */
+/** Semantic edge: an orthogonal (right-angle, rounded-corner) connector coloured
+ *  and weighted by relation type, dimmed when a focus set is active and this edge
+ *  is outside it, and labelled only when it is in the focused set — so the
+ *  un-focused board stays label-free (design-00003 Tier A/B). */
 export function RelationEdge({
   id,
   sourceX,
@@ -26,14 +29,25 @@ export function RelationEdge({
   data,
   markerEnd,
 }: EdgeProps<ESEdge>) {
-  const [path, labelX, labelY] = getBezierPath({
+  // Siblings sharing a corridor get a small center offset so their orthogonal
+  // paths bump apart instead of overlapping (parallel-edge separation).
+  const offset = data?.pathOffset ?? 0;
+  const vertical = sourcePosition === Position.Top || sourcePosition === Position.Bottom;
+  const center =
+    offset === 0
+      ? {}
+      : vertical
+        ? { centerX: (sourceX + targetX) / 2 + offset }
+        : { centerY: (sourceY + targetY) / 2 + offset };
+  const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
     targetX,
     targetY,
     sourcePosition,
     targetPosition,
-    ...(data?.curvature !== undefined ? { curvature: data.curvature } : {}),
+    borderRadius: CORNER_RADIUS,
+    ...center,
   });
 
   const relation = data?.relation;
