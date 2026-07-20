@@ -251,12 +251,18 @@ test("hovering an edge isolates it and dims the rest [design-00003]", async ({ p
   await page.getByRole("button", { name: "Design" }).click(); // show every edge
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
   const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
+  const nodeOpacity = (id: string) =>
+    page.locator(`.react-flow__node[data-id="${id}"]`).evaluate((el) => getComputedStyle(el).opacity);
   await edge("r1").hover({ force: true }); // the "issues" edge a1→c1
   await expect(edge("r1")).toHaveClass(/animated/); // hovered edge flows/emphasised
   await expect(edge("r3").locator(".react-flow__edge-path")).toHaveCSS("opacity", "0.12"); // another edge dims
+  // its two endpoints (a1, c1) stay bright; an unrelated node (e1) dims
+  expect(await nodeOpacity("a1")).toBe("1");
+  expect(Number(await nodeOpacity("e1"))).toBeLessThan(1);
   // leaving restores the board
   await page.mouse.move(5, 5);
   await expect(edge("r1")).not.toHaveClass(/animated/);
+  expect(await nodeOpacity("e1")).toBe("1");
 });
 
 test("New clears the model and does not restore it on reload", async ({ page }) => {

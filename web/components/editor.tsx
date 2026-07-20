@@ -127,18 +127,23 @@ function Canvas() {
   // the irrelevant nodes, so everything left stays full opacity.
   const dimActive = focus.active && !isoNodeIds;
 
-  const decoratedNodes = useMemo(
-    () =>
-      visibleNodes.map((n) =>
-        !dimActive
-          ? n
-          : {
-              ...n,
-              style: { ...n.style, opacity: focus.nodeIds.has(n.id) ? 1 : NODE_DIM_OPACITY },
-            },
-      ),
-    [visibleNodes, dimActive, focus],
-  );
+  // Hovering an edge dims every node except that edge's two endpoints, so a
+  // single connection reads as just "source → target". Otherwise the focus
+  // neighbourhood is the bright set.
+  const hoveredEndpoints = useMemo(() => {
+    if (!hoveredEdgeId) return null;
+    const e = edges.find((x) => x.id === hoveredEdgeId);
+    return e ? new Set([e.source, e.target]) : null;
+  }, [hoveredEdgeId, edges]);
+
+  const decoratedNodes = useMemo(() => {
+    const bright = hoveredEndpoints ?? (dimActive ? focus.nodeIds : null);
+    if (!bright) return visibleNodes;
+    return visibleNodes.map((n) => ({
+      ...n,
+      style: { ...n.style, opacity: bright.has(n.id) ? 1 : NODE_DIM_OPACITY },
+    }));
+  }, [visibleNodes, hoveredEndpoints, dimActive, focus]);
   const visibleEdges = useMemo(() => {
     const ids = new Set(visibleNodes.map((n) => n.id));
     return routedEdges.filter((e) => ids.has(e.source) && ids.has(e.target));

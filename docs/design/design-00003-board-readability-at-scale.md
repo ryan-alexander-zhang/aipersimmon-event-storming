@@ -65,9 +65,10 @@ change); Tier B changes edge geometry; Tier C is structural.
 - **Edge-hover isolation.** When many edges are highlighted at once (a node with
   several incident edges), an individual connection is still hard to trace.
   Hovering a single edge emphasises just it — thicker, a soft glow, brought to
-  front, its label shown — and dims every other edge, so one edge and its
-  direction read unambiguously. The node-focus baseline (flow + all incident
-  labels) is unchanged; hover only isolates on demand.
+  front, its label shown — dims every other edge, **and dims every node except
+  the edge's two endpoints**, so the connection reads as just "source → target".
+  The node-focus baseline (flow + all incident labels) is unchanged; hover only
+  isolates on demand.
 - **On-demand edge labels.** Hide relation labels by default; show a label only
   when its edge is in the focused set (or on edge hover). Removes label
   collisions directly. The relation is still carried on every edge (`edge.data.relation`).
