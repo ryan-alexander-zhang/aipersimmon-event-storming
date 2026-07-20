@@ -2,13 +2,16 @@
 
 import { Download, FolderPlus, Upload } from "lucide-react";
 import { type ChangeEvent, useRef, useState } from "react";
-import { fromModel, exportJSON, importJSON } from "@/lib/dsl/serialize";
+import { exportJSON, fromModel, importJSON } from "@/lib/dsl/serialize";
+import { LEVEL_LABEL, LEVELS } from "@/lib/eventstorming/levels";
 import { useESStore } from "@/lib/store/store";
 
 export function Toolbar() {
   const nodes = useESStore((s) => s.nodes);
   const edges = useESStore((s) => s.edges);
   const contexts = useESStore((s) => s.contexts);
+  const level = useESStore((s) => s.level);
+  const setLevel = useESStore((s) => s.setLevel);
   const setModel = useESStore((s) => s.setModel);
   const addContext = useESStore((s) => s.addContext);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -18,6 +21,7 @@ export function Toolbar() {
     const json = exportJSON(nodes, edges, contexts, {
       name: "Event Storming",
       createdAt: new Date().toISOString(),
+      level,
     });
     const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
     const a = document.createElement("a");
@@ -54,6 +58,21 @@ export function Toolbar() {
   return (
     <header className="flex items-center gap-2 border-b border-zinc-200 bg-white px-3 py-2">
       <span className="text-sm font-semibold text-zinc-800">Event Storming</span>
+      <div className="ml-3 flex items-center rounded-md border border-zinc-300 p-0.5" role="group" aria-label="Level">
+        {LEVELS.map((lv) => (
+          <button
+            key={lv}
+            type="button"
+            className={`rounded px-2 py-0.5 text-xs font-medium ${
+              level === lv ? "bg-zinc-800 text-white" : "text-zinc-600 hover:bg-zinc-100"
+            }`}
+            aria-pressed={level === lv}
+            onClick={() => setLevel(lv)}
+          >
+            {LEVEL_LABEL[lv]}
+          </button>
+        ))}
+      </div>
       <div className="ml-auto flex items-center gap-2">
         {error && (
           <span

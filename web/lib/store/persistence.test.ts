@@ -18,10 +18,11 @@ const edges: ESEdge[] = [];
 describe("persistence v2 (T10/RT7)", () => {
   beforeEach(() => clearSaved());
 
-  it("saves and restores the model incl. contexts [us-00005-FR-1]", () => {
-    saveModel(nodes, edges, contexts);
+  it("saves and restores the model incl. contexts + level [us-00005-FR-1]", () => {
+    saveModel(nodes, edges, contexts, "process");
     const loaded = loadModel();
     expect(loaded?.contexts).toEqual(contexts);
+    expect(loaded?.level).toBe("process");
     expect(loaded?.nodes.map((n) => n.data)).toEqual(nodes.map((n) => n.data));
   });
 
@@ -44,7 +45,7 @@ describe("persistence v2 (T10/RT7)", () => {
     // @ts-expect-error simulate a non-browser environment
     delete globalThis.window;
     try {
-      expect(() => saveModel(nodes, edges, contexts)).not.toThrow();
+      expect(() => saveModel(nodes, edges, contexts, "design")).not.toThrow();
       expect(loadModel()).toBeNull();
       expect(() => clearSaved()).not.toThrow();
     } finally {

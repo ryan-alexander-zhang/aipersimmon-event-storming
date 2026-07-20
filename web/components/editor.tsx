@@ -18,6 +18,7 @@ import { ElementNode, routeHandles } from "@/components/nodes/element-node";
 import { PropertyPanel } from "@/components/property-panel";
 import { Toolbar } from "@/components/toolbar";
 import { ELEMENT_DEFINITIONS, ELEMENT_TYPES, type ElementType } from "@/lib/eventstorming/elements";
+import { isVisibleAt } from "@/lib/eventstorming/levels";
 import { isValidConnection as canConnect } from "@/lib/eventstorming/relations";
 import { loadModel, saveModel } from "@/lib/store/persistence";
 import { useESStore } from "@/lib/store/store";
@@ -38,7 +39,7 @@ function useAutosave() {
     let timer: ReturnType<typeof setTimeout>;
     const unsubscribe = useESStore.subscribe((s) => {
       clearTimeout(timer);
-      timer = setTimeout(() => saveModel(s.nodes, s.edges, s.contexts), 400);
+      timer = setTimeout(() => saveModel(s.nodes, s.edges, s.contexts, s.level), 400);
     });
     return () => {
       clearTimeout(timer);
@@ -54,6 +55,7 @@ function Canvas() {
   const onEdgesChange = useESStore((s) => s.onEdgesChange);
   const connect = useESStore((s) => s.connect);
   const setSelected = useESStore((s) => s.setSelected);
+  const level = useESStore((s) => s.level);
 
   useAutosave();
 
@@ -74,6 +76,14 @@ function Canvas() {
     });
   }, [nodes, edges]);
 
+  // The level is a view filter: hide element types (and edges touching them)
+  // that don't belong at the current level. The model keeps everything.
+  const visibleNodes = useMemo(() => nodes.filter((n) => isVisibleAt(level, n.type)), [nodes, level]);
+  const visibleEdges = useMemo(() => {
+    const ids = new Set(visibleNodes.map((n) => n.id));
+    return routedEdges.filter((e) => ids.has(e.source) && ids.has(e.target));
+  }, [routedEdges, visibleNodes]);
+
   const onConnect = useCallback((c: Connection) => void connect(c), [connect]);
 
   // Manual links stay possible for cross-context/ambiguous relations; the rule
@@ -93,8 +103,8 @@ function Canvas() {
       <div className="flex min-h-0 flex-1">
         <div className="relative flex-1">
           <ReactFlow
-            nodes={nodes}
-            edges={routedEdges}
+            nodes={visibleNodes}
+            edges={visibleEdges}
             nodeTypes={nodeTypes}
             defaultEdgeOptions={defaultEdgeOptions}
             nodesDraggable={false}

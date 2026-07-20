@@ -4,6 +4,7 @@
 
 import { z } from "zod";
 import { ELEMENT_TYPES } from "@/lib/eventstorming/elements";
+import { LEVELS } from "@/lib/eventstorming/levels";
 import { RELATION_TYPES } from "@/lib/eventstorming/relations";
 
 export const DSL_VERSION = "2.0";
@@ -40,7 +41,7 @@ export const edgeSchema = z.object({
 
 export const metaSchema = z.object({
   name: z.string(),
-  level: z.literal("process"),
+  level: z.enum(LEVELS).default("design"),
   createdAt: z.string(),
 });
 

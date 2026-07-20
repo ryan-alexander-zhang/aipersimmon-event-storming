@@ -3,7 +3,7 @@ import type { Context } from "@/lib/dsl/schema";
 import type { ESEdge, ESNode } from "@/lib/store/types";
 import { exportJSON, fromModel, importJSON, toModel } from "./serialize";
 
-const META = { name: "Order flow", createdAt: "2026-07-20T00:00:00Z" };
+const META = { name: "Order flow", createdAt: "2026-07-20T00:00:00Z", level: "design" as const };
 const CONTEXTS: Context[] = [{ id: "ord", name: "Ordering", order: 0 }];
 
 function sampleCanvas(): { nodes: ESNode[]; edges: ESEdge[] } {
@@ -40,11 +40,12 @@ describe("serialize v2 (T2/RT1)", () => {
     expect(back.nodes.every((n) => n.position.x === 0 && n.position.y === 0)).toBe(true);
   });
 
-  it("export omits position and includes contexts + order [us-00004]", () => {
+  it("export omits position and includes contexts + order + level [us-00004]", () => {
     const { nodes, edges } = sampleCanvas();
     const out = JSON.parse(exportJSON(nodes, edges, CONTEXTS, META));
     expect(out.version).toBe("2.0");
     expect(out.contexts).toEqual(CONTEXTS);
+    expect(out.meta.level).toBe("design");
     expect(out.nodes[0].position).toBeUndefined();
     expect(out.nodes[2].order).toBe(0);
   });

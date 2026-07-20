@@ -15,6 +15,7 @@ import { create } from "zustand";
 import { createStore, type StateCreator } from "zustand/vanilla";
 import type { Context } from "@/lib/dsl/schema";
 import { ELEMENT_DEFINITIONS, type ElementType } from "@/lib/eventstorming/elements";
+import type { Level } from "@/lib/eventstorming/levels";
 import { resolveRelation } from "@/lib/eventstorming/relations";
 import { computeLayout } from "@/lib/layout/layout";
 import type { ESEdge, ESNode, ESNodeData } from "./types";
@@ -23,7 +24,10 @@ export interface ESState {
   nodes: ESNode[];
   edges: ESEdge[];
   contexts: Context[];
+  level: Level;
   selectedId: string | null;
+
+  setLevel: (level: Level) => void;
 
   onNodesChange: (changes: NodeChange<ESNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<ESEdge>[]) => void;
@@ -47,7 +51,12 @@ export interface ESState {
   reassignContext: (nodeId: string, context: string) => void;
 
   setSelected: (id: string | null) => void;
-  setModel: (model: { nodes: ESNode[]; edges: ESEdge[]; contexts: Context[] }) => void;
+  setModel: (model: {
+    nodes: ESNode[];
+    edges: ESEdge[];
+    contexts: Context[];
+    level?: Level;
+  }) => void;
   clear: () => void;
 }
 
@@ -60,7 +69,10 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   nodes: [],
   edges: [],
   contexts: [],
+  level: "design",
   selectedId: null,
+
+  setLevel: (level) => set({ level }),
 
   onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) }),
   onEdgesChange: (changes) => set({ edges: applyEdgeChanges(changes, get().edges) }),
@@ -141,8 +153,14 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   reassignContext: (nodeId, context) => get().updateNodeData(nodeId, { context }),
 
   setSelected: (id) => set({ selectedId: id }),
-  setModel: ({ nodes, edges, contexts }) =>
-    set({ nodes: laidOut(nodes, edges, contexts), edges, contexts, selectedId: null }),
+  setModel: ({ nodes, edges, contexts, level }) =>
+    set({
+      nodes: laidOut(nodes, edges, contexts),
+      edges,
+      contexts,
+      level: level ?? get().level,
+      selectedId: null,
+    }),
   clear: () => set({ nodes: [], edges: [], contexts: [], selectedId: null }),
 });
 

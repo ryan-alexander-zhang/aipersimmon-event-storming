@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "meta": { "name": "Order Lifecycle (demo)", "level": "process", "createdAt": "2026-07-20T00:00:00.000Z" },
+  "meta": { "name": "Order Lifecycle (demo)", "level": "design", "createdAt": "2026-07-20T00:00:00.000Z" },
   "contexts": [
     { "id": "ord", "name": "Ordering", "order": 0 },
     { "id": "pay", "name": "Payment", "order": 1 },

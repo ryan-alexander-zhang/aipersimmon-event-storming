@@ -3,6 +3,7 @@
 // never stored. Export validates with the schema (parse); import migrates older
 // documents then validates untrusted JSON (safeParse).
 
+import type { Level } from "@/lib/eventstorming/levels";
 import type { ESEdge, ESNode } from "@/lib/store/types";
 import { migrateToLatest } from "./migrate";
 import { type Context, DSL_VERSION, type Model, modelSchema } from "./schema";
@@ -10,6 +11,7 @@ import { type Context, DSL_VERSION, type Model, modelSchema } from "./schema";
 export interface ModelMeta {
   name: string;
   createdAt: string;
+  level: Level;
 }
 
 /** Canvas → DSL. Throws (via schema.parse) if the model is somehow invalid. */
@@ -21,7 +23,7 @@ export function toModel(
 ): Model {
   const draft = {
     version: DSL_VERSION,
-    meta: { name: meta.name, level: "process", createdAt: meta.createdAt },
+    meta: { name: meta.name, level: meta.level, createdAt: meta.createdAt },
     contexts,
     nodes: nodes.map((n) => ({
       id: n.id,
@@ -49,9 +51,11 @@ export function fromModel(model: Model): {
   nodes: ESNode[];
   edges: ESEdge[];
   contexts: Context[];
+  level: Level;
 } {
   return {
     contexts: model.contexts,
+    level: model.meta.level,
     nodes: model.nodes.map((n) => ({
       id: n.id,
       type: n.type,

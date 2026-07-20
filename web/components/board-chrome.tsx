@@ -2,7 +2,13 @@
 
 import { useViewport } from "@xyflow/react";
 import { Plus, X } from "lucide-react";
-import { BAND_ORDER, type Band, ELEMENT_DEFINITIONS } from "@/lib/eventstorming/elements";
+import {
+  BAND_ORDER,
+  type Band,
+  ELEMENT_BAND,
+  ELEMENT_DEFINITIONS,
+} from "@/lib/eventstorming/elements";
+import { LEVEL_TYPES } from "@/lib/eventstorming/levels";
 import { BAND_H, computeContextBoxes } from "@/lib/layout/layout";
 import { useESStore } from "@/lib/store/store";
 
@@ -33,10 +39,13 @@ export function BoardChrome() {
   const nodes = useESStore((s) => s.nodes);
   const edges = useESStore((s) => s.edges);
   const contexts = useESStore((s) => s.contexts);
+  const level = useESStore((s) => s.level);
   const addNode = useESStore((s) => s.addNode);
   const renameContext = useESStore((s) => s.renameContext);
   const removeContext = useESStore((s) => s.removeContext);
   const setSelected = useESStore((s) => s.setSelected);
+
+  const visibleBands = new Set(LEVEL_TYPES[level].map((t) => ELEMENT_BAND[t]));
 
   const boxes = new Map(computeContextBoxes(nodes, edges, contexts).map((b) => [b.id, b]));
   const nameOf = new Map(contexts.map((c) => [c.id, c.name]));
@@ -47,6 +56,7 @@ export function BoardChrome() {
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       {/* band rail — left edge, vertical position tracks the viewport */}
       {BAND_ORDER.map((band, i) => {
+        if (!visibleBands.has(band)) return null;
         const top = i * BAND_H * zoom + vy;
         return (
           <div

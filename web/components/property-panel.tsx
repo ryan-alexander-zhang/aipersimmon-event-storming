@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { ELEMENT_DEFINITIONS, type ElementType } from "@/lib/eventstorming/elements";
+import { isVisibleAt } from "@/lib/eventstorming/levels";
 import { useESStore } from "@/lib/store/store";
 
 // Contextual slice actions per selected element type. `dir` says whether the new
@@ -48,6 +49,7 @@ export function PropertyPanel() {
   const selectedId = useESStore((s) => s.selectedId);
   const node = useESStore((s) => s.nodes.find((n) => n.id === s.selectedId) ?? null);
   const nodes = useESStore((s) => s.nodes);
+  const level = useESStore((s) => s.level);
   const contexts = useESStore((s) => s.contexts);
   const addNode = useESStore((s) => s.addNode);
   const connect = useESStore((s) => s.connect);
@@ -95,7 +97,7 @@ export function PropertyPanel() {
     reorderEvent(swap.id, a);
   };
 
-  const actions = SLICE[node.type] ?? [];
+  const actions = (SLICE[node.type] ?? []).filter((a) => isVisibleAt(level, a.type));
 
   return (
     <aside className={wrap} key={selectedId}>
