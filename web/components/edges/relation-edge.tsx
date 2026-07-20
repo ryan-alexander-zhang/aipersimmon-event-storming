@@ -8,6 +8,7 @@ import {
   Position,
 } from "@xyflow/react";
 import { RELATION_STYLE } from "@/lib/eventstorming/edge-style";
+import { offsetOrthogonalPath } from "@/lib/layout/edge-path";
 import type { ESEdge } from "@/lib/store/types";
 
 const DIM_OPACITY = 0.12;
@@ -29,26 +30,23 @@ export function RelationEdge({
   data,
   markerEnd,
 }: EdgeProps<ESEdge>) {
-  // Siblings sharing a corridor get a small center offset so their orthogonal
-  // paths bump apart instead of overlapping (parallel-edge separation).
+  // Edges sharing a corridor get a small center offset so they bump apart. A
+  // straight/aligned smoothstep ignores a center offset, so offset edges use a
+  // manually jogged orthogonal path instead (issue-00003).
   const offset = data?.pathOffset ?? 0;
   const vertical = sourcePosition === Position.Top || sourcePosition === Position.Bottom;
-  const center =
+  const [path, labelX, labelY] =
     offset === 0
-      ? {}
-      : vertical
-        ? { centerX: (sourceX + targetX) / 2 + offset }
-        : { centerY: (sourceY + targetY) / 2 + offset };
-  const [path, labelX, labelY] = getSmoothStepPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-    borderRadius: CORNER_RADIUS,
-    ...center,
-  });
+      ? getSmoothStepPath({
+          sourceX,
+          sourceY,
+          targetX,
+          targetY,
+          sourcePosition,
+          targetPosition,
+          borderRadius: CORNER_RADIUS,
+        })
+      : offsetOrthogonalPath(sourceX, sourceY, targetX, targetY, vertical, offset);
 
   const relation = data?.relation;
   const style = relation ? RELATION_STYLE[relation] : undefined;

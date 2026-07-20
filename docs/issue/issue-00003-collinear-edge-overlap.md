@@ -69,3 +69,19 @@ interval lane assignment**:
 - Visual: focusing `Match Driver` on the ride-hailing model now shows `handledBy`
   (down to Matching) and the hotspot `annotates` edge on separate lanes instead
   of one overlapping line; the timeline (node columns / event order) is unchanged.
+
+## Follow-up: the offset was computed but not rendered
+
+The first fix computed distinct offsets correctly (`annotates` = +26, `handledBy`
+= 0, verified by dumping the real pipeline), yet the edges still overlapped
+on screen. **Second root cause**: `getSmoothStepPath` draws a straight line for
+perfectly collinear endpoints (same `x`, facing handles) and **ignores the
+`centerX`/`centerY` offset** — so the computed offset had no visual effect.
+
+Fix: offset edges no longer rely on smoothstep. `offsetOrthogonalPath`
+([`edge-path.ts`](../../web/lib/layout/edge-path.ts)) builds a manual right-angle
+path whose middle run is shifted by the offset (sideways for vertical edges);
+`RelationEdge` uses it whenever `pathOffset != 0`, and smoothstep only for
+centred edges. Unit-tested (`edge-path.test.ts`) and visually confirmed at a
+depth-1 isolate of `Match Driver` (annotates jogs to its own lane). Unit 101 /
+E2E 19 green.
