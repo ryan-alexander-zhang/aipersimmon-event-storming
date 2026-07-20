@@ -85,6 +85,23 @@ describe("layout engine (RT2)", () => {
     expect(x.ev0).toBeLessThan(x.ev); // order -1 before order 0
   });
 
+  it("stacks concurrent events (same order) in one column, different lanes", () => {
+    const ev = (id: string, order: number): ESNode => ({
+      id,
+      type: "domainEvent",
+      position: { x: 0, y: 0 },
+      data: { label: id, context: "A", order },
+    });
+    const nodes = [ev("p1", 0), ev("p2", 0), ev("later", 1)];
+    const out = computeLayout(nodes, [], contexts);
+    const by = Object.fromEntries(out.map((n) => [n.id, n.position]));
+    // p1 and p2 are concurrent → same column (x), different lane (y)
+    expect(by.p1.x).toBe(by.p2.x);
+    expect(by.p1.y).not.toBe(by.p2.y);
+    // the order-1 event sits in a later column
+    expect(by.later.x).toBeGreaterThan(by.p1.x);
+  });
+
   it("is deterministic (same model → identical layout)", () => {
     const { nodes, edges } = sliceModel();
     const a = computeLayout(nodes, edges, contexts);
