@@ -3,7 +3,7 @@ import type { Context } from "@/lib/dsl/schema";
 import { bandIndex } from "@/lib/eventstorming/elements";
 import type { RelationType } from "@/lib/eventstorming/relations";
 import type { ESEdge, ESNode } from "@/lib/store/types";
-import { BAND_H, computeLayout } from "./layout";
+import { BAND_H, computeContextBoxes, computeLayout } from "./layout";
 
 const contexts: Context[] = [
   { id: "A", name: "Ordering", order: 0 },
@@ -100,6 +100,58 @@ describe("layout engine (RT2)", () => {
     expect(by.p1.y).not.toBe(by.p2.y);
     // the order-1 event sits in a later column
     expect(by.later.x).toBeGreaterThan(by.p1.x);
+  });
+
+  it("handles nodes missing order/context and unattached hotspots without throwing", () => {
+    const n = (id: string, type: ESNode["type"], ctx?: string, order?: number): ESNode => ({
+      id,
+      type,
+      position: { x: 0, y: 0 },
+      data: {
+        label: id,
+        ...(ctx ? { context: ctx } : {}),
+        ...(order !== undefined ? { order } : {}),
+      },
+    });
+    const out = computeLayout(
+      [
+        n("e", "domainEvent", "A"), // event with no order
+        n("h", "hotspot", "A"), // hotspot with no annotates target
+        n("orphan", "actor"), // node with no context
+      ],
+      [],
+      contexts,
+    );
+    expect(out).toHaveLength(3);
+    expect(out.every((x) => Number.isFinite(x.position.x) && Number.isFinite(x.position.y))).toBe(true);
+  });
+
+  it("stacks unrelated same-type nodes that land in one cell", () => {
+    const actor = (id: string): ESNode => ({
+      id,
+      type: "actor",
+      position: { x: 0, y: 0 },
+      data: { label: id, context: "A" },
+    });
+    const out = computeLayout([actor("a1"), actor("a2")], [], contexts);
+    const ys = out.map((n) => n.position.y);
+    expect(ys[0]).not.toBe(ys[1]); // both unplaced → same cell → stacked
+  });
+
+  it("reserves a column box per context, including empty ones", () => {
+    const one: ESNode = {
+      id: "ev",
+      type: "domainEvent",
+      position: { x: 0, y: 0 },
+      data: { label: "ev", context: "A", order: 0 },
+    };
+    const boxes = computeContextBoxes([one], [], contexts); // context B has no nodes
+    const a = boxes.find((b) => b.id === "A");
+    const b = boxes.find((b) => b.id === "B");
+    expect(a).toBeDefined();
+    expect(b).toBeDefined();
+    expect(b!.x).toBeGreaterThan(a!.x); // empty B still sits after A
+    expect(a!.width).toBeGreaterThan(0);
   });
 
   it("is deterministic (same model → identical layout)", () => {

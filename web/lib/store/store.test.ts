@@ -101,6 +101,68 @@ describe("store v2 (RT3)", () => {
     expect(node(c)!.position.x).toBe(node(e)!.position.x);
   });
 
+  it("rejects degenerate connections (self, missing node, null endpoint)", () => {
+    const ctx = get().addContext("c");
+    const c = get().addNode("command", ctx);
+    expect(get().connect({ source: c, target: c, sourceHandle: null, targetHandle: null })).toBe(false);
+    expect(get().connect({ source: "ghost", target: c, sourceHandle: null, targetHandle: null })).toBe(false);
+    expect(
+      get().connect({ source: null as unknown as string, target: c, sourceHandle: null, targetHandle: null }),
+    ).toBe(false);
+    expect(get().edges).toHaveLength(0);
+  });
+
+  it("removeContext drops member nodes and their edges", () => {
+    const ctx = get().addContext("c");
+    const e = get().addNode("domainEvent", ctx);
+    const p = get().addNode("policy", ctx);
+    get().connect({ source: e, target: p, sourceHandle: null, targetHandle: null });
+    expect(get().edges).toHaveLength(1);
+    get().removeContext(ctx);
+    expect(get().nodes).toHaveLength(0);
+    expect(get().edges).toHaveLength(0);
+  });
+
+  it("sets the level [us-00008-FR-1]", () => {
+    expect(get().level).toBe("design");
+    get().setLevel("big-picture");
+    expect(get().level).toBe("big-picture");
+  });
+
+  it("renames only the target context", () => {
+    const c = get().addContext("Old");
+    const other = get().addContext("Other");
+    get().renameContext(c, "New");
+    expect(get().contexts.find((x) => x.id === c)?.name).toBe("New");
+    expect(get().contexts.find((x) => x.id === other)?.name).toBe("Other");
+  });
+
+  it("clears selection when the selected node is removed", () => {
+    const ctx = get().addContext("c");
+    const a = get().addNode("actor", ctx);
+    get().setSelected(a);
+    get().removeNode(a);
+    expect(get().selectedId).toBeNull();
+  });
+
+  it("reordering an event swaps its timeline column (x) [us-00006-AC-3.1]", () => {
+    const ctx = get().addContext("c");
+    const e0 = get().addNode("domainEvent", ctx); // order 0
+    const e1 = get().addNode("domainEvent", ctx); // order 1
+    expect(node(e1)!.position.x).toBeGreaterThan(node(e0)!.position.x);
+    get().reorderEvent(e0, 2); // move e0 after e1
+    expect(node(e0)!.position.x).toBeGreaterThan(node(e1)!.position.x);
+  });
+
+  it("reassigning context moves a node into the other context's column [us-00006-AC-4.1]", () => {
+    const a = get().addContext("A");
+    const b = get().addContext("B"); // ordered after A → to the right
+    const ev = get().addNode("domainEvent", a);
+    const before = node(ev)!.position.x;
+    get().reassignContext(ev, b);
+    expect(node(ev)!.position.x).toBeGreaterThan(before);
+  });
+
   it("replaces state on setModel and resets on clear", () => {
     const ctx = get().addContext("c");
     get().addNode("actor", ctx);

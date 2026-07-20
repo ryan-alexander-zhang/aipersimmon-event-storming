@@ -58,6 +58,16 @@ describe("serialize v2 (T2/RT1)", () => {
     if (result.ok) expect(result.model).toEqual(model);
   });
 
+  it("round-trips a node with no context (global participant)", () => {
+    const global: ESNode[] = [
+      { id: "g", type: "actor", position: { x: 0, y: 0 }, data: { label: "Global" } },
+    ];
+    const back = fromModel(toModel(global, [], [], META));
+    expect(back.nodes[0].data.context).toBeUndefined();
+    const out = JSON.parse(exportJSON(global, [], [], META));
+    expect(out.nodes[0].context).toBeUndefined();
+  });
+
   it("migrates a v1 document on import (drops position, default context)", () => {
     const v1 = JSON.stringify({
       version: "1.0",
@@ -79,6 +89,25 @@ describe("serialize v2 (T2/RT1)", () => {
       expect(byId.e2.order).toBe(0);
       expect(byId.e1.order).toBe(1);
     }
+  });
+
+  it("migrates a v1 doc with a non-event node and missing arrays", () => {
+    const v1 = JSON.stringify({
+      version: "1.0",
+      meta: { name: "x", level: "process", createdAt: "t" },
+      nodes: [{ id: "c1", type: "command", label: "C" }], // no position, no edges key
+    });
+    const result = importJSON(v1);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.model.nodes[0].context).toBe("default");
+      expect(result.model.nodes[0].order).toBeUndefined(); // non-event carries no order
+      expect(result.model.edges).toEqual([]);
+    }
+  });
+
+  it("passes through non-object input for the schema to reject", () => {
+    expect(importJSON("null").ok).toBe(false);
   });
 
   it("rejects malformed JSON [spec-00001-XFR-2]", () => {

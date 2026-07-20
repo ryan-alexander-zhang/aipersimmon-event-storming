@@ -24,6 +24,30 @@ test("adds a Domain Event into its band via a context header [us-00001-AC-1.1, u
   await addEvent(page);
   await expect(nodes(page, "domainEvent")).toHaveCount(1);
   await expect(nodes(page, "domainEvent")).toContainText("Domain Event");
+  // conventional colour (orange #F6A623)
+  const body = nodes(page, "domainEvent").locator("[data-testid=node-body]");
+  expect(await body.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(246, 166, 35)");
+});
+
+test("a second context adds a column group after the first [us-00006-AC-1.1]", async ({ page }) => {
+  await page.goto("/");
+  await addContext(page);
+  await addContext(page);
+  const evBtns = page.getByRole("button", { name: "Event", exact: true });
+  await evBtns.nth(0).click();
+  await evBtns.nth(1).click();
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+  const xs = await nodes(page, "domainEvent").evaluateAll((els) =>
+    els.map((e) => e.getBoundingClientRect().x),
+  );
+  expect(Math.max(...xs)).toBeGreaterThan(Math.min(...xs)); // second context to the right
+});
+
+test("elements are not free-draggable [us-00007-AC-4.1]", async ({ page }) => {
+  await page.goto("/");
+  await addContext(page);
+  await addEvent(page);
+  await expect(nodes(page, "domainEvent")).not.toHaveClass(/draggable/);
 });
 
 test("builds a slice: event triggers a policy and updates a read model [us-00007-AC-1.1/2.1, us-00002-AC-1.1]", async ({
@@ -91,10 +115,17 @@ test("level filter hides types without deleting them [us-00008-AC-1.1]", async (
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await expect(nodes(page, "command")).toHaveCount(2);
   await page.getByRole("button", { name: "Big Picture" }).click();
-  await expect(nodes(page, "command")).toHaveCount(0); // hidden
-  await expect(nodes(page, "domainEvent")).toHaveCount(2); // still shown
+  // Big Picture hides commands, aggregates, read models…
+  await expect(nodes(page, "command")).toHaveCount(0);
+  await expect(nodes(page, "aggregate")).toHaveCount(0);
+  await expect(nodes(page, "readModel")).toHaveCount(0);
+  // …and keeps actors/systems, events, hotspots
+  await expect(nodes(page, "actor")).toHaveCount(1);
+  await expect(nodes(page, "externalSystem")).toHaveCount(1);
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
   await page.getByRole("button", { name: "Design" }).click();
   await expect(nodes(page, "command")).toHaveCount(2); // restored (never deleted)
+  await expect(nodes(page, "aggregate")).toHaveCount(1);
 });
 
 test("import then export round-trips the model incl. level [us-00004-AC-3.1, us-00008-AC-2.1]", async ({

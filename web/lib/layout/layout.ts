@@ -121,8 +121,9 @@ export function computeLayout(nodes: ESNode[], edges: ESEdge[], contexts: Contex
   const { place, base } = computePlacement(nodes, edges, contexts);
   const cellCount = new Map<string, number>();
   return nodes.map((n) => {
+    // computePlacement places every node and bases every referenced context.
     const p = place.get(n.id)!;
-    const globalCol = (base.get(p.ctx) ?? 0) + p.col;
+    const globalCol = base.get(p.ctx)! + p.col;
     const row = bandIndex(n.type);
     // parallel lane offsets the whole slice within its band; a residual counter
     // separates any exact (band, column, lane) collisions.
@@ -149,7 +150,7 @@ export function computeContextBoxes(
   const { ctxIds, base, width } = computePlacement(nodes, edges, contexts);
   return ctxIds.map((id) => ({
     id,
-    x: (base.get(id) ?? 0) * COL_W,
-    width: (width.get(id) ?? 1) * COL_W - (COL_W - NODE_W),
+    x: base.get(id)! * COL_W,
+    width: width.get(id)! * COL_W - (COL_W - NODE_W),
   }));
 }
