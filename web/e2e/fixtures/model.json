@@ -1,15 +1,26 @@
 {
-  "version": "1.0",
-  "meta": { "name": "Order", "level": "process", "createdAt": "2026-07-16T00:00:00Z" },
+  "version": "2.0",
+  "meta": { "name": "Fixture", "level": "process", "createdAt": "2026-07-20T00:00:00Z" },
+  "contexts": [
+    { "id": "ord", "name": "Ordering", "order": 0 },
+    { "id": "pay", "name": "Payment", "order": 1 }
+  ],
   "nodes": [
-    { "id": "a1", "type": "actor", "label": "Customer", "position": { "x": -320, "y": 0 }, "properties": {} },
-    { "id": "c1", "type": "command", "label": "Place Order", "position": { "x": -90, "y": 0 }, "properties": {} },
-    { "id": "ag1", "type": "aggregate", "label": "Order", "position": { "x": 140, "y": 0 }, "properties": {} },
-    { "id": "e1", "type": "domainEvent", "label": "Order Placed", "position": { "x": 370, "y": 0 }, "properties": { "pivotal": true } }
+    { "id": "a1", "type": "actor", "label": "Customer", "context": "ord", "properties": {} },
+    { "id": "c1", "type": "command", "label": "Place Order", "context": "ord", "properties": {} },
+    { "id": "ag1", "type": "aggregate", "label": "Order", "context": "ord", "properties": {} },
+    { "id": "e1", "type": "domainEvent", "label": "Order Placed", "context": "ord", "order": 0, "properties": { "pivotal": true } },
+    { "id": "rm1", "type": "readModel", "label": "Order View", "context": "ord", "properties": {} },
+    { "id": "ex1", "type": "externalSystem", "label": "Payment Gateway", "context": "pay", "properties": {} },
+    { "id": "c2", "type": "command", "label": "Charge Payment", "context": "pay", "properties": {} },
+    { "id": "e2", "type": "domainEvent", "label": "Payment Authorized", "context": "pay", "order": 0, "properties": {} }
   ],
   "edges": [
     { "id": "r1", "source": "a1", "target": "c1", "relation": "issues" },
     { "id": "r2", "source": "c1", "target": "ag1", "relation": "handledBy" },
-    { "id": "r3", "source": "ag1", "target": "e1", "relation": "emits" }
+    { "id": "r3", "source": "ag1", "target": "e1", "relation": "emits" },
+    { "id": "r4", "source": "e1", "target": "rm1", "relation": "updates" },
+    { "id": "r5", "source": "c2", "target": "ex1", "relation": "handledBy" },
+    { "id": "r6", "source": "ex1", "target": "e2", "relation": "emits" }
   ]
 }
