@@ -25,6 +25,24 @@ function targetsOf(edges: ESEdge[], source: string, rel: RelationType): string[]
   return edges.filter((e) => e.source === source && e.data?.relation === rel).map((e) => e.target);
 }
 
+export const NODE_W = 190;
+
+/** Flow-space horizontal extent of each bounded context, from laid-out nodes. */
+export function contextExtents(nodes: ESNode[]): Map<string, { x: number; width: number }> {
+  const acc = new Map<string, { min: number; max: number }>();
+  for (const n of nodes) {
+    const c = n.data.context;
+    if (!c) continue;
+    const e = acc.get(c) ?? { min: Infinity, max: -Infinity };
+    e.min = Math.min(e.min, n.position.x);
+    e.max = Math.max(e.max, n.position.x + NODE_W);
+    acc.set(c, e);
+  }
+  const out = new Map<string, { x: number; width: number }>();
+  for (const [c, e] of acc) out.set(c, { x: e.min, width: e.max - e.min });
+  return out;
+}
+
 /** Compute a new node array with positions derived from the model. Pure and
  *  deterministic: the same (nodes, edges, contexts) always yields the same layout. */
 export function computeLayout(nodes: ESNode[], edges: ESEdge[], contexts: Context[]): ESNode[] {
