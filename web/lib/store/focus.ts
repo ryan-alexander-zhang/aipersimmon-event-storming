@@ -24,6 +24,45 @@ export function focusSource(
   return hoveredId ?? selectedId ?? null;
 }
 
+export type IsolateDirection = "up" | "down" | "both";
+
+/** The anchor node's N-hop neighbourhood as an induced subgraph, for isolate/focus
+ *  mode (design-00003 §3 Tier C). `down` walks source→target (downstream causes),
+ *  `up` walks target→source (upstream), `both` is undirected. Returns the reached
+ *  nodes and every edge whose endpoints are both reached. */
+export function computeNeighborhood(
+  anchorId: string | null | undefined,
+  edges: ESEdge[],
+  opts: { depth: number; direction: IsolateDirection },
+): { nodeIds: Set<string>; edgeIds: Set<string> } {
+  const nodeIds = new Set<string>();
+  const edgeIds = new Set<string>();
+  if (!anchorId) return { nodeIds, edgeIds };
+  nodeIds.add(anchorId);
+  const down = opts.direction !== "up";
+  const up = opts.direction !== "down";
+  let frontier = [anchorId];
+  for (let d = 0; d < opts.depth && frontier.length; d++) {
+    const fset = new Set(frontier);
+    const next: string[] = [];
+    for (const e of edges) {
+      if (down && fset.has(e.source) && !nodeIds.has(e.target)) {
+        nodeIds.add(e.target);
+        next.push(e.target);
+      }
+      if (up && fset.has(e.target) && !nodeIds.has(e.source)) {
+        nodeIds.add(e.source);
+        next.push(e.source);
+      }
+    }
+    frontier = next;
+  }
+  for (const e of edges) {
+    if (nodeIds.has(e.source) && nodeIds.has(e.target)) edgeIds.add(e.id);
+  }
+  return { nodeIds, edgeIds };
+}
+
 /** The focused node plus its direct neighbours, and the edges incident to it. */
 export function computeFocus(focusId: string | null | undefined, edges: ESEdge[]): FocusSet {
   if (!focusId) return EMPTY;

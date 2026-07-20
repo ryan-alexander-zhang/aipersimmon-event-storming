@@ -2,7 +2,7 @@
 id: plan-00005-readability-tier-c-isolate-semantic-zoom
 type: plan
 role: main
-status: open
+status: resolved
 parent: spec-00001-mvp-editor
 ---
 

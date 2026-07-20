@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeFocus, focusSource } from "./focus";
+import { computeFocus, computeNeighborhood, focusSource } from "./focus";
 import type { ESEdge } from "./types";
 
 const edge = (id: string, source: string, target: string): ESEdge => ({
@@ -42,6 +42,43 @@ describe("computeFocus (RA2)", () => {
     expect(f.active).toBe(true);
     expect([...f.nodeIds]).toEqual(["lonely"]);
     expect(f.edgeIds.size).toBe(0);
+  });
+});
+
+describe("computeNeighborhood (TC1)", () => {
+  // chain a -> b -> c -> d
+  const chain: ESEdge[] = [edge("ab", "a", "b"), edge("bc", "b", "c"), edge("cd", "c", "d")];
+
+  it("returns empty for a missing anchor", () => {
+    const n = computeNeighborhood(null, chain, { depth: 3, direction: "both" });
+    expect(n.nodeIds.size).toBe(0);
+    expect(n.edgeIds.size).toBe(0);
+  });
+
+  it("walks downstream (source→target) to the given depth", () => {
+    expect([...computeNeighborhood("b", chain, { depth: 1, direction: "down" }).nodeIds].sort()).toEqual(["b", "c"]);
+    expect([...computeNeighborhood("b", chain, { depth: 2, direction: "down" }).nodeIds].sort()).toEqual(["b", "c", "d"]);
+  });
+
+  it("walks upstream (target→source) to the given depth", () => {
+    expect([...computeNeighborhood("c", chain, { depth: 1, direction: "up" }).nodeIds].sort()).toEqual(["b", "c"]);
+    expect([...computeNeighborhood("c", chain, { depth: 2, direction: "up" }).nodeIds].sort()).toEqual(["a", "b", "c"]);
+  });
+
+  it("both directions reach either side", () => {
+    expect([...computeNeighborhood("b", chain, { depth: 1, direction: "both" }).nodeIds].sort()).toEqual(["a", "b", "c"]);
+  });
+
+  it("returns the induced edges among reached nodes", () => {
+    const n = computeNeighborhood("a", chain, { depth: 3, direction: "down" });
+    expect([...n.nodeIds].sort()).toEqual(["a", "b", "c", "d"]);
+    expect([...n.edgeIds].sort()).toEqual(["ab", "bc", "cd"]);
+  });
+
+  it("an anchor with no edges is just itself", () => {
+    const n = computeNeighborhood("lonely", chain, { depth: 3, direction: "both" });
+    expect([...n.nodeIds]).toEqual(["lonely"]);
+    expect(n.edgeIds.size).toBe(0);
   });
 });
 

@@ -189,6 +189,20 @@ describe("store v2 (RT3)", () => {
     expect(get().hoveredId).toBeNull();
   });
 
+  it("tracks isolate view state and clears active on clear/setModel (TC2)", () => {
+    expect(get().isolate).toEqual({ active: false, direction: "down", depth: 2 });
+    get().toggleIsolate();
+    expect(get().isolate.active).toBe(true);
+    get().setIsolateDirection("up");
+    get().setIsolateDepth(3);
+    expect(get().isolate).toMatchObject({ active: true, direction: "up", depth: 3 });
+    get().setIsolateDepth(0); // clamped to >= 1
+    expect(get().isolate.depth).toBe(1);
+    get().clear();
+    expect(get().isolate.active).toBe(false);
+    expect(get().isolate.direction).toBe("up"); // preference kept
+  });
+
   it("applies node/edge changes and tracks selection", () => {
     const ctx = get().addContext("c");
     const a = get().addNode("actor", ctx);

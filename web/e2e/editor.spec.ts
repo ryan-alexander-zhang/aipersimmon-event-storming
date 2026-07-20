@@ -213,6 +213,38 @@ test("focused edges flow (animated); the rest stay static [design-00003]", async
   await expect(page.locator(".react-flow__edge.animated")).toHaveCount(1);
 });
 
+test("isolate keeps only the selected node's neighbourhood [design-00003]", async ({ page }) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+  await nodes(page, "domainEvent").filter({ hasText: "Order Placed" }).click();
+  await page.getByRole("button", { name: "Off", exact: true }).click(); // toggle Isolate on
+  await page.getByRole("button", { name: "Downstream" }).click();
+  // downstream of "Order Placed" is just its Read Model; the rest is hidden
+  await expect(nodes(page, "domainEvent")).toHaveCount(1); // Payment Authorized hidden
+  await expect(nodes(page, "readModel")).toHaveCount(1);
+  await expect(nodes(page, "command")).toHaveCount(0); // upstream hidden
+  // upstream shows the producers instead of the read model
+  await page.getByRole("button", { name: "Upstream" }).click();
+  await expect(nodes(page, "command")).toHaveCount(1);
+  await expect(nodes(page, "readModel")).toHaveCount(0);
+  // toggling off restores the whole board
+  await page.getByRole("button", { name: "On", exact: true }).click();
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+});
+
+test("semantic zoom drops detail when zoomed out [design-00003]", async ({ page }) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await page.getByRole("button", { name: "Design" }).click(); // model.json loads at Process
+  await expect(nodes(page, "aggregate")).toHaveCount(1); // Design detail at fit zoom
+  const zoomOut = page.locator(".react-flow__controls-zoomout");
+  for (let i = 0; i < 4; i++) await zoomOut.click();
+  // zoomed out past the Design threshold → aggregates drop, backbone stays
+  await expect(nodes(page, "aggregate")).toHaveCount(0);
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+});
+
 test("New clears the model and does not restore it on reload", async ({ page }) => {
   await page.goto("/");
   await addContext(page);

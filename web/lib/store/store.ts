@@ -18,7 +18,16 @@ import { ELEMENT_DEFINITIONS, type ElementType } from "@/lib/eventstorming/eleme
 import type { Level } from "@/lib/eventstorming/levels";
 import { resolveRelation } from "@/lib/eventstorming/relations";
 import { computeLayout } from "@/lib/layout/layout";
+import type { IsolateDirection } from "./focus";
 import type { ESEdge, ESNode, ESNodeData } from "./types";
+
+/** Isolate ("focus mode") view state: hide everything outside the selected
+ *  node's `depth`-hop neighbourhood in `direction`. Anchored on selectedId. */
+export interface IsolateState {
+  active: boolean;
+  direction: IsolateDirection;
+  depth: number;
+}
 
 export interface ESState {
   nodes: ESNode[];
@@ -28,8 +37,13 @@ export interface ESState {
   selectedId: string | null;
   /** Transient hover target; drives the focus highlight, never persisted. */
   hoveredId: string | null;
+  /** Isolate/focus mode; view-only, never persisted. */
+  isolate: IsolateState;
 
   setLevel: (level: Level) => void;
+  toggleIsolate: () => void;
+  setIsolateDirection: (direction: IsolateDirection) => void;
+  setIsolateDepth: (depth: number) => void;
 
   onNodesChange: (changes: NodeChange<ESNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<ESEdge>[]) => void;
@@ -75,8 +89,12 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   level: "design",
   selectedId: null,
   hoveredId: null,
+  isolate: { active: false, direction: "down", depth: 2 },
 
   setLevel: (level) => set({ level }),
+  toggleIsolate: () => set({ isolate: { ...get().isolate, active: !get().isolate.active } }),
+  setIsolateDirection: (direction) => set({ isolate: { ...get().isolate, direction } }),
+  setIsolateDepth: (depth) => set({ isolate: { ...get().isolate, depth: Math.max(1, depth) } }),
 
   onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) }),
   onEdgesChange: (changes) => set({ edges: applyEdgeChanges(changes, get().edges) }),
@@ -166,8 +184,17 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       level: level ?? get().level,
       selectedId: null,
       hoveredId: null,
+      isolate: { ...get().isolate, active: false },
     }),
-  clear: () => set({ nodes: [], edges: [], contexts: [], selectedId: null, hoveredId: null }),
+  clear: () =>
+    set({
+      nodes: [],
+      edges: [],
+      contexts: [],
+      selectedId: null,
+      hoveredId: null,
+      isolate: { ...get().isolate, active: false },
+    }),
 });
 
 export const useESStore = create<ESState>()(initializer);

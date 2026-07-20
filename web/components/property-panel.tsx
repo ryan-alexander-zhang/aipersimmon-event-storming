@@ -58,6 +58,10 @@ export function PropertyPanel() {
   const reorderEvent = useESStore((s) => s.reorderEvent);
   const reassignContext = useESStore((s) => s.reassignContext);
   const setSelected = useESStore((s) => s.setSelected);
+  const isolate = useESStore((s) => s.isolate);
+  const toggleIsolate = useESStore((s) => s.toggleIsolate);
+  const setIsolateDirection = useESStore((s) => s.setIsolateDirection);
+  const setIsolateDepth = useESStore((s) => s.setIsolateDepth);
 
   const wrap = "w-64 shrink-0 overflow-y-auto border-l border-zinc-200 bg-zinc-50 p-3";
 
@@ -201,6 +205,75 @@ export function PropertyPanel() {
           </div>
         </div>
       )}
+
+      <div className="mt-4 border-t border-zinc-200 pt-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+            Isolate
+          </span>
+          <button
+            type="button"
+            aria-pressed={isolate.active}
+            onClick={toggleIsolate}
+            className={`rounded px-2 py-0.5 text-xs font-medium ${
+              isolate.active
+                ? "bg-zinc-800 text-white"
+                : "border border-zinc-300 text-zinc-600 hover:bg-zinc-100"
+            }`}
+          >
+            {isolate.active ? "On" : "Off"}
+          </button>
+        </div>
+        {isolate.active && (
+          <div className="mt-2 space-y-2">
+            <div
+              className="flex items-center rounded-md border border-zinc-300 p-0.5"
+              role="group"
+              aria-label="Isolate direction"
+            >
+              {(
+                [
+                  ["up", "Upstream"],
+                  ["both", "Both"],
+                  ["down", "Downstream"],
+                ] as const
+              ).map(([d, lbl]) => (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={isolate.direction === d}
+                  className={`flex-1 rounded px-1.5 py-0.5 text-[11px] font-medium ${
+                    isolate.direction === d ? "bg-zinc-800 text-white" : "text-zinc-600 hover:bg-zinc-100"
+                  }`}
+                  onClick={() => setIsolateDirection(d)}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-zinc-600">
+              <span>Depth</span>
+              <button
+                type="button"
+                aria-label="Decrease depth"
+                className="rounded border border-zinc-300 px-1.5 hover:bg-zinc-100"
+                onClick={() => setIsolateDepth(isolate.depth - 1)}
+              >
+                −
+              </button>
+              <span className="tabular-nums">{isolate.depth}</span>
+              <button
+                type="button"
+                aria-label="Increase depth"
+                className="rounded border border-zinc-300 px-1.5 hover:bg-zinc-100"
+                onClick={() => setIsolateDepth(isolate.depth + 1)}
+              >
+                +
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <button
         type="button"

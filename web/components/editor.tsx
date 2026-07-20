@@ -11,6 +11,8 @@ import {
   type NodeTypes,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
+  useStore,
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo } from "react";
 import { BoardChrome } from "@/components/board-chrome";
@@ -20,10 +22,10 @@ import { PropertyPanel } from "@/components/property-panel";
 import { Toolbar } from "@/components/toolbar";
 import { RELATION_STYLE } from "@/lib/eventstorming/edge-style";
 import { ELEMENT_DEFINITIONS, ELEMENT_TYPES, type ElementType } from "@/lib/eventstorming/elements";
-import { isVisibleAt } from "@/lib/eventstorming/levels";
+import { typesForZoom } from "@/lib/eventstorming/levels";
 import { isValidConnection as canConnect } from "@/lib/eventstorming/relations";
 import { computeEdgeOffsets } from "@/lib/layout/edge-spread";
-import { computeFocus, focusSource } from "@/lib/store/focus";
+import { computeFocus, computeNeighborhood, focusSource } from "@/lib/store/focus";
 import { loadModel, saveModel } from "@/lib/store/persistence";
 import { useESStore } from "@/lib/store/store";
 import type { ESEdge } from "@/lib/store/types";
@@ -66,6 +68,9 @@ function Canvas() {
   const selectedId = useESStore((s) => s.selectedId);
   const hoveredId = useESStore((s) => s.hoveredId);
   const level = useESStore((s) => s.level);
+  const isolate = useESStore((s) => s.isolate);
+  const zoom = useStore((s) => s.transform[2]);
+  const { fitView } = useReactFlow();
 
   useAutosave();
 
@@ -94,22 +99,43 @@ function Canvas() {
     });
   }, [nodes, edges]);
 
-  // The level is a view filter: hide element types (and edges touching them)
-  // that don't belong at the current level. The model keeps everything.
-  const visibleNodes = useMemo(() => nodes.filter((n) => isVisibleAt(level, n.type)), [nodes, level]);
+  // Visible element types = the Level filter, further narrowed by semantic zoom
+  // (zoomed out → backbone; both never show more than the Level).
+  const visibleTypes = useMemo(() => new Set(typesForZoom(zoom, level)), [zoom, level]);
 
-  // Dim nodes outside the focused neighbourhood via the node wrapper's opacity.
+  // Isolate ("focus mode"): when on with a selected anchor, keep only that node's
+  // N-hop neighbourhood; otherwise null (show everything the types allow).
+  const isoNodeIds = useMemo(
+    () =>
+      isolate.active && selectedId
+        ? computeNeighborhood(selectedId, edges, {
+            depth: isolate.depth,
+            direction: isolate.direction,
+          }).nodeIds
+        : null,
+    [isolate.active, isolate.depth, isolate.direction, selectedId, edges],
+  );
+
+  const visibleNodes = useMemo(
+    () => nodes.filter((n) => visibleTypes.has(n.type) && (!isoNodeIds || isoNodeIds.has(n.id))),
+    [nodes, visibleTypes, isoNodeIds],
+  );
+
+  // Dimming (Tier A) applies only when NOT isolating — isolate already removed
+  // the irrelevant nodes, so everything left stays full opacity.
+  const dimActive = focus.active && !isoNodeIds;
+
   const decoratedNodes = useMemo(
     () =>
       visibleNodes.map((n) =>
-        !focus.active
+        !dimActive
           ? n
           : {
               ...n,
               style: { ...n.style, opacity: focus.nodeIds.has(n.id) ? 1 : NODE_DIM_OPACITY },
             },
       ),
-    [visibleNodes, focus],
+    [visibleNodes, dimActive, focus],
   );
   const visibleEdges = useMemo(() => {
     const ids = new Set(visibleNodes.map((n) => n.id));
@@ -126,7 +152,13 @@ function Canvas() {
     () =>
       visibleEdges.map((e) => {
         const relation = e.data?.relation;
-        const focusState = !focus.active ? "none" : focus.edgeIds.has(e.id) ? "on" : "off";
+        const focusState = !focus.active
+          ? "none"
+          : focus.edgeIds.has(e.id)
+            ? "on"
+            : dimActive
+              ? "off"
+              : "none";
         return {
           ...e,
           type: "relation",
@@ -139,8 +171,16 @@ function Canvas() {
             : e.markerEnd,
         };
       }),
-    [visibleEdges, focus, offsets],
+    [visibleEdges, focus, offsets, dimActive],
   );
+
+  // Refit the view when isolate frames a subset (or clears back to the board).
+  const isoKey =
+    isoNodeIds && selectedId ? `${selectedId}|${isolate.direction}|${isolate.depth}` : "off";
+  useEffect(() => {
+    const t = setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 0);
+    return () => clearTimeout(t);
+  }, [isoKey, fitView]);
 
   const onConnect = useCallback((c: Connection) => void connect(c), [connect]);
 
@@ -172,6 +212,7 @@ function Canvas() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             isValidConnection={isValidConnection}
+            minZoom={0.2}
             onNodeClick={(_, n) => setSelected(n.id)}
             onNodeMouseEnter={(_, n) => setHovered(n.id)}
             onNodeMouseLeave={() => setHovered(null)}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ElementType } from "./elements";
-import { isVisibleAt, LEVEL_TYPES } from "./levels";
+import { isVisibleAt, LEVEL_TYPES, typesForZoom } from "./levels";
 
 describe("levels", () => {
   it("is cumulative: Big Picture ⊂ Process ⊂ Design", () => {
@@ -24,5 +24,33 @@ describe("levels", () => {
 
   it("Design shows aggregates", () => {
     expect(isVisibleAt("design", "aggregate")).toBe(true);
+  });
+});
+
+describe("semantic zoom (TC5)", () => {
+  it("shows full Design detail when zoomed in", () => {
+    expect(typesForZoom(1, "design")).toEqual(LEVEL_TYPES.design);
+    expect(typesForZoom(1, "design")).toContain("aggregate");
+  });
+
+  it("keeps full detail at a small board's fit zoom (~0.5)", () => {
+    expect(typesForZoom(0.5, "design")).toEqual(LEVEL_TYPES.design);
+    expect(typesForZoom(0.5, "design")).toContain("aggregate");
+  });
+
+  it("drops to Process detail at mid zoom, backbone when far out", () => {
+    expect(typesForZoom(0.35, "design")).toEqual(LEVEL_TYPES.process); // no aggregate
+    expect(typesForZoom(0.35, "design")).not.toContain("aggregate");
+    expect(typesForZoom(0.2, "design")).toEqual(LEVEL_TYPES["big-picture"]); // backbone only
+    expect(typesForZoom(0.2, "design")).not.toContain("command");
+  });
+
+  it("never shows more than the current Level (bounded)", () => {
+    // even zoomed all the way in, a Process board stays Process
+    expect(typesForZoom(2, "process")).toEqual(LEVEL_TYPES.process);
+    for (const zoom of [0.2, 0.5, 1, 2]) {
+      const shown = typesForZoom(zoom, "process");
+      expect(shown.every((t) => LEVEL_TYPES.process.includes(t))).toBe(true);
+    }
   });
 });
