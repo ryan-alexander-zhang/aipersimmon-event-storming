@@ -176,3 +176,19 @@ test("autosaves and restores on reload [us-00005-AC-1.1]", async ({ page }) => {
   await page.reload();
   await expect(nodes(page, "domainEvent")).toHaveCount(1);
 });
+
+test("New clears the model and does not restore it on reload", async ({ page }) => {
+  await page.goto("/");
+  await addContext(page);
+  await addEvent(page);
+  await expect(nodes(page, "domainEvent")).toHaveCount(1);
+  await page.waitForTimeout(600); // let autosave persist the current model
+
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "New" }).click();
+  await expect(nodes(page, "domainEvent")).toHaveCount(0);
+
+  await page.waitForTimeout(600);
+  await page.reload();
+  await expect(nodes(page, "domainEvent")).toHaveCount(0);
+});

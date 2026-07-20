@@ -1,9 +1,10 @@
 "use client";
 
-import { Download, FolderPlus, Upload } from "lucide-react";
+import { Download, FilePlus, FolderPlus, Upload } from "lucide-react";
 import { type ChangeEvent, useRef, useState } from "react";
 import { exportJSON, fromModel, importJSON } from "@/lib/dsl/serialize";
 import { LEVEL_LABEL, LEVELS } from "@/lib/eventstorming/levels";
+import { clearSaved } from "@/lib/store/persistence";
 import { useESStore } from "@/lib/store/store";
 
 export function Toolbar() {
@@ -14,8 +15,23 @@ export function Toolbar() {
   const setLevel = useESStore((s) => s.setLevel);
   const setModel = useESStore((s) => s.setModel);
   const addContext = useESStore((s) => s.addContext);
+  const clear = useESStore((s) => s.clear);
   const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Start a fresh model: wipe the canvas and the local autosave so a reload no
+  // longer restores the previous one. Confirm first when there is work to lose.
+  const onNew = () => {
+    if (
+      (nodes.length > 0 || contexts.length > 0) &&
+      !window.confirm("Start a new model? This clears the current one.")
+    ) {
+      return;
+    }
+    setError(null);
+    clear();
+    clearSaved();
+  };
 
   const onExport = () => {
     const json = exportJSON(nodes, edges, contexts, {
@@ -84,6 +100,9 @@ export function Toolbar() {
             {error}
           </span>
         )}
+        <button type="button" className={btn} onClick={onNew}>
+          <FilePlus size={14} /> New
+        </button>
         <button type="button" className={btn} onClick={onAddContext}>
           <FolderPlus size={14} /> Add context
         </button>
