@@ -2,7 +2,7 @@
 id: plan-00002-structured-board
 type: plan
 role: main
-status: open
+status: resolved
 parent: spec-00001-mvp-editor
 ---
 
