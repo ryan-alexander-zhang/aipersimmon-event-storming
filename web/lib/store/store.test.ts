@@ -203,6 +203,13 @@ describe("store v2 (RT3)", () => {
     expect(get().isolate.direction).toBe("up"); // preference kept
   });
 
+  it("tracks the hovered edge and clears it on clear (HE1)", () => {
+    get().setHoveredEdge("e1");
+    expect(get().hoveredEdgeId).toBe("e1");
+    get().clear();
+    expect(get().hoveredEdgeId).toBeNull();
+  });
+
   it("applies node/edge changes and tracks selection", () => {
     const ctx = get().addContext("c");
     const a = get().addNode("actor", ctx);

@@ -245,6 +245,20 @@ test("semantic zoom drops detail when zoomed out [design-00003]", async ({ page 
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
 });
 
+test("hovering an edge isolates it and dims the rest [design-00003]", async ({ page }) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await page.getByRole("button", { name: "Design" }).click(); // show every edge
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+  const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
+  await edge("r1").hover({ force: true }); // the "issues" edge a1→c1
+  await expect(edge("r1")).toHaveClass(/animated/); // hovered edge flows/emphasised
+  await expect(edge("r3").locator(".react-flow__edge-path")).toHaveCSS("opacity", "0.12"); // another edge dims
+  // leaving restores the board
+  await page.mouse.move(5, 5);
+  await expect(edge("r1")).not.toHaveClass(/animated/);
+});
+
 test("New clears the model and does not restore it on reload", async ({ page }) => {
   await page.goto("/");
   await addContext(page);

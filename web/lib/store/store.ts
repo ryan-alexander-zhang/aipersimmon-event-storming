@@ -37,6 +37,8 @@ export interface ESState {
   selectedId: string | null;
   /** Transient hover target; drives the focus highlight, never persisted. */
   hoveredId: string | null;
+  /** Transient hovered edge; drives edge-hover isolation, never persisted. */
+  hoveredEdgeId: string | null;
   /** Isolate/focus mode; view-only, never persisted. */
   isolate: IsolateState;
 
@@ -68,6 +70,7 @@ export interface ESState {
 
   setSelected: (id: string | null) => void;
   setHovered: (id: string | null) => void;
+  setHoveredEdge: (id: string | null) => void;
   setModel: (model: {
     nodes: ESNode[];
     edges: ESEdge[];
@@ -89,6 +92,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   level: "design",
   selectedId: null,
   hoveredId: null,
+  hoveredEdgeId: null,
   isolate: { active: false, direction: "down", depth: 2 },
 
   setLevel: (level) => set({ level }),
@@ -176,6 +180,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
 
   setSelected: (id) => set({ selectedId: id }),
   setHovered: (id) => set({ hoveredId: id }),
+  setHoveredEdge: (id) => set({ hoveredEdgeId: id }),
   setModel: ({ nodes, edges, contexts, level }) =>
     set({
       nodes: laidOut(nodes, edges, contexts),
@@ -184,6 +189,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       level: level ?? get().level,
       selectedId: null,
       hoveredId: null,
+      hoveredEdgeId: null,
       isolate: { ...get().isolate, active: false },
     }),
   clear: () =>
@@ -193,6 +199,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       contexts: [],
       selectedId: null,
       hoveredId: null,
+      hoveredEdgeId: null,
       isolate: { ...get().isolate, active: false },
     }),
 });

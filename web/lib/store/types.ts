@@ -25,6 +25,9 @@ export type ESEdgeData = {
   // View-only center offset (px) for parallel-edge separation of the orthogonal
   // path; siblings in one corridor bump apart. Never serialized.
   pathOffset?: number;
+  // View-only edge-hover isolation: the hovered edge is "on" (emphasised), the
+  // rest are "dim"; undefined means no edge is hovered. Never serialized.
+  hover?: "on" | "dim";
 };
 
 export type ESEdge = Edge<ESEdgeData>;

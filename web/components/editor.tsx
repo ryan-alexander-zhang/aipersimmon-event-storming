@@ -65,6 +65,8 @@ function Canvas() {
   const connect = useESStore((s) => s.connect);
   const setSelected = useESStore((s) => s.setSelected);
   const setHovered = useESStore((s) => s.setHovered);
+  const setHoveredEdge = useESStore((s) => s.setHoveredEdge);
+  const hoveredEdgeId = useESStore((s) => s.hoveredEdgeId);
   const selectedId = useESStore((s) => s.selectedId);
   const hoveredId = useESStore((s) => s.hoveredId);
   const level = useESStore((s) => s.level);
@@ -161,19 +163,33 @@ function Canvas() {
             : dimActive
               ? "off"
               : "none";
+        // Edge-hover isolation overrides focus: the hovered edge is emphasised,
+        // every other edge dims — so a single connection can be traced.
+        const hover = hoveredEdgeId
+          ? e.id === hoveredEdgeId
+            ? "on"
+            : "dim"
+          : undefined;
+        const emphasised = hover === "on";
+        const color = relation ? RELATION_STYLE[relation].color : undefined;
         return {
           ...e,
           type: "relation",
-          // Focused edges flow (marching-ants); reduced-motion falls back to
-          // the thicker static line via a CSS override in globals.css.
-          animated: focusState === "on",
-          data: e.data ? { ...e.data, focusState, pathOffset: offsets.get(e.id) } : e.data,
-          markerEnd: relation
-            ? { type: MarkerType.ArrowClosed, color: RELATION_STYLE[relation].color }
+          // Focused (or hovered) edges flow; reduced-motion falls back to a
+          // static line via a CSS override in globals.css.
+          animated: hover ? emphasised : focusState === "on",
+          zIndex: emphasised ? 1000 : undefined,
+          data: e.data ? { ...e.data, focusState, hover, pathOffset: offsets.get(e.id) } : e.data,
+          markerEnd: color
+            ? {
+                type: MarkerType.ArrowClosed,
+                color,
+                ...(emphasised ? { width: 26, height: 26 } : {}),
+              }
             : e.markerEnd,
         };
       }),
-    [visibleEdges, focus, offsets, dimActive],
+    [visibleEdges, focus, offsets, dimActive, hoveredEdgeId],
   );
 
   // Refit the view when isolate frames a subset (or clears back to the board).
@@ -218,6 +234,8 @@ function Canvas() {
             onNodeClick={(_, n) => setSelected(n.id)}
             onNodeMouseEnter={(_, n) => setHovered(n.id)}
             onNodeMouseLeave={() => setHovered(null)}
+            onEdgeMouseEnter={(_, e) => setHoveredEdge(e.id)}
+            onEdgeMouseLeave={() => setHoveredEdge(null)}
             onPaneClick={() => {
               setSelected(null);
               setHovered(null);
