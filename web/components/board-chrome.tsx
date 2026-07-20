@@ -9,7 +9,7 @@ import {
   ELEMENT_DEFINITIONS,
 } from "@/lib/eventstorming/elements";
 import { LEVEL_TYPES } from "@/lib/eventstorming/levels";
-import { BAND_H, computeContextBoxes } from "@/lib/layout/layout";
+import { computeBandTops, computeContextBoxes } from "@/lib/layout/layout";
 import { useESStore } from "@/lib/store/store";
 
 const BAND_LABEL: Record<Band, string> = {
@@ -47,6 +47,7 @@ export function BoardChrome() {
 
   const visibleBands = new Set(LEVEL_TYPES[level].map((t) => ELEMENT_BAND[t]));
 
+  const bandTops = computeBandTops(nodes, edges, contexts);
   const boxes = new Map(computeContextBoxes(nodes, edges, contexts).map((b) => [b.id, b]));
   const nameOf = new Map(contexts.map((c) => [c.id, c.name]));
 
@@ -57,7 +58,7 @@ export function BoardChrome() {
       {/* band rail — left edge, vertical position tracks the viewport */}
       {BAND_ORDER.map((band, i) => {
         if (!visibleBands.has(band)) return null;
-        const top = i * BAND_H * zoom + vy;
+        const top = bandTops[i] * zoom + vy;
         return (
           <div
             key={band}

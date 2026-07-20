@@ -3,7 +3,7 @@ import type { Context } from "@/lib/dsl/schema";
 import { bandIndex } from "@/lib/eventstorming/elements";
 import type { RelationType } from "@/lib/eventstorming/relations";
 import type { ESEdge, ESNode } from "@/lib/store/types";
-import { BAND_H, computeContextBoxes, computeLayout } from "./layout";
+import { BAND_H, computeContextBoxes, computeLayout, STACK_H } from "./layout";
 
 const contexts: Context[] = [
   { id: "A", name: "Ordering", order: 0 },
@@ -100,6 +100,36 @@ describe("layout engine (RT2)", () => {
     expect(by.p1.y).not.toBe(by.p2.y);
     // the order-1 event sits in a later column
     expect(by.later.x).toBeGreaterThan(by.p1.x);
+  });
+
+  it("grows the band so concurrent lanes do not overlap the next band (issue-00002)", () => {
+    const ev = (id: string, order: number): ESNode => ({
+      id,
+      type: "domainEvent",
+      position: { x: 0, y: 0 },
+      data: { label: id, context: "A", order },
+    });
+    const pol = (id: string): ESNode => ({
+      id,
+      type: "policy",
+      position: { x: 0, y: 0 },
+      data: { label: id, context: "A" },
+    });
+    // three concurrent events (order 0), each triggering its own policy
+    const nodes = [ev("e0", 0), ev("e1", 0), ev("e2", 0), pol("p0"), pol("p1"), pol("p2")];
+    const e = (id: string, s: string, t: string): ESEdge => ({
+      id,
+      source: s,
+      target: t,
+      data: { relation: "triggers" },
+    });
+    const edges = [e("t0", "e0", "p0"), e("t1", "e1", "p1"), e("t2", "e2", "p2")];
+    const out = computeLayout(nodes, edges, contexts);
+    const y = Object.fromEntries(out.map((n) => [n.id, n.position.y]));
+    const lowestEvent = Math.max(y.e0, y.e1, y.e2);
+    const highestPolicy = Math.min(y.p0, y.p1, y.p2);
+    // the lowest event sticky must clear a full sub-row before the policy band
+    expect(lowestEvent + STACK_H).toBeLessThanOrEqual(highestPolicy);
   });
 
   it("handles nodes missing order/context and unattached hotspots without throwing", () => {

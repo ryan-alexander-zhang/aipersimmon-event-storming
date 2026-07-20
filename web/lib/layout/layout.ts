@@ -4,7 +4,7 @@
 // The user never sets positions — this is what keeps the board readable.
 
 import type { Context } from "@/lib/dsl/schema";
-import { bandIndex } from "@/lib/eventstorming/elements";
+import { BAND_ORDER, bandIndex } from "@/lib/eventstorming/elements";
 import type { RelationType } from "@/lib/eventstorming/relations";
 import type { ESEdge, ESNode } from "@/lib/store/types";
 
@@ -115,29 +115,63 @@ function computePlacement(nodes: ESNode[], edges: ESEdge[], contexts: Context[])
   return { place, ctxIds, base, width };
 }
 
+interface Rows {
+  subRow: Map<string, number>; // sub-row within the band (lane + collision stack)
+  globalCol: Map<string, number>;
+  bandTops: number[]; // y of each band's top, indexed by band-order row
+}
+
+// Resolve each node's sub-row within its band and, from the busiest band, the
+// cumulative top y of every band. A band grows by STACK_H per extra sub-row so
+// concurrent lanes never overflow into the band below (issue-00002).
+function computeRows(nodes: ESNode[], place: Placed["place"], base: Placed["base"]): Rows {
+  const cellCount = new Map<string, number>();
+  const subRow = new Map<string, number>();
+  const globalCol = new Map<string, number>();
+  const maxSubRow = new Array(BAND_ORDER.length).fill(0);
+  for (const n of nodes) {
+    // computePlacement places every node and bases every referenced context.
+    const p = place.get(n.id)!;
+    const gcol = base.get(p.ctx)! + p.col;
+    const row = bandIndex(n.type);
+    // parallel lane offsets the whole slice within its band; a residual counter
+    // separates any exact (band, column, lane) collisions.
+    const cellKey = `${row}:${gcol.toFixed(2)}:${p.lane}`;
+    const stack = cellCount.get(cellKey) ?? 0;
+    cellCount.set(cellKey, stack + 1);
+    const sr = p.lane + stack;
+    subRow.set(n.id, sr);
+    globalCol.set(n.id, gcol);
+    if (sr > maxSubRow[row]) maxSubRow[row] = sr;
+  }
+  const bandTops = new Array(BAND_ORDER.length).fill(0);
+  for (let r = 1; r < bandTops.length; r++) {
+    // a band with maxSubRow s occupies s*STACK_H + BAND_H; an un-stacked band
+    // keeps BAND_H, so a board with no concurrency lays out exactly as before.
+    bandTops[r] = bandTops[r - 1] + maxSubRow[r - 1] * STACK_H + BAND_H;
+  }
+  return { subRow, globalCol, bandTops };
+}
+
 /** Compute a new node array with positions derived from the model. Pure and
  *  deterministic: the same (nodes, edges, contexts) always yields the same layout. */
 export function computeLayout(nodes: ESNode[], edges: ESEdge[], contexts: Context[]): ESNode[] {
   const { place, base } = computePlacement(nodes, edges, contexts);
-  const cellCount = new Map<string, number>();
-  return nodes.map((n) => {
-    // computePlacement places every node and bases every referenced context.
-    const p = place.get(n.id)!;
-    const globalCol = base.get(p.ctx)! + p.col;
-    const row = bandIndex(n.type);
-    // parallel lane offsets the whole slice within its band; a residual counter
-    // separates any exact (band, column, lane) collisions.
-    const cellKey = `${row}:${globalCol.toFixed(2)}:${p.lane}`;
-    const stack = cellCount.get(cellKey) ?? 0;
-    cellCount.set(cellKey, stack + 1);
-    return {
-      ...n,
-      position: {
-        x: Math.round(globalCol * COL_W),
-        y: row * BAND_H + (p.lane + stack) * STACK_H,
-      },
-    };
-  });
+  const { subRow, globalCol, bandTops } = computeRows(nodes, place, base);
+  return nodes.map((n) => ({
+    ...n,
+    position: {
+      x: Math.round(globalCol.get(n.id)! * COL_W),
+      y: bandTops[bandIndex(n.type)] + subRow.get(n.id)! * STACK_H,
+    },
+  }));
+}
+
+/** The y of each band's top (indexed by band-order row), for the band rail so it
+ *  tracks the variable band heights. Same inputs as computeLayout. */
+export function computeBandTops(nodes: ESNode[], edges: ESEdge[], contexts: Context[]): number[] {
+  const { place, base } = computePlacement(nodes, edges, contexts);
+  return computeRows(nodes, place, base).bandTops;
 }
 
 /** Flow-space horizontal box of each context (including empty ones), for the
