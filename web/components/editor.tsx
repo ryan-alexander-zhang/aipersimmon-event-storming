@@ -186,11 +186,7 @@ function Canvas() {
           zIndex: emphasised ? 1000 : undefined,
           data: e.data ? { ...e.data, focusState, hover, pathOffset: offsets.get(e.id) } : e.data,
           markerEnd: color
-            ? {
-                type: MarkerType.ArrowClosed,
-                color,
-                ...(emphasised ? { width: 26, height: 26 } : {}),
-              }
+            ? { type: MarkerType.ArrowClosed, color }
             : e.markerEnd,
         };
       }),
