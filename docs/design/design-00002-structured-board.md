@@ -117,3 +117,57 @@ layout engine).
 Keep DSL/store/serialize/React-Flow/custom-node code; add the layout engine,
 context+order model, `updates` relation, and slice-builder UI; disable free
 drag. Tracked in plan-00002.
+
+## 8. Levels (view filter)
+
+`meta.level` is a Zod enum: `big-picture` | `process` | `design`. A level is a
+**view filter over the same model** — switching it shows/hides element types
+(and their bands and slice actions); it never deletes anything.
+
+| Level | Element types shown |
+|---|---|
+| Big Picture | Actor, External System, Domain Event, Hot Spot |
+| Process | + Command, Policy, Read Model |
+| Design | + Aggregate |
+
+Types are cumulative (Big Picture ⊂ Process ⊂ Design). The store holds the
+current `level`; the board filters visible nodes/edges/bands, the toolbar
+switches it, and it is serialized (`meta.level`) and autosaved. See §11 for
+each level's purpose.
+
+## 9. Concurrency — parallel events
+
+The timeline stays strictly left→right; concurrency is expressed two ways:
+
+- **Fan-out**: one Domain Event triggers several Policies (or an Aggregate emits
+  several events) — multiple edges from one source. Already supported by the
+  graph model.
+- **Same-slot parallel events**: Domain Events that share the same `order` in a
+  context are concurrent — they occupy one timeline column and stack in
+  **sub-lanes**; each event's slice inherits its lane so parallel branches align
+  top-to-bottom. (Swimlanes-by-actor are a different vertical partition that
+  conflicts with type-bands; deferred as a possible Big-Picture-only layout.)
+
+## 10. Connector routing
+
+Nodes expose anchor handles on all four sides. Each edge picks the handle pair
+from the two nodes' relative positions: the **vertical slice chain connects
+bottom↔top**, while **timeline / cross-column relations connect left↔right** —
+avoiding the awkward S-curves of a single left/right handle. Routing is derived
+at render time from positions, so it re-computes with the layout.
+
+## 11. Context columns & editing
+
+Every context reserves an ordered column slot from the layout engine — including
+empty contexts, so their headers never pile at the origin. Context headers are
+editable (rename) and removable (removing a context drops its member nodes and
+their edges). This is the only place `Context.order` and membership change; the
+layout recomputes from them.
+
+## 12. Actor vs External System
+
+Both live in the top participant band (per the ddd-crew convention) but are
+visually distinct: Actor is the small yellow sticky (person icon); External
+System is a **wider pink** sticky (server icon). External Systems are created
+through slice actions (a Command's "+ External System", an External System's
+"+ Domain Event").

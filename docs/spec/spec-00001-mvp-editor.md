@@ -36,6 +36,8 @@ annotates); Model and DSL. Inputs:
 | US5 | [us-00005-local-persistence](../us/us-00005-local-persistence.md) | active | Autosave locally and restore on reload |
 | US6 | [us-00006-bounded-contexts-timeline](../us/us-00006-bounded-contexts-timeline.md) | active | Organize the board into bounded contexts along an ordered timeline |
 | US7 | [us-00007-structured-slice-editing](../us/us-00007-structured-slice-editing.md) | active | Build event slices; layout is computed, positions never hand-set |
+| US8 | [us-00008-levels](../us/us-00008-levels.md) | active | Switch Big Picture / Process / Design levels (view filter over one model) |
+| US9 | [us-00009-concurrent-events](../us/us-00009-concurrent-events.md) | active | Show concurrent events in parallel sub-lanes at one timeline slot |
 
 ## 3. Cross-cutting / System Requirements
 

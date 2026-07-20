@@ -31,6 +31,9 @@ slice builder is the primary interaction; positions are derived, never dragged.
 | RT6 | Timeline reorder + context reassignment (the only moves); manual validated links for cross-context | us-00006, us-00002 | RT4 | run: reorder swaps columns; reassign moves context; invalid manual link rejected |
 | RT7 | Export/import v2 + autosave (adapt serialize + persistence to v2 + migration) | us-00004, us-00005 | RT1,RT3 | run+unit: round-trip preserves contexts/order; reload restores; v1 import migrates |
 | RT8 | Retire free-drag palette-drop; repurpose palette as slice/context add; cleanup | us-00001 re-scope | RT5 | run: no free drop path remains |
+| RT9 | Level filter (Big Picture / Process / Design): store level, toolbar selector, hide types/bands/slice actions, serialize `meta.level` | us-00008 | RT4,RT5 | run+unit: each level shows the right bands; level round-trips |
+| RT10 | Concurrent events: same `order` share a column, stack in sub-lanes; slice inherits lane | us-00009 | RT2 | unit: same-order events share x, differ in y |
+| RT11 | Review fixes: reserve context column slots + editable/removable headers; 4-side handles + geometry connector routing; External System creatable + distinct | us-00006, us-00007, us-00001 | RT4,RT5 | run: contexts side-by-side & renamable; vertical chain connects top↔bottom; System creatable & distinct |
 
 ## Detailed Acceptance Path
 
@@ -49,6 +52,8 @@ slice builder is the primary interaction; positions are derived, never dragged.
 | us-00005 persistence | us-00005-AC-1.1, -2.1 |
 | us-00006 contexts + timeline | us-00006-AC-1.1, -3.1, -4.1 |
 | us-00007 slice + computed layout | us-00007-AC-1.1, -2.1, -4.1 |
+| us-00008 levels | us-00008-AC-1.1, -2.1 |
+| us-00009 concurrent events | us-00009-AC-1.1 |
 | spec cross-cutting | spec-00001-XAC-1.1, -2.1, -4.1 |
 
 - Before `resolved`: a subagent verifies every GWT maps to a passing test, then a
