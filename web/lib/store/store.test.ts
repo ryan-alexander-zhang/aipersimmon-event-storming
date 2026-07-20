@@ -176,6 +176,19 @@ describe("store v2 (RT3)", () => {
     expect(get().contexts).toHaveLength(0);
   });
 
+  it("tracks the transient hover target and clears it on clear/setModel (RA3)", () => {
+    const ctx = get().addContext("c");
+    const a = get().addNode("actor", ctx);
+    get().setHovered(a);
+    expect(get().hoveredId).toBe(a);
+    get().clear();
+    expect(get().hoveredId).toBeNull();
+    const ctx2 = get().addContext("c2");
+    get().setHovered(get().addNode("actor", ctx2));
+    get().setModel({ nodes: [], edges: [], contexts: [] });
+    expect(get().hoveredId).toBeNull();
+  });
+
   it("applies node/edge changes and tracks selection", () => {
     const ctx = get().addContext("c");
     const a = get().addNode("actor", ctx);

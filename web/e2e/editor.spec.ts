@@ -177,6 +177,31 @@ test("autosaves and restores on reload [us-00005-AC-1.1]", async ({ page }) => {
   await expect(nodes(page, "domainEvent")).toHaveCount(1);
 });
 
+test("relation labels appear only for the focused node [design-00003]", async ({ page }) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+  // Nothing focused → the un-focused board carries no relation labels.
+  await expect(page.getByText("emits", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("updates", { exact: true })).toHaveCount(0);
+  // Focusing a node reveals the labels of its incident edges only.
+  await nodes(page, "readModel").click(); // rm1 ← "updates" from the event
+  await expect(page.getByText("updates", { exact: true })).toBeVisible();
+  await expect(page.getByText("emits", { exact: true })).toHaveCount(0); // not incident to rm1
+});
+
+test("focusing a node dims the rest of the board [design-00003]", async ({ page }) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await expect(nodes(page, "readModel")).toHaveCount(1);
+  await nodes(page, "readModel").click(); // focus rm1
+  const opacity = (loc: ReturnType<typeof nodes>) =>
+    loc.evaluate((el) => Number(getComputedStyle(el).opacity));
+  // The focused node stays fully opaque; an unrelated node (Payment Gateway) dims.
+  expect(await opacity(nodes(page, "readModel"))).toBe(1);
+  expect(await opacity(nodes(page, "externalSystem"))).toBeLessThan(1);
+});
+
 test("New clears the model and does not restore it on reload", async ({ page }) => {
   await page.goto("/");
   await addContext(page);

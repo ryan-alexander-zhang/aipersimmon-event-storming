@@ -19,6 +19,11 @@ export type ESNode = Node<ESNodeData, ElementType>;
 
 export type ESEdgeData = {
   relation: RelationType;
+  // View-only focus state injected at render time (never serialized):
+  //   "none" = no focus active · "on" = in the focused set · "off" = dimmed.
+  focusState?: "none" | "on" | "off";
+  // View-only bezier curvature for parallel-edge separation (never serialized).
+  curvature?: number;
 };
 
 export type ESEdge = Edge<ESEdgeData>;

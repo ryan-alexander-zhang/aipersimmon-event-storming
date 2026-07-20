@@ -26,6 +26,8 @@ export interface ESState {
   contexts: Context[];
   level: Level;
   selectedId: string | null;
+  /** Transient hover target; drives the focus highlight, never persisted. */
+  hoveredId: string | null;
 
   setLevel: (level: Level) => void;
 
@@ -51,6 +53,7 @@ export interface ESState {
   reassignContext: (nodeId: string, context: string) => void;
 
   setSelected: (id: string | null) => void;
+  setHovered: (id: string | null) => void;
   setModel: (model: {
     nodes: ESNode[];
     edges: ESEdge[];
@@ -71,6 +74,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   contexts: [],
   level: "design",
   selectedId: null,
+  hoveredId: null,
 
   setLevel: (level) => set({ level }),
 
@@ -153,6 +157,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   reassignContext: (nodeId, context) => get().updateNodeData(nodeId, { context }),
 
   setSelected: (id) => set({ selectedId: id }),
+  setHovered: (id) => set({ hoveredId: id }),
   setModel: ({ nodes, edges, contexts, level }) =>
     set({
       nodes: laidOut(nodes, edges, contexts),
@@ -160,8 +165,9 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       contexts,
       level: level ?? get().level,
       selectedId: null,
+      hoveredId: null,
     }),
-  clear: () => set({ nodes: [], edges: [], contexts: [], selectedId: null }),
+  clear: () => set({ nodes: [], edges: [], contexts: [], selectedId: null, hoveredId: null }),
 });
 
 export const useESStore = create<ESState>()(initializer);
