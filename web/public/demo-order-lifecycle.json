@@ -1,0 +1,114 @@
+{
+  "version": "2.0",
+  "meta": { "name": "Order Lifecycle (demo)", "level": "process", "createdAt": "2026-07-20T00:00:00.000Z" },
+  "contexts": [
+    { "id": "ord", "name": "Ordering", "order": 0 },
+    { "id": "pay", "name": "Payment", "order": 1 },
+    { "id": "ful", "name": "Fulfillment", "order": 2 },
+    { "id": "sup", "name": "Support & Notification", "order": 3 }
+  ],
+  "nodes": [
+    { "id": "a_customer", "type": "actor", "label": "Customer", "context": "ord", "properties": {} },
+    { "id": "a_wh", "type": "actor", "label": "Warehouse Operator", "context": "ful", "properties": {} },
+    { "id": "a_support", "type": "actor", "label": "Support Agent", "context": "sup", "properties": {} },
+
+    { "id": "rm_cart", "type": "readModel", "label": "Cart Summary", "context": "ord", "properties": {} },
+    { "id": "rm_paystatus", "type": "readModel", "label": "Payment Status", "context": "pay", "properties": {} },
+    { "id": "rm_tracking", "type": "readModel", "label": "Order Tracking", "context": "ful", "properties": {} },
+    { "id": "rm_picklist", "type": "readModel", "label": "Pick List", "context": "ful", "properties": {} },
+
+    { "id": "c_place", "type": "command", "label": "Place Order", "context": "ord", "properties": {} },
+    { "id": "c_charge", "type": "command", "label": "Charge Payment", "context": "pay", "properties": {} },
+    { "id": "c_reserve", "type": "command", "label": "Reserve Stock", "context": "ful", "properties": {} },
+    { "id": "c_createship", "type": "command", "label": "Create Shipment", "context": "ful", "properties": {} },
+    { "id": "c_dispatch", "type": "command", "label": "Dispatch Shipment", "context": "ful", "properties": {} },
+    { "id": "c_notify", "type": "command", "label": "Send Notification", "context": "sup", "properties": {} },
+    { "id": "c_track", "type": "command", "label": "Track Shipment", "context": "ful", "properties": {} },
+    { "id": "c_cancel", "type": "command", "label": "Cancel Order", "context": "ord", "properties": {} },
+    { "id": "c_refund", "type": "command", "label": "Issue Refund", "context": "sup", "properties": {} },
+
+    { "id": "ag_order", "type": "aggregate", "label": "Order", "context": "ord", "properties": {} },
+    { "id": "ag_inventory", "type": "aggregate", "label": "Inventory", "context": "ful", "properties": {} },
+    { "id": "ag_shipment", "type": "aggregate", "label": "Shipment", "context": "ful", "properties": {} },
+
+    { "id": "ex_pay", "type": "externalSystem", "label": "Payment Gateway", "context": "pay", "properties": {} },
+    { "id": "ex_email", "type": "externalSystem", "label": "Email Service", "context": "sup", "properties": {} },
+    { "id": "ex_carrier", "type": "externalSystem", "label": "Carrier API", "context": "ful", "properties": {} },
+
+    { "id": "e_placed", "type": "domainEvent", "label": "Order Placed", "context": "ord", "order": 0, "properties": { "pivotal": true } },
+    { "id": "e_cancelled", "type": "domainEvent", "label": "Order Cancelled", "context": "ord", "order": 1, "properties": {} },
+    { "id": "e_authorized", "type": "domainEvent", "label": "Payment Authorized", "context": "pay", "order": 0, "properties": { "pivotal": true } },
+    { "id": "e_declined", "type": "domainEvent", "label": "Payment Declined", "context": "pay", "order": 1, "properties": {} },
+    { "id": "e_reserved", "type": "domainEvent", "label": "Stock Reserved", "context": "ful", "order": 0, "properties": {} },
+    { "id": "e_shipcreated", "type": "domainEvent", "label": "Shipment Created", "context": "ful", "order": 1, "properties": {} },
+    { "id": "e_dispatched", "type": "domainEvent", "label": "Shipment Dispatched", "context": "ful", "order": 2, "properties": { "pivotal": true } },
+    { "id": "e_delivered", "type": "domainEvent", "label": "Shipment Delivered", "context": "ful", "order": 3, "properties": {} },
+    { "id": "e_notified", "type": "domainEvent", "label": "Customer Notified", "context": "sup", "order": 0, "properties": {} },
+    { "id": "e_refunded", "type": "domainEvent", "label": "Refund Issued", "context": "sup", "order": 1, "properties": {} },
+
+    { "id": "p1_pay", "type": "policy", "label": "On Order Placed, request payment", "context": "ord", "properties": {} },
+    { "id": "p2_cancel", "type": "policy", "label": "On Payment Declined, cancel order", "context": "pay", "properties": {} },
+    { "id": "p3_reserve", "type": "policy", "label": "On Payment Authorized, reserve stock", "context": "pay", "properties": {} },
+    { "id": "p4_ship", "type": "policy", "label": "On Stock Reserved, create shipment", "context": "ful", "properties": {} },
+    { "id": "p5_notify", "type": "policy", "label": "On Dispatched, notify customer", "context": "ful", "properties": {} },
+    { "id": "p6_track", "type": "policy", "label": "On Dispatched, start tracking", "context": "ful", "properties": {} },
+
+    { "id": "h_retry", "type": "hotspot", "label": "Retry policy on gateway timeout?", "context": "pay", "properties": {} },
+    { "id": "h_reserve", "type": "hotspot", "label": "Reserve stock before or after payment?", "context": "ful", "properties": {} },
+    { "id": "h_refund", "type": "hotspot", "label": "Are partial refunds supported?", "context": "sup", "properties": {} }
+  ],
+  "edges": [
+    { "id": "i1", "source": "a_customer", "target": "c_place", "relation": "issues" },
+    { "id": "i2", "source": "a_wh", "target": "c_dispatch", "relation": "issues" },
+    { "id": "i3", "source": "a_support", "target": "c_refund", "relation": "issues" },
+
+    { "id": "hb1", "source": "c_place", "target": "ag_order", "relation": "handledBy" },
+    { "id": "hb2", "source": "c_charge", "target": "ex_pay", "relation": "handledBy" },
+    { "id": "hb3", "source": "c_reserve", "target": "ag_inventory", "relation": "handledBy" },
+    { "id": "hb4", "source": "c_createship", "target": "ag_shipment", "relation": "handledBy" },
+    { "id": "hb5", "source": "c_dispatch", "target": "ag_shipment", "relation": "handledBy" },
+    { "id": "hb6", "source": "c_notify", "target": "ex_email", "relation": "handledBy" },
+    { "id": "hb7", "source": "c_track", "target": "ex_carrier", "relation": "handledBy" },
+    { "id": "hb8", "source": "c_cancel", "target": "ag_order", "relation": "handledBy" },
+    { "id": "hb9", "source": "c_refund", "target": "ag_order", "relation": "handledBy" },
+
+    { "id": "m1", "source": "ag_order", "target": "e_placed", "relation": "emits" },
+    { "id": "m2", "source": "ex_pay", "target": "e_authorized", "relation": "emits" },
+    { "id": "m3", "source": "ex_pay", "target": "e_declined", "relation": "emits" },
+    { "id": "m4", "source": "ag_inventory", "target": "e_reserved", "relation": "emits" },
+    { "id": "m5", "source": "ag_shipment", "target": "e_shipcreated", "relation": "emits" },
+    { "id": "m6", "source": "ag_shipment", "target": "e_dispatched", "relation": "emits" },
+    { "id": "m7", "source": "ex_carrier", "target": "e_delivered", "relation": "emits" },
+    { "id": "m8", "source": "ex_email", "target": "e_notified", "relation": "emits" },
+    { "id": "m9", "source": "ag_order", "target": "e_cancelled", "relation": "emits" },
+    { "id": "m10", "source": "ag_order", "target": "e_refunded", "relation": "emits" },
+
+    { "id": "t1", "source": "e_placed", "target": "p1_pay", "relation": "triggers" },
+    { "id": "t2", "source": "e_authorized", "target": "p3_reserve", "relation": "triggers" },
+    { "id": "t3", "source": "e_declined", "target": "p2_cancel", "relation": "triggers" },
+    { "id": "t4", "source": "e_reserved", "target": "p4_ship", "relation": "triggers" },
+    { "id": "t5", "source": "e_dispatched", "target": "p5_notify", "relation": "triggers" },
+    { "id": "t6", "source": "e_dispatched", "target": "p6_track", "relation": "triggers" },
+
+    { "id": "v1", "source": "p1_pay", "target": "c_charge", "relation": "invokes" },
+    { "id": "v2", "source": "p3_reserve", "target": "c_reserve", "relation": "invokes" },
+    { "id": "v3", "source": "p2_cancel", "target": "c_cancel", "relation": "invokes" },
+    { "id": "v4", "source": "p4_ship", "target": "c_createship", "relation": "invokes" },
+    { "id": "v5", "source": "p5_notify", "target": "c_notify", "relation": "invokes" },
+    { "id": "v6", "source": "p6_track", "target": "c_track", "relation": "invokes" },
+
+    { "id": "u1", "source": "e_placed", "target": "rm_cart", "relation": "updates" },
+    { "id": "u2", "source": "e_authorized", "target": "rm_paystatus", "relation": "updates" },
+    { "id": "u3", "source": "e_reserved", "target": "rm_picklist", "relation": "updates" },
+    { "id": "u4", "source": "e_dispatched", "target": "rm_tracking", "relation": "updates" },
+
+    { "id": "f1", "source": "rm_cart", "target": "a_customer", "relation": "informs" },
+    { "id": "f2", "source": "rm_paystatus", "target": "a_customer", "relation": "informs" },
+    { "id": "f3", "source": "rm_tracking", "target": "a_customer", "relation": "informs" },
+    { "id": "f4", "source": "rm_picklist", "target": "a_wh", "relation": "informs" },
+
+    { "id": "n1", "source": "h_retry", "target": "ex_pay", "relation": "annotates" },
+    { "id": "n2", "source": "h_reserve", "target": "c_reserve", "relation": "annotates" },
+    { "id": "n3", "source": "h_refund", "target": "c_refund", "relation": "annotates" }
+  ]
+}

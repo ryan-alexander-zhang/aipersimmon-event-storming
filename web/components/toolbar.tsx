@@ -1,19 +1,21 @@
 "use client";
 
-import { Download, Upload } from "lucide-react";
+import { Download, FolderPlus, Upload } from "lucide-react";
 import { type ChangeEvent, useRef, useState } from "react";
-import { exportJSON, fromModel, importJSON } from "@/lib/dsl/serialize";
+import { fromModel, exportJSON, importJSON } from "@/lib/dsl/serialize";
 import { useESStore } from "@/lib/store/store";
 
 export function Toolbar() {
   const nodes = useESStore((s) => s.nodes);
   const edges = useESStore((s) => s.edges);
+  const contexts = useESStore((s) => s.contexts);
   const setModel = useESStore((s) => s.setModel);
+  const addContext = useESStore((s) => s.addContext);
   const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   const onExport = () => {
-    const json = exportJSON(nodes, edges, {
+    const json = exportJSON(nodes, edges, contexts, {
       name: "Event Storming",
       createdAt: new Date().toISOString(),
     });
@@ -30,9 +32,20 @@ export function Toolbar() {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-importing the same file
     if (!file) return;
-    const result = importJSON(await file.text());
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      setError("Could not read the file.");
+      return;
+    }
+    const result = importJSON(text);
     if (result.ok) setModel(fromModel(result.model));
     else setError(result.error);
+  };
+
+  const onAddContext = () => {
+    addContext(`Context ${contexts.length + 1}`);
   };
 
   const btn =
@@ -52,6 +65,9 @@ export function Toolbar() {
             {error}
           </span>
         )}
+        <button type="button" className={btn} onClick={onAddContext}>
+          <FolderPlus size={14} /> Add context
+        </button>
         <button type="button" className={btn} onClick={onExport}>
           <Download size={14} /> Export
         </button>

@@ -9,9 +9,9 @@ import {
   MarkerType,
   MiniMap,
   type NodeTypes,
+  Panel,
   ReactFlow,
   ReactFlowProvider,
-  useReactFlow,
 } from "@xyflow/react";
 import type { DragEvent } from "react";
 import { useCallback, useEffect, useMemo } from "react";
@@ -20,6 +20,7 @@ import { ELEMENT_DND_MIME, Palette } from "@/components/palette";
 import { PropertyPanel } from "@/components/property-panel";
 import { Toolbar } from "@/components/toolbar";
 import {
+  BAND_ORDER,
   ELEMENT_DEFINITIONS,
   ELEMENT_TYPES,
   type ElementType,
@@ -28,17 +29,23 @@ import { isValidConnection as canConnect } from "@/lib/eventstorming/relations";
 import { loadModel, saveModel } from "@/lib/store/persistence";
 import { useESStore } from "@/lib/store/store";
 
+const defaultEdgeOptions = {
+  markerEnd: { type: MarkerType.ArrowClosed },
+  labelBgPadding: [4, 2] as [number, number],
+  labelBgStyle: { fill: "#ffffff", fillOpacity: 0.85 },
+};
+
 /** Hydrate from local storage on mount, then debounce-save on every change. */
 function useAutosave() {
   useEffect(() => {
     const loaded = loadModel();
-    if (loaded && (loaded.nodes.length > 0 || loaded.edges.length > 0)) {
+    if (loaded && (loaded.nodes.length > 0 || loaded.contexts.length > 0)) {
       useESStore.getState().setModel(loaded);
     }
     let timer: ReturnType<typeof setTimeout>;
     const unsubscribe = useESStore.subscribe((s) => {
       clearTimeout(timer);
-      timer = setTimeout(() => saveModel(s.nodes, s.edges), 400);
+      timer = setTimeout(() => saveModel(s.nodes, s.edges, s.contexts), 400);
     });
     return () => {
       clearTimeout(timer);
@@ -47,21 +54,13 @@ function useAutosave() {
   }, []);
 }
 
-const defaultEdgeOptions = {
-  markerEnd: { type: MarkerType.ArrowClosed },
-  labelBgPadding: [4, 2] as [number, number],
-  labelBgStyle: { fill: "#ffffff", fillOpacity: 0.85 },
-};
-
 function Canvas() {
   const nodes = useESStore((s) => s.nodes);
   const edges = useESStore((s) => s.edges);
   const onNodesChange = useESStore((s) => s.onNodesChange);
   const onEdgesChange = useESStore((s) => s.onEdgesChange);
   const connect = useESStore((s) => s.connect);
-  const addNode = useESStore((s) => s.addNode);
   const setSelected = useESStore((s) => s.setSelected);
-  const { screenToFlowPosition } = useReactFlow();
 
   useAutosave();
 
@@ -73,8 +72,6 @@ function Canvas() {
 
   const onConnect = useCallback((c: Connection) => void connect(c), [connect]);
 
-  // Live feedback: React Flow refuses the drop (invalid styling) when no rule
-  // matches the source/target element types.
   const isValidConnection = useCallback<IsValidConnection>(
     (c) => {
       const s = nodes.find((n) => n.id === c.source);
@@ -89,16 +86,16 @@ function Canvas() {
     e.dataTransfer.dropEffect = "move";
   }, []);
 
-  const onDrop = useCallback(
-    (e: DragEvent) => {
-      e.preventDefault();
-      const type = e.dataTransfer.getData(ELEMENT_DND_MIME) as ElementType;
-      if (!type) return;
-      const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-      addNode(type, position);
-    },
-    [screenToFlowPosition, addNode],
-  );
+  // Position comes from the layout engine, not the drop point; a drop just adds
+  // the element into a bounded context (created on demand).
+  const onDrop = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    const type = e.dataTransfer.getData(ELEMENT_DND_MIME) as ElementType;
+    if (!type) return;
+    const s = useESStore.getState();
+    const ctx = s.contexts[0]?.id ?? s.addContext("Context 1");
+    s.addNode(type, ctx);
+  }, []);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -111,6 +108,8 @@ function Canvas() {
             edges={edges}
             nodeTypes={nodeTypes}
             defaultEdgeOptions={defaultEdgeOptions}
+            nodesDraggable={false}
+            deleteKeyCode={null}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -124,6 +123,17 @@ function Canvas() {
               nodeColor={(n) => ELEMENT_DEFINITIONS[n.type as ElementType]?.color ?? "#ccc"}
             />
             <Controls />
+            <Panel
+              position="top-left"
+              className="rounded-md border border-zinc-200 bg-white/90 p-2 text-[10px] text-zinc-500 shadow-sm"
+            >
+              <div className="mb-1 font-semibold uppercase tracking-wide">Bands (top → bottom)</div>
+              <ol className="flex flex-col gap-0.5">
+                {BAND_ORDER.map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+              </ol>
+            </Panel>
           </ReactFlow>
         </div>
         <PropertyPanel />

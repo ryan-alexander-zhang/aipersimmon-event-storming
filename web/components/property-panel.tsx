@@ -7,9 +7,11 @@ import { useESStore } from "@/lib/store/store";
 export function PropertyPanel() {
   const selectedId = useESStore((s) => s.selectedId);
   const node = useESStore((s) => s.nodes.find((n) => n.id === s.selectedId) ?? null);
+  const contexts = useESStore((s) => s.contexts);
   const updateNodeData = useESStore((s) => s.updateNodeData);
   const removeNode = useESStore((s) => s.removeNode);
   const addHotspot = useESStore((s) => s.addHotspot);
+  const reassignContext = useESStore((s) => s.reassignContext);
 
   const wrap = "w-64 shrink-0 overflow-y-auto border-l border-zinc-200 bg-zinc-50 p-3";
 
@@ -54,6 +56,24 @@ export function PropertyPanel() {
         </label>
       )}
 
+      {contexts.length > 0 && (
+        <label className="mt-3 block text-xs font-medium text-zinc-600">
+          Bounded context
+          <select
+            className={field}
+            value={node.data.context ?? ""}
+            onChange={(e) => reassignContext(node.id, e.target.value)}
+          >
+            {node.data.context === undefined && <option value="">—</option>}
+            {contexts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       {node.type === "domainEvent" && (
         <label className="mt-3 flex items-center gap-2 text-sm text-zinc-700">
           <input
@@ -70,13 +90,7 @@ export function PropertyPanel() {
           <button
             type="button"
             className="flex items-center gap-1.5 rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
-            onClick={() =>
-              addHotspot(
-                node.id,
-                { x: node.position.x + 40, y: node.position.y + 120 },
-                "Hotspot?",
-              )
-            }
+            onClick={() => addHotspot(node.id, "Hotspot?")}
           >
             <Flame size={14} /> Add hotspot
           </button>
