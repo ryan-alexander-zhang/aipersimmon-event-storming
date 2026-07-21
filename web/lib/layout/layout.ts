@@ -98,25 +98,26 @@ function computePlacement(nodes: ESNode[], edges: ESEdge[], contexts: Context[])
   // 4. free (unplaced) nodes have no timeline slot; tile them horizontally in
   //    their band, side by side. They must not share a column within a band —
   //    the sub-lane stacking a shared column triggers means *concurrency*, which
-  //    does not apply here. The starting column is per (context, band): a free
-  //    node only clears placed nodes in its OWN band, so e.g. free Actors tile
-  //    from column 0 (above the events) rather than being pushed past events in
-  //    another band.
-  const freeBase = new Map<string, number>(); // `${ctx}:${band}` → last placed column
+  //    does not apply here. Fill the LOWEST available columns per (context, band),
+  //    skipping only columns a placed node in that same band holds. This keeps
+  //    free nodes compact from column 0 and stops one placed node (e.g. a Command
+  //    connected to a far Event) from evacuating the rest to higher columns.
+  const occupied = new Map<string, Set<number>>(); // `${ctx}:${band}` → placed columns
   for (const [id, p] of place) {
     const t = byId.get(id)?.type;
     if (!t) continue;
     const k = `${p.ctx}:${bandIndex(t)}`;
-    freeBase.set(k, Math.max(freeBase.get(k) ?? -1, p.col));
+    (occupied.get(k) ?? occupied.set(k, new Set()).get(k)!).add(p.col);
   }
-  const freeCol = new Map<string, number>(); // `${ctx}:${band}` → next free column
+  const nextFree = new Map<string, number>(); // `${ctx}:${band}` → next column to try
   for (const n of nodes) {
     if (place.has(n.id)) continue;
     const ctx = ctxOf(n.id);
     const key = `${ctx}:${bandIndex(n.type)}`;
-    const base = (freeBase.get(key) ?? -1) + 1;
-    const col = Math.max(base, freeCol.get(key) ?? base);
-    freeCol.set(key, col + 1);
+    const taken = occupied.get(key);
+    let col = nextFree.get(key) ?? 0;
+    while (taken?.has(col)) col++;
+    nextFree.set(key, col + 1);
     set(n.id, ctx, col, 0);
   }
 

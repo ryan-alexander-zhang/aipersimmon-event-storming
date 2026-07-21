@@ -134,6 +134,21 @@ describe("store v2 (RT3)", () => {
     expect(node(a1)!.position.x).toBe(node(e1)!.position.x);
   });
 
+  it("connecting one free node to an event keeps the others compact, not shifted right [issue-00008]", () => {
+    const c0 = get().addNode("command");
+    const c1 = get().addNode("command");
+    const c2 = get().addNode("command");
+    const e0 = get().addNode("domainEvent");
+    const e1 = get().addNode("domainEvent");
+    const e2 = get().addNode("domainEvent");
+    get().connect({ source: c0, target: e2, sourceHandle: null, targetHandle: null }); // produces
+    const cmdXs = [c0, c1, c2].map((id) => node(id)!.position.x).sort((a, b) => a - b);
+    const evtXs = [e0, e1, e2].map((id) => node(id)!.position.x).sort((a, b) => a - b);
+    // the connected command aligns above its event; the free ones fill the empty
+    // low columns — so the band spans the same columns as the events, not beyond.
+    expect(cmdXs).toEqual(evtXs);
+  });
+
   it("reorders an event and reassigns a node's context [us-00006-FR-3/4]", () => {
     const c1 = get().addContext("c1");
     const c2 = get().addContext("c2");
