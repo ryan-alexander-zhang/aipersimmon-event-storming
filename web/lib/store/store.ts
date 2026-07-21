@@ -89,9 +89,11 @@ export interface ESState {
   clear: () => void;
 }
 
-// Recompute positions from the model whenever structure changes.
-function laidOut(nodes: ESNode[], edges: ESEdge[], contexts: Context[]): ESNode[] {
-  return computeLayout(nodes, edges, contexts);
+// Recompute positions from the model whenever structure — or the Level — changes.
+// The Level collapses its hidden bands, so switching Level reflows the board
+// (issue-00009).
+function laidOut(nodes: ESNode[], edges: ESEdge[], contexts: Context[], level: Level): ESNode[] {
+  return computeLayout(nodes, edges, contexts, level);
 }
 
 const initializer: StateCreator<ESState> = (set, get) => ({
@@ -104,7 +106,8 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   hoveredEdgeId: null,
   isolate: { active: false, direction: "down", depth: 2 },
 
-  setLevel: (level) => set({ level }),
+  setLevel: (level) =>
+    set({ level, nodes: laidOut(get().nodes, get().edges, get().contexts, level) }),
   toggleIsolate: () => set({ isolate: { ...get().isolate, active: !get().isolate.active } }),
   setIsolateDirection: (direction) => set({ isolate: { ...get().isolate, direction } }),
   setIsolateDepth: (depth) => set({ isolate: { ...get().isolate, depth: Math.max(1, depth) } }),
@@ -127,7 +130,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     const keep = new Set(nodes.map((n) => n.id));
     const edges = get().edges.filter((e) => keep.has(e.source) && keep.has(e.target));
     const contexts = get().contexts.filter((c) => c.id !== id);
-    set({ nodes: laidOut(nodes, edges, contexts), edges, contexts, selectedId: null });
+    set({ nodes: laidOut(nodes, edges, contexts, get().level), edges, contexts, selectedId: null });
   },
 
   addNode: (type, context, data) => {
@@ -142,7 +145,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     }
     const node: ESNode = { id, type, position: { x: 0, y: 0 }, data: nodeData };
     const nodes = [...get().nodes, node];
-    set({ nodes: laidOut(nodes, get().edges, get().contexts) });
+    set({ nodes: laidOut(nodes, get().edges, get().contexts, get().level) });
     return id;
   },
 
@@ -150,14 +153,14 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     const nodes = get().nodes.map((n) =>
       n.id === id ? { ...n, data: { ...n.data, ...patch } } : n,
     );
-    set({ nodes: laidOut(nodes, get().edges, get().contexts) });
+    set({ nodes: laidOut(nodes, get().edges, get().contexts, get().level) });
   },
 
   removeNode: (id) => {
     const nodes = get().nodes.filter((n) => n.id !== id);
     const edges = get().edges.filter((e) => e.source !== id && e.target !== id);
     set({
-      nodes: laidOut(nodes, edges, get().contexts),
+      nodes: laidOut(nodes, edges, get().contexts, get().level),
       edges,
       selectedId: get().selectedId === id ? null : get().selectedId,
     });
@@ -181,7 +184,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     if (!relation) return false;
     const edge: ESEdge = { id: nanoid(), source, target, data: { relation }, label: relation };
     const edges = addEdge(edge, get().edges);
-    set({ nodes: laidOut(nodes, edges, get().contexts), edges });
+    set({ nodes: laidOut(nodes, edges, get().contexts, get().level), edges });
     return true;
   },
 
@@ -192,7 +195,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       n.id === eventId ? { ...n, data: { ...n.data, order } } : n,
     );
     const normalized = normalizeContextOrders(written, ev.data.context);
-    set({ nodes: laidOut(normalized, get().edges, get().contexts) });
+    set({ nodes: laidOut(normalized, get().edges, get().contexts, get().level) });
   },
 
   nudgeEvent: (eventId, dir) => {
@@ -221,7 +224,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   setHoveredEdge: (id) => set({ hoveredEdgeId: id }),
   setModel: ({ nodes, edges, contexts, level }) =>
     set({
-      nodes: laidOut(nodes, edges, contexts),
+      nodes: laidOut(nodes, edges, contexts, level ?? get().level),
       edges,
       contexts,
       level: level ?? get().level,

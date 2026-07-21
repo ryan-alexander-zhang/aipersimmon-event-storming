@@ -135,6 +135,12 @@ current `level`; the board filters visible nodes/edges/bands, the toolbar
 switches it, and it is serialized (`meta.level`) and autosaved. See §11 for
 each level's purpose.
 
+Layout is a function of `(model, level)`: a band hidden at the current level
+reserves no vertical space, so switching level **reflows** the board and the
+visible bands collapse adjacent — a coarser level does not leave the hidden
+bands' gaps behind (issue-00009). Reflow keys on the level only, never on
+semantic zoom (design-00003 §3 Tier C), so zooming stays smooth.
+
 ## 9. Concurrency — parallel events
 
 The timeline stays strictly left→right; concurrency is expressed two ways:

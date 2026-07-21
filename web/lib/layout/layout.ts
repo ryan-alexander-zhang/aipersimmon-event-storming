@@ -5,6 +5,7 @@
 
 import type { Context } from "@/lib/dsl/schema";
 import { BAND_ORDER, bandIndex } from "@/lib/eventstorming/elements";
+import { type Level, LEVEL_TYPES } from "@/lib/eventstorming/levels";
 import type { RelationType } from "@/lib/eventstorming/relations";
 import type { ESEdge, ESNode } from "@/lib/store/types";
 
@@ -151,8 +152,16 @@ interface Rows {
 
 // Resolve each node's sub-row within its band and, from the busiest band, the
 // cumulative top y of every band. A band grows by STACK_H per extra sub-row so
-// concurrent lanes never overflow into the band below (issue-00002).
-function computeRows(nodes: ESNode[], place: Placed["place"], base: Placed["base"]): Rows {
+// concurrent lanes never overflow into the band below (issue-00002). Bands
+// hidden at `level` reserve no height, so the visible bands collapse adjacent
+// (issue-00009) — layout is a function of (model, level), never of zoom.
+function computeRows(
+  nodes: ESNode[],
+  place: Placed["place"],
+  base: Placed["base"],
+  level: Level,
+): Rows {
+  const visibleBand = new Set(LEVEL_TYPES[level].map((t) => bandIndex(t)));
   const cellCount = new Map<string, number>();
   const subRow = new Map<string, number>();
   const globalCol = new Map<string, number>();
@@ -176,16 +185,25 @@ function computeRows(nodes: ESNode[], place: Placed["place"], base: Placed["base
   for (let r = 1; r < bandTops.length; r++) {
     // a band with maxSubRow s occupies s*STACK_H + BAND_H; an un-stacked band
     // keeps BAND_H, so a board with no concurrency lays out exactly as before.
-    bandTops[r] = bandTops[r - 1] + maxSubRow[r - 1] * STACK_H + BAND_H;
+    // A band hidden at this level occupies nothing, so the next visible band
+    // sits directly below the previous visible one.
+    const prevH = visibleBand.has(r - 1) ? maxSubRow[r - 1] * STACK_H + BAND_H : 0;
+    bandTops[r] = bandTops[r - 1] + prevH;
   }
   return { subRow, globalCol, bandTops };
 }
 
 /** Compute a new node array with positions derived from the model. Pure and
- *  deterministic: the same (nodes, edges, contexts) always yields the same layout. */
-export function computeLayout(nodes: ESNode[], edges: ESEdge[], contexts: Context[]): ESNode[] {
+ *  deterministic: the same (nodes, edges, contexts, level) always yields the same
+ *  layout. Bands hidden at `level` collapse so the visible ones sit adjacent. */
+export function computeLayout(
+  nodes: ESNode[],
+  edges: ESEdge[],
+  contexts: Context[],
+  level: Level = "design",
+): ESNode[] {
   const { place, base } = computePlacement(nodes, edges, contexts);
-  const { subRow, globalCol, bandTops } = computeRows(nodes, place, base);
+  const { subRow, globalCol, bandTops } = computeRows(nodes, place, base, level);
   return nodes.map((n) => ({
     ...n,
     position: {
@@ -197,9 +215,14 @@ export function computeLayout(nodes: ESNode[], edges: ESEdge[], contexts: Contex
 
 /** The y of each band's top (indexed by band-order row), for the band rail so it
  *  tracks the variable band heights. Same inputs as computeLayout. */
-export function computeBandTops(nodes: ESNode[], edges: ESEdge[], contexts: Context[]): number[] {
+export function computeBandTops(
+  nodes: ESNode[],
+  edges: ESEdge[],
+  contexts: Context[],
+  level: Level = "design",
+): number[] {
   const { place, base } = computePlacement(nodes, edges, contexts);
-  return computeRows(nodes, place, base).bandTops;
+  return computeRows(nodes, place, base, level).bandTops;
 }
 
 /** Flow-space horizontal box of each context (including empty ones), for the

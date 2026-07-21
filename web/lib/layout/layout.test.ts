@@ -188,6 +188,27 @@ describe("layout engine (RT2)", () => {
     expect(a!.width).toBeGreaterThan(0);
   });
 
+  it("collapses bands hidden at a coarse level so visible bands sit adjacent [issue-00009]", () => {
+    const { nodes, edges } = sliceModel();
+    // Design shows every band, so the Domain Event sits 4 band-steps below the Actor.
+    const design = computeLayout(nodes, edges, contexts, "design");
+    const dy = Object.fromEntries(design.map((n) => [n.id, n.position.y]));
+    expect(dy.ev - dy.act).toBe(bandIndex("domainEvent") * BAND_H);
+
+    // Big Picture hides Command/Constraint/Aggregate; those bands reserve no
+    // height, so the Domain Event band collapses to one step below the Actor.
+    const bp = computeLayout(nodes, edges, contexts, "big-picture");
+    const by = Object.fromEntries(bp.map((n) => [n.id, n.position.y]));
+    expect(by.ev - by.act).toBe(BAND_H);
+  });
+
+  it("defaults to the full-band (design) layout when no level is given", () => {
+    const { nodes, edges } = sliceModel();
+    const withDefault = computeLayout(nodes, edges, contexts);
+    const explicit = computeLayout(nodes, edges, contexts, "design");
+    expect(withDefault.map((n) => n.position)).toEqual(explicit.map((n) => n.position));
+  });
+
   it("is deterministic (same model → identical layout)", () => {
     const { nodes, edges } = sliceModel();
     const a = computeLayout(nodes, edges, contexts);

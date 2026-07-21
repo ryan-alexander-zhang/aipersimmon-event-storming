@@ -49,7 +49,7 @@ export function BoardChrome() {
 
   const visibleBands = new Set(LEVEL_TYPES[level].map((t) => ELEMENT_BAND[t]));
 
-  const bandTops = computeBandTops(nodes, edges, contexts);
+  const bandTops = computeBandTops(nodes, edges, contexts, level);
   const boxes = new Map(computeContextBoxes(nodes, edges, contexts).map((b) => [b.id, b]));
   const nameOf = new Map(contexts.map((c) => [c.id, c.name]));
 

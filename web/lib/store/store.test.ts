@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { StoreApi } from "zustand";
+import { BAND_H } from "@/lib/layout/layout";
 import { createESStore, type ESState } from "./store";
 import { gapOrder, slotOrders } from "./timeline";
 
@@ -366,5 +367,21 @@ describe("timeline editing [us-00010]", () => {
     get().setEventOrder(cmd, 3);
     get().nudgeEvent(cmd, 1);
     expect(node(cmd)?.data.order).toBeUndefined();
+  });
+
+  it("relayouts to collapse hidden bands when the Level changes [issue-00009]", () => {
+    const ctx = get().addContext("Ordering");
+    const a = get().addNode("actor", ctx);
+    const c = get().addNode("command", ctx);
+    const e = get().addNode("domainEvent", ctx);
+    get().connect({ source: a, target: c, sourceHandle: null, targetHandle: null }); // issues
+    get().connect({ source: c, target: e, sourceHandle: null, targetHandle: null }); // produces
+    // Design (default): Command/Constraint/Aggregate bands sit between the Actor
+    // band and the Domain Event band, so its event is 4 band-steps below it.
+    expect(node(e)!.position.y - node(a)!.position.y).toBe(4 * BAND_H);
+    // Big Picture hides those three bands; the layout must reflow so the visible
+    // Domain Event band collapses up to sit one step below the Actor band.
+    get().setLevel("big-picture");
+    expect(node(e)!.position.y - node(a)!.position.y).toBe(BAND_H);
   });
 });
