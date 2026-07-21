@@ -83,6 +83,57 @@ describe("computeEdgeOffsets (issue-00003: corridor lanes)", () => {
     expect(off(out, "hb2")).toBe(0);
   });
 
+  it("separates a cross-column edge from the same-column edge it overlaps (issue-00004)", () => {
+    // arrived → autostart (down, within the column) then autostart → start
+    // (up and across to a different column). getSmoothStepPath runs the invokes
+    // edge's long vertical segment out of autostart's handle — down autostart's
+    // column — where it overlaps the triggers edge. They must be separated even
+    // though invokes' far endpoint (start) sits in another column.
+    const p = new Map<string, { x: number; y: number }>([
+      ["arrived", { x: 100, y: 400 }],
+      ["autostart", { x: 100, y: 600 }],
+      ["start", { x: 400, y: 100 }],
+    ]);
+    const out = computeEdgeOffsets(
+      [e("trg", "arrived", "autostart", "triggers"), e("inv", "autostart", "start", "invokes")],
+      p,
+    );
+    expect(off(out, "trg")).toBe(0); // shorter, stays centred
+    expect(off(out, "inv")).not.toBe(0); // pushed off the shared column
+  });
+
+  it("clears the hit-zone when a corridor's nodes differ in width (issue-00005)", () => {
+    // Mirror the ride-hailing column: triggers (arrived→autostart, narrow, lane 0),
+    // invokes (autostart→start, cross-column, lane +1), annotates (gps→arrived,
+    // from a WIDE hotspot, lane −1). The wide node drifts annotates' rendered
+    // centre-midpoint right, so a raw −GAP lane cancels against the drift.
+    const p = new Map<string, { x: number; y: number; w?: number }>([
+      ["arrived", { x: 100, y: 400, w: 130 }],
+      ["autostart", { x: 100, y: 600, w: 130 }],
+      ["start", { x: 400, y: 100, w: 130 }],
+      ["gps", { x: 100, y: 1000, w: 200 }], // wider → centre drifts right
+    ]);
+    const out = computeEdgeOffsets(
+      [
+        e("trg", "arrived", "autostart", "triggers"),
+        e("inv", "autostart", "start", "invokes"),
+        e("ann", "gps", "arrived", "annotates"),
+      ],
+      p,
+    );
+    // Rendered vertical-run x = centre-midpoint + returned offset (offsetOrthogonalPath).
+    const cx = (id: string) => (p.get(id)!.x + (p.get(id)!.w ?? 0) / 2);
+    const runX = (id: string, s: string, t: string) => (cx(s) + cx(t)) / 2 + off(out, id);
+    const xs = [
+      runX("trg", "arrived", "autostart"),
+      runX("inv", "autostart", "start"),
+      runX("ann", "gps", "arrived"),
+    ];
+    for (let i = 0; i < xs.length; i++)
+      for (let j = i + 1; j < xs.length; j++)
+        expect(Math.abs(xs[i] - xs[j])).toBeGreaterThanOrEqual(26); // GAP
+  });
+
   it("is deterministic across input order", () => {
     const es = [
       e("hb", "cmd", "agg", "handledBy"),

@@ -150,8 +150,18 @@ function Canvas() {
   }, [routedEdges, visibleNodes]);
 
   // Center offset per edge so edges sharing a column/row corridor bow apart
-  // instead of overlapping on one centreline (needs node positions).
-  const nodePos = useMemo(() => new Map(nodes.map((n) => [n.id, n.position])), [nodes]);
+  // instead of overlapping on one centreline (needs node positions + measured
+  // sizes so the lane centreline is computed in the space edges render in).
+  const nodePos = useMemo(
+    () =>
+      new Map(
+        nodes.map((n) => [
+          n.id,
+          { x: n.position.x, y: n.position.y, w: n.measured?.width, h: n.measured?.height },
+        ]),
+      ),
+    [nodes],
+  );
   const offsets = useMemo(() => computeEdgeOffsets(visibleEdges, nodePos), [visibleEdges, nodePos]);
 
   // Colour/weight each edge by relation, colour its arrow to match, spread
