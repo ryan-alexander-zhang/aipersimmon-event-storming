@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
-import { ELEMENT_DEFINITIONS, type ElementType } from "@/lib/eventstorming/elements";
+import { ELEMENT_DEFINITIONS, ELEMENT_TYPES, type ElementType } from "@/lib/eventstorming/elements";
 import { isVisibleAt } from "@/lib/eventstorming/levels";
 import { useESStore } from "@/lib/store/store";
 
@@ -76,9 +76,36 @@ export function PropertyPanel() {
   const wrap = "w-64 shrink-0 overflow-y-auto border-l border-zinc-200 bg-zinc-50 p-3";
 
   if (!node) {
+    // Nothing selected → the panel is the element palette: place any element the
+    // current level allows as a free (Ungrouped) sticky. This is what makes e.g.
+    // an Actor creatable at Big Picture without a Command (decision-00003).
+    const paletteTypes = ELEMENT_TYPES.filter((t) => isVisibleAt(level, t));
     return (
       <aside className={wrap}>
-        <p className="text-xs text-zinc-500">Select an element to edit it, or add one from the palette above (the current level’s stickies) — or a Domain Event from a context header — to start a slice.</p>
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+          Add element
+        </div>
+        <div className="flex flex-col gap-1.5">
+          {paletteTypes.map((t) => (
+            <button
+              key={t}
+              type="button"
+              aria-label={`Add ${ELEMENT_DEFINITIONS[t].label}`}
+              className="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+              onClick={() => setSelected(addNode(t))}
+            >
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-[3px]"
+                style={{ background: ELEMENT_DEFINITIONS[t].color }}
+              />
+              {ELEMENT_DEFINITIONS[t].label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-4 text-xs text-zinc-500">
+          Pick an element to place it (Ungrouped), or add a Domain Event from a context
+          header. Select an element to edit it and build its slice.
+        </p>
       </aside>
     );
   }

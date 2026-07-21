@@ -42,8 +42,9 @@ test("creates a Domain Event on an empty board, grouped as Ungrouped [issue-0000
   await expect(nodes(page, "domainEvent")).toHaveCount(1);
   await expect(page.getByText("Ungrouped", { exact: true })).toBeVisible();
 
-  // a second ungrouped event joins the same soft group (one Ungrouped header) and
-  // takes the next timeline slot (to the right)
+  // deselect (the palette lives in the empty panel) so a second ungrouped event
+  // can be added; it joins the same soft group and takes the next timeline slot
+  await page.locator(".react-flow__pane").click({ position: { x: 10, y: 10 } });
   await addUngroupedEvent(page);
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
   await expect(page.getByText("Ungrouped", { exact: true })).toHaveCount(1);
@@ -58,11 +59,13 @@ test("creates an Actor directly at Big Picture, no Command needed [us-00007-AC-5
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Big Picture" }).click();
-  await palette(page, "Actor");
-  await expect(nodes(page, "actor")).toHaveCount(1);
-  // Big Picture's palette must not offer Process/Design-only elements
+  // the empty-panel palette offers Big Picture stickies only (assert before adding,
+  // while nothing is selected and the palette is shown)
+  await expect(page.getByRole("button", { name: "Add Actor" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Add Command" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add Aggregate" })).toHaveCount(0);
+  await palette(page, "Actor");
+  await expect(nodes(page, "actor")).toHaveCount(1);
 });
 
 test("a Command produces a Domain Event without an Aggregate [us-00007-AC-1.2, decision-00003]", async ({
