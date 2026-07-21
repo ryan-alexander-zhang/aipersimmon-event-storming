@@ -110,6 +110,30 @@ describe("store v2 (RT3)", () => {
     expect(get().edges).toHaveLength(0);
   });
 
+  it("tiles free (unconnected) same-band nodes horizontally, not stacked [issue-00007]", () => {
+    const a0 = get().addNode("actor");
+    const a1 = get().addNode("actor");
+    const a2 = get().addNode("actor");
+    const xs = [a0, a1, a2].map((id) => node(id)!.position.x);
+    const ys = [a0, a1, a2].map((id) => node(id)!.position.y);
+    // free actors are not concurrent: they spread along the band (distinct x),
+    // and share the one Actors/Systems row (same y), never stacked vertically.
+    expect(new Set(xs).size).toBe(3);
+    expect(new Set(ys).size).toBe(1);
+  });
+
+  it("aligns free nodes to their own band's first columns, not after other bands [issue-00007]", () => {
+    const e0 = get().addNode("domainEvent");
+    const e1 = get().addNode("domainEvent");
+    const a0 = get().addNode("actor");
+    const a1 = get().addNode("actor");
+    // Actors are a different band (row) than Domain Events, so they never collide;
+    // free Actors should tile from their band's column 0 (above the events), not be
+    // pushed to the right past the events.
+    expect(node(a0)!.position.x).toBe(node(e0)!.position.x);
+    expect(node(a1)!.position.x).toBe(node(e1)!.position.x);
+  });
+
   it("reorders an event and reassigns a node's context [us-00006-FR-3/4]", () => {
     const c1 = get().addContext("c1");
     const c2 = get().addContext("c2");

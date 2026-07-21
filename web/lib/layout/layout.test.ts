@@ -156,7 +156,7 @@ describe("layout engine (RT2)", () => {
     expect(out.every((x) => Number.isFinite(x.position.x) && Number.isFinite(x.position.y))).toBe(true);
   });
 
-  it("stacks unrelated same-type nodes that land in one cell", () => {
+  it("tiles unrelated same-type free nodes side by side, not stacked [issue-00007]", () => {
     const actor = (id: string): ESNode => ({
       id,
       type: "actor",
@@ -164,8 +164,12 @@ describe("layout engine (RT2)", () => {
       data: { label: id, context: "A" },
     });
     const out = computeLayout([actor("a1"), actor("a2")], [], contexts);
+    const xs = out.map((n) => n.position.x);
     const ys = out.map((n) => n.position.y);
-    expect(ys[0]).not.toBe(ys[1]); // both unplaced → same cell → stacked
+    // free (unconnected) nodes have no timeline slot and are not concurrent:
+    // distinct columns, one shared band row — never stacked (issue-00007).
+    expect(xs[0]).not.toBe(xs[1]);
+    expect(ys[0]).toBe(ys[1]);
   });
 
   it("reserves a column box per context, including empty ones", () => {

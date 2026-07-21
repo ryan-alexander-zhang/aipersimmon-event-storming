@@ -95,8 +95,30 @@ function computePlacement(nodes: ESNode[], edges: ESEdge[], contexts: Context[])
     if (p) set(n.id, p.ctx, p.col, p.lane);
   }
 
-  // 4. anything still unplaced → column 0 of its context
-  for (const n of nodes) if (!place.has(n.id)) set(n.id, ctxOf(n.id), 0, 0);
+  // 4. free (unplaced) nodes have no timeline slot; tile them horizontally in
+  //    their band, side by side. They must not share a column within a band —
+  //    the sub-lane stacking a shared column triggers means *concurrency*, which
+  //    does not apply here. The starting column is per (context, band): a free
+  //    node only clears placed nodes in its OWN band, so e.g. free Actors tile
+  //    from column 0 (above the events) rather than being pushed past events in
+  //    another band.
+  const freeBase = new Map<string, number>(); // `${ctx}:${band}` → last placed column
+  for (const [id, p] of place) {
+    const t = byId.get(id)?.type;
+    if (!t) continue;
+    const k = `${p.ctx}:${bandIndex(t)}`;
+    freeBase.set(k, Math.max(freeBase.get(k) ?? -1, p.col));
+  }
+  const freeCol = new Map<string, number>(); // `${ctx}:${band}` → next free column
+  for (const n of nodes) {
+    if (place.has(n.id)) continue;
+    const ctx = ctxOf(n.id);
+    const key = `${ctx}:${bandIndex(n.type)}`;
+    const base = (freeBase.get(key) ?? -1) + 1;
+    const col = Math.max(base, freeCol.get(key) ?? base);
+    freeCol.set(key, col + 1);
+    set(n.id, ctx, col, 0);
+  }
 
   // 5. ordered contexts (declared first, then any referenced-only) each reserve
   //    a slot; an empty context still gets width 1.
