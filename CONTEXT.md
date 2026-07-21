@@ -92,6 +92,11 @@ The left→right ordering of Domain Events that forms the board's spine; every
 other element is placed relative to the event it serves.
 _Avoid_: flow, sequence (when precision matters).
 
+**Concurrent Events**:
+Two or more Domain Events that occupy the same timeline position because they
+happen in parallel. They share one column and stack in parallel sub-lanes.
+_Avoid_: parallel events, simultaneous, same-slot (when precision matters).
+
 ### Artifacts
 
 **Model**:

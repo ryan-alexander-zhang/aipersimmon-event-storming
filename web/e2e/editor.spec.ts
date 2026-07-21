@@ -6,6 +6,14 @@ const fixture = (name: string) => path.join(__dirname, "fixtures", name);
 
 const addContext = (page: Page) => page.getByRole("button", { name: "Add context" }).click();
 const addEvent = (page: Page) => page.getByRole("button", { name: "Event", exact: true }).first().click();
+// add a Domain Event (via the context header) and label it, so tests can track it
+const addLabeledEvent = async (page: Page, label: string) => {
+  await addEvent(page);
+  await page.getByLabel("Label", { exact: true }).fill(label);
+};
+// flow-space left edge of the event whose label matches
+const xOf = async (page: Page, label: string) =>
+  (await nodes(page, "domainEvent").filter({ hasText: label }).boundingBox())!.x;
 const addUngroupedEvent = (page: Page) =>
   page.getByRole("button", { name: "Add Domain Event" }).click();
 const palette = (page: Page, label: string) =>
@@ -105,11 +113,44 @@ test("a second context adds a column group after the first [us-00006-AC-1.1]", a
   expect(Math.max(...xs)).toBeGreaterThan(Math.min(...xs)); // second context to the right
 });
 
-test("elements are not free-draggable [us-00007-AC-4.1]", async ({ page }) => {
+test("only timeline elements are drag-enabled; others stay locked [us-00007-AC-4.1]", async ({
+  page,
+}) => {
   await page.goto("/");
   await addContext(page);
-  await addEvent(page);
-  await expect(nodes(page, "domainEvent")).not.toHaveClass(/draggable/);
+  await addEvent(page); // one event, selected
+  await slice(page, "+ Command (produces)");
+  // non-timeline elements cannot be dragged at all (no free positioning)
+  await expect(nodes(page, "command")).not.toHaveClass(/draggable/);
+  // Domain Events are drag-enabled — but only to reorder the timeline; their
+  // position is still computed (a drag edits `order`, verified at the store level
+  // in store.test.ts and by the layout tests; RF pointer-drag isn't simulable in
+  // Playwright, so the drag itself is verified manually per design-00004 §9).
+  await expect(nodes(page, "domainEvent")).toHaveClass(/draggable/);
+});
+
+test("moves an event to the start with the panel button [us-00010-AC-4.1]", async ({ page }) => {
+  await page.goto("/");
+  await addContext(page);
+  await addLabeledEvent(page, "Alpha");
+  await addLabeledEvent(page, "Bravo");
+  await addLabeledEvent(page, "Charlie"); // x order: Alpha < Bravo < Charlie
+  await nodes(page, "domainEvent").filter({ hasText: "Charlie" }).click();
+  await page.getByRole("button", { name: "Move to start" }).click();
+  expect(await xOf(page, "Charlie")).toBeLessThan(await xOf(page, "Alpha"));
+  expect(await xOf(page, "Alpha")).toBeLessThan(await xOf(page, "Bravo"));
+});
+
+test("nudges the selected event one column with the arrow keys [us-00010-AC-5.1]", async ({ page }) => {
+  await page.goto("/");
+  await addContext(page);
+  await addLabeledEvent(page, "Alpha");
+  await addLabeledEvent(page, "Bravo");
+  await addLabeledEvent(page, "Charlie");
+  await nodes(page, "domainEvent").filter({ hasText: "Bravo" }).click();
+  await page.keyboard.press("ArrowLeft"); // Bravo moves before Alpha
+  expect(await xOf(page, "Bravo")).toBeLessThan(await xOf(page, "Alpha"));
+  expect(await xOf(page, "Alpha")).toBeLessThan(await xOf(page, "Charlie"));
 });
 
 test("builds a slice: event triggers a policy and updates a read model [us-00007-AC-1.1/2.1, us-00002-AC-1.1]", async ({

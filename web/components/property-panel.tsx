@@ -1,6 +1,12 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Trash2,
+} from "lucide-react";
 import { ELEMENT_DEFINITIONS, ELEMENT_TYPES, type ElementType } from "@/lib/eventstorming/elements";
 import { isVisibleAt } from "@/lib/eventstorming/levels";
 import { useESStore } from "@/lib/store/store";
@@ -58,14 +64,14 @@ const SLICE: Partial<Record<ElementType, SliceAction[]>> = {
 export function PropertyPanel() {
   const selectedId = useESStore((s) => s.selectedId);
   const node = useESStore((s) => s.nodes.find((n) => n.id === s.selectedId) ?? null);
-  const nodes = useESStore((s) => s.nodes);
   const level = useESStore((s) => s.level);
   const contexts = useESStore((s) => s.contexts);
   const addNode = useESStore((s) => s.addNode);
   const connect = useESStore((s) => s.connect);
   const updateNodeData = useESStore((s) => s.updateNodeData);
   const removeNode = useESStore((s) => s.removeNode);
-  const reorderEvent = useESStore((s) => s.reorderEvent);
+  const nudgeEvent = useESStore((s) => s.nudgeEvent);
+  const moveEventToEnd = useESStore((s) => s.moveEventToEnd);
   const reassignContext = useESStore((s) => s.reassignContext);
   const setSelected = useESStore((s) => s.setSelected);
   const isolate = useESStore((s) => s.isolate);
@@ -123,19 +129,6 @@ export function PropertyPanel() {
         : { source: node.id, target: newId };
     connect({ ...conn, sourceHandle: null, targetHandle: null });
     setSelected(newId);
-  };
-
-  const moveEvent = (delta: -1 | 1) => {
-    const siblings = nodes
-      .filter((n) => n.type === "domainEvent" && n.data.context === node.data.context)
-      .sort((a, b) => (a.data.order ?? 0) - (b.data.order ?? 0));
-    const idx = siblings.findIndex((s) => s.id === node.id);
-    const swap = siblings[idx + delta];
-    if (!swap) return;
-    const a = siblings[idx].data.order ?? idx;
-    const b = swap.data.order ?? idx + delta;
-    reorderEvent(siblings[idx].id, b);
-    reorderEvent(swap.id, a);
   };
 
   const actions = (SLICE[node.type] ?? []).filter((a) => isVisibleAt(level, a.type));
@@ -201,19 +194,39 @@ export function PropertyPanel() {
             <span className="text-zinc-500">Timeline</span>
             <button
               type="button"
+              aria-label="Move to start"
               className="flex items-center rounded border border-zinc-300 px-1.5 py-0.5 hover:bg-zinc-100"
-              onClick={() => moveEvent(-1)}
+              onClick={() => moveEventToEnd(node.id, -1)}
+              title="Move to start"
+            >
+              <ChevronsLeft size={13} />
+            </button>
+            <button
+              type="button"
+              aria-label="Move earlier"
+              className="flex items-center rounded border border-zinc-300 px-1.5 py-0.5 hover:bg-zinc-100"
+              onClick={() => nudgeEvent(node.id, -1)}
               title="Move earlier"
             >
               <ChevronLeft size={13} />
             </button>
             <button
               type="button"
+              aria-label="Move later"
               className="flex items-center rounded border border-zinc-300 px-1.5 py-0.5 hover:bg-zinc-100"
-              onClick={() => moveEvent(1)}
+              onClick={() => nudgeEvent(node.id, 1)}
               title="Move later"
             >
               <ChevronRight size={13} />
+            </button>
+            <button
+              type="button"
+              aria-label="Move to end"
+              className="flex items-center rounded border border-zinc-300 px-1.5 py-0.5 hover:bg-zinc-100"
+              onClick={() => moveEventToEnd(node.id, 1)}
+              title="Move to end"
+            >
+              <ChevronsRight size={13} />
             </button>
           </div>
         </div>

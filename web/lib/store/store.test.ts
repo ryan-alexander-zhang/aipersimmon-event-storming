@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { StoreApi } from "zustand";
 import { createESStore, type ESState } from "./store";
+import { gapOrder, slotOrders } from "./timeline";
 
 let store: StoreApi<ESState>;
 const get = () => store.getState();
@@ -149,12 +150,10 @@ describe("store v2 (RT3)", () => {
     expect(cmdXs).toEqual(evtXs);
   });
 
-  it("reorders an event and reassigns a node's context [us-00006-FR-3/4]", () => {
+  it("reassigns a node's context [us-00006-FR-4]", () => {
     const c1 = get().addContext("c1");
     const c2 = get().addContext("c2");
     const e = get().addNode("domainEvent", c1);
-    get().reorderEvent(e, 5);
-    expect(node(e)?.data.order).toBe(5);
     get().reassignContext(e, c2);
     expect(node(e)?.data.context).toBe(c2);
   });
@@ -221,7 +220,7 @@ describe("store v2 (RT3)", () => {
     const e0 = get().addNode("domainEvent", ctx); // order 0
     const e1 = get().addNode("domainEvent", ctx); // order 1
     expect(node(e1)!.position.x).toBeGreaterThan(node(e0)!.position.x);
-    get().reorderEvent(e0, 2); // move e0 after e1
+    get().setEventOrder(e0, 2); // move e0 after e1
     expect(node(e0)!.position.x).toBeGreaterThan(node(e1)!.position.x);
   });
 
@@ -292,5 +291,80 @@ describe("store v2 (RT3)", () => {
     expect(get().selectedId).toBe(a);
     get().onNodesChange([{ type: "remove", id: a }]);
     expect(node(a)).toBeUndefined();
+  });
+});
+
+describe("timeline editing [us-00010]", () => {
+  // build n Domain Events in one context; return the context id and their ids
+  const events = (n: number) => {
+    const ctx = get().addContext("c");
+    const ids = Array.from({ length: n }, () => get().addNode("domainEvent", ctx));
+    return { ctx, ids };
+  };
+  const orderOf = (id: string) => node(id)!.data.order;
+  // the context's Domain Events, in timeline order, as an id sequence
+  const sequence = (ctx: string) =>
+    get()
+      .nodes.filter((n) => n.type === "domainEvent" && n.data.context === ctx)
+      .sort((a, b) => (a.data.order ?? 0) - (b.data.order ?? 0))
+      .map((n) => n.id);
+
+  it("inserts a dragged event into a gap, shifting the rest [us-00010-AC-1.1]", () => {
+    const { ctx, ids: [a, b, c] } = events(3);
+    // drop C in the gap between A and B (gap index 1)
+    get().setEventOrder(c, gapOrder(slotOrders(get().nodes, ctx), 1));
+    expect(sequence(ctx)).toEqual([a, c, b]);
+  });
+
+  it("moves a dragged event after the last column [us-00010-AC-1.2]", () => {
+    const { ctx, ids: [a, b, c] } = events(3);
+    get().setEventOrder(a, gapOrder(slotOrders(get().nodes, ctx), 3));
+    expect(sequence(ctx)).toEqual([b, c, a]);
+  });
+
+  it("makes two events concurrent when one is dropped onto the other [us-00010-AC-2.1]", () => {
+    const { ctx, ids: [a, b] } = events(2);
+    get().setEventOrder(b, slotOrders(get().nodes, ctx)[0]); // onto A's slot
+    expect(orderOf(a)).toBe(orderOf(b)); // one shared slot
+    // concurrent → same timeline column (x), different parallel sub-lane (y)
+    expect(node(a)!.position.x).toBe(node(b)!.position.x);
+    expect(node(a)!.position.y).not.toBe(node(b)!.position.y);
+  });
+
+  it("splits a concurrent event back into its own column [us-00010-AC-3.1]", () => {
+    const { ctx, ids: [a, b] } = events(2);
+    get().setEventOrder(b, slotOrders(get().nodes, ctx)[0]); // concurrent with A
+    expect(orderOf(a)).toBe(orderOf(b));
+    // drag B into the gap after the (now single) column
+    get().setEventOrder(b, gapOrder(slotOrders(get().nodes, ctx), 1));
+    expect(orderOf(a)).not.toBe(orderOf(b));
+    expect(sequence(ctx)).toEqual([a, b]);
+  });
+
+  it("moves an event to the start of its context [us-00010-AC-4.1]", () => {
+    const { ctx, ids: [a, b, c] } = events(3);
+    get().moveEventToEnd(c, -1);
+    expect(sequence(ctx)).toEqual([c, a, b]);
+  });
+
+  it("nudges a selected event one column toward the start [us-00010-AC-5.1]", () => {
+    const { ctx, ids: [a, b, c] } = events(3);
+    get().nudgeEvent(b, -1);
+    expect(sequence(ctx)).toEqual([b, a, c]);
+  });
+
+  it("leaves no empty column: an adjustment normalizes a gapped context [us-00010-AC-8.1]", () => {
+    const { ids: [a, b, c] } = events(3);
+    get().removeNode(b); // A at order 0, C at order 2 → a gap at slot 1
+    get().setEventOrder(c, 2); // any adjustment re-normalizes the context
+    expect([orderOf(a), orderOf(c)].sort((x, y) => (x ?? 0) - (y ?? 0))).toEqual([0, 1]);
+  });
+
+  it("ignores timeline moves on non-events [us-00010 scope]", () => {
+    const ctx = get().addContext("c");
+    const cmd = get().addNode("command", ctx);
+    get().setEventOrder(cmd, 3);
+    get().nudgeEvent(cmd, 1);
+    expect(node(cmd)?.data.order).toBeUndefined();
   });
 });
