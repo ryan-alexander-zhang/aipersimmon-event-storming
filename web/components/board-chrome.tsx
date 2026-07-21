@@ -15,6 +15,7 @@ import { useESStore } from "@/lib/store/store";
 const BAND_LABEL: Record<Band, string> = {
   actorSystem: "Actors / Systems",
   command: "Commands",
+  constraint: "Constraints",
   aggregate: "Aggregates",
   domainEvent: "Domain Events",
   policy: "Policies",
@@ -25,6 +26,7 @@ const BAND_LABEL: Record<Band, string> = {
 const BAND_COLOR: Record<Band, string> = {
   actorSystem: ELEMENT_DEFINITIONS.actor.color,
   command: ELEMENT_DEFINITIONS.command.color,
+  constraint: ELEMENT_DEFINITIONS.constraint.color,
   aggregate: ELEMENT_DEFINITIONS.aggregate.color,
   domainEvent: ELEMENT_DEFINITIONS.domainEvent.color,
   policy: ELEMENT_DEFINITIONS.policy.color,
@@ -51,7 +53,10 @@ export function BoardChrome() {
   const boxes = new Map(computeContextBoxes(nodes, edges, contexts).map((b) => [b.id, b]));
   const nameOf = new Map(contexts.map((c) => [c.id, c.name]));
 
-  const addEvent = (ctxId: string) => setSelected(addNode("domainEvent", ctxId));
+  const addEvent = (ctxId?: string) => setSelected(addNode("domainEvent", ctxId));
+
+  // The context-less bucket: the one layout box that is not a declared context.
+  const ungrouped = [...boxes.values()].find((b) => !nameOf.has(b.id));
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -114,6 +119,25 @@ export function BoardChrome() {
             </div>
           );
         })}
+
+      {/* Ungrouped — a soft group for context-less elements. No rename/remove; it
+          appears only while it has members and can be emptied by assigning them. */}
+      {ungrouped && (
+        <div
+          className="pointer-events-auto absolute top-2 flex items-center gap-1.5 rounded-md border border-dashed border-zinc-300 bg-white/70 px-2 py-1 shadow-sm backdrop-blur-sm"
+          style={{ left: ungrouped.x * zoom + vx, width: Math.max(ungrouped.width * zoom, 150) }}
+        >
+          <span className="min-w-0 flex-1 text-xs font-bold italic text-zinc-400">Ungrouped</span>
+          <button
+            type="button"
+            className="flex items-center gap-1 rounded border border-zinc-300 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 hover:bg-zinc-100"
+            onClick={() => addEvent()}
+            title="Add a Domain Event"
+          >
+            <Plus size={11} /> Event
+          </button>
+        </div>
+      )}
     </div>
   );
 }

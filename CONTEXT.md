@@ -24,9 +24,16 @@ A person or role that issues a Command. The small yellow sticky.
 _Avoid_: user, agent, persona.
 
 **Aggregate**:
-The consistency boundary that handles a Command and emits a Domain Event. The
-large yellow sticky.
-_Avoid_: entity, model, constraint.
+The consistency boundary you *design* to handle a Command and emit a Domain
+Event — the design **output**. The large yellow sticky. Introduced at the Design
+level.
+_Avoid_: entity, model.
+
+**Constraint**:
+A restriction, rule, or precondition that must hold to perform a Command — the
+design **input**. It constrains a Command; it never emits events. Distinct from
+the Aggregate (input vs designed output). Introduced at the Design level.
+_Avoid_: aggregate, validation, guard.
 
 **Policy**:
 A reaction rule of the form "when X happens, do Y" that connects a Domain Event
@@ -56,6 +63,9 @@ _Avoid_: milestone, key event.
 Edges carry a **semantic type**, not just a geometric connection:
 
 **issues**: Actor → Command.
+**produces**: Command → Domain Event. The Process-level causal spine; at Design
+it is refined by the Aggregate boundary (handledBy + emits).
+**constrainedBy**: Command → Constraint.
 **handledBy**: Command → Aggregate.
 **emits**: Aggregate → Domain Event (also External System → Domain Event).
 **triggers**: Domain Event → Policy.
@@ -70,6 +80,12 @@ Edges carry a **semantic type**, not just a geometric connection:
 A named grouping of a slice of the model that forms one column group along the
 timeline (e.g. Ordering, Payment). The board's columns are organized by it.
 _Avoid_: module, service, area.
+
+**Ungrouped**:
+The state of an element that belongs to no Bounded Context. Ungrouped elements are
+collected in a single soft group on the board and can be assigned to a context
+later — context membership is optional.
+_Avoid_: orphan, unassigned, none.
 
 **Timeline**:
 The left→right ordering of Domain Events that forms the board's spine; every

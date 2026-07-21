@@ -15,14 +15,16 @@ describe("levels", () => {
     for (const t of hidden) expect(isVisibleAt("big-picture", t)).toBe(false);
   });
 
-  it("Process adds commands/policies/read models but not aggregates", () => {
+  it("Process adds commands/policies/read models but not constraints/aggregates", () => {
     expect(isVisibleAt("process", "command")).toBe(true);
     expect(isVisibleAt("process", "policy")).toBe(true);
     expect(isVisibleAt("process", "readModel")).toBe(true);
     expect(isVisibleAt("process", "aggregate")).toBe(false);
+    expect(isVisibleAt("process", "constraint")).toBe(false);
   });
 
-  it("Design shows aggregates", () => {
+  it("Design introduces both Constraint (input) and Aggregate (output)", () => {
+    expect(isVisibleAt("design", "constraint")).toBe(true);
     expect(isVisibleAt("design", "aggregate")).toBe(true);
   });
 });

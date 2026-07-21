@@ -55,8 +55,9 @@ export interface ESState {
   renameContext: (id: string, name: string) => void;
   /** Remove a context along with its member nodes and their edges. */
   removeContext: (id: string) => void;
-  /** Add a node of `type` in `context`; Domain Events get the next timeline order. */
-  addNode: (type: ElementType, context: string, data?: Partial<ESNodeData>) => string;
+  /** Add a node of `type` in `context` (omit/empty → Ungrouped); Domain Events get
+   *  the next timeline order within that context. */
+  addNode: (type: ElementType, context?: string, data?: Partial<ESNodeData>) => string;
   updateNodeData: (id: string, patch: Partial<ESNodeData>) => void;
   removeNode: (id: string) => void;
   /** Attach a hotspot to `targetId` (inherits its context); returns the hotspot id. */
@@ -123,11 +124,12 @@ const initializer: StateCreator<ESState> = (set, get) => ({
 
   addNode: (type, context, data) => {
     const id = nanoid();
-    const nodeData: ESNodeData = { label: ELEMENT_DEFINITIONS[type].label, context, ...data };
+    const ctx = context || undefined; // "" and undefined both mean Ungrouped
+    const nodeData: ESNodeData = { label: ELEMENT_DEFINITIONS[type].label, context: ctx, ...data };
     if (type === "domainEvent" && nodeData.order === undefined) {
       nodeData.order =
         get()
-          .nodes.filter((n) => n.type === "domainEvent" && n.data.context === context)
+          .nodes.filter((n) => n.type === "domainEvent" && n.data.context === ctx)
           .reduce((m, n) => Math.max(m, n.data.order ?? 0), -1) + 1;
     }
     const node: ESNode = { id, type, position: { x: 0, y: 0 }, data: nodeData };
@@ -155,7 +157,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
 
   addHotspot: (targetId, text) => {
     const target = get().nodes.find((n) => n.id === targetId);
-    const id = get().addNode("hotspot", target?.data.context ?? "", { label: text });
+    const id = get().addNode("hotspot", target?.data.context, { label: text });
     get().connect({ source: id, target: targetId, sourceHandle: null, targetHandle: null });
     return id;
   },
@@ -176,7 +178,9 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   },
 
   reorderEvent: (eventId, order) => get().updateNodeData(eventId, { order }),
-  reassignContext: (nodeId, context) => get().updateNodeData(nodeId, { context }),
+  // Empty selection → Ungrouped (no context), keeping one canonical "no context".
+  reassignContext: (nodeId, context) =>
+    get().updateNodeData(nodeId, { context: context || undefined }),
 
   setSelected: (id) => set({ selectedId: id }),
   setHovered: (id) => set({ hoveredId: id }),

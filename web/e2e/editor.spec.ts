@@ -6,6 +6,10 @@ const fixture = (name: string) => path.join(__dirname, "fixtures", name);
 
 const addContext = (page: Page) => page.getByRole("button", { name: "Add context" }).click();
 const addEvent = (page: Page) => page.getByRole("button", { name: "Event", exact: true }).first().click();
+const addUngroupedEvent = (page: Page) =>
+  page.getByRole("button", { name: "Add Domain Event" }).click();
+const palette = (page: Page, label: string) =>
+  page.getByRole("button", { name: `Add ${label}` }).click();
 const slice = (page: Page, name: string) => page.getByRole("button", { name, exact: true }).click();
 const nodes = (page: Page, type: string) => page.locator(`.react-flow__node-${type}`);
 const edges = (page: Page) => page.locator(".react-flow__edge");
@@ -27,6 +31,61 @@ test("adds a Domain Event into its band via a context header [us-00001-AC-1.1, u
   // conventional colour (orange #F6A623)
   const body = nodes(page, "domainEvent").locator("[data-testid=node-body]");
   expect(await body.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(246, 166, 35)");
+});
+
+test("creates a Domain Event on an empty board, grouped as Ungrouped [issue-00006]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  // empty board — no context created first
+  await addUngroupedEvent(page);
+  await expect(nodes(page, "domainEvent")).toHaveCount(1);
+  await expect(page.getByText("Ungrouped", { exact: true })).toBeVisible();
+
+  // a second ungrouped event joins the same soft group (one Ungrouped header) and
+  // takes the next timeline slot (to the right)
+  await addUngroupedEvent(page);
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+  await expect(page.getByText("Ungrouped", { exact: true })).toHaveCount(1);
+  const xs = await nodes(page, "domainEvent").evaluateAll((els) =>
+    els.map((e) => e.getBoundingClientRect().x),
+  );
+  expect(Math.max(...xs)).toBeGreaterThan(Math.min(...xs));
+});
+
+test("creates an Actor directly at Big Picture, no Command needed [us-00007-AC-5.1, decision-00003]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Big Picture" }).click();
+  await palette(page, "Actor");
+  await expect(nodes(page, "actor")).toHaveCount(1);
+  // Big Picture's palette must not offer Process/Design-only elements
+  await expect(page.getByRole("button", { name: "Add Command" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add Aggregate" })).toHaveCount(0);
+});
+
+test("a Command produces a Domain Event without an Aggregate [us-00007-AC-1.2, decision-00003]", async ({
+  page,
+}) => {
+  await page.goto("/"); // default Design level
+  await addUngroupedEvent(page); // event created and selected
+  await slice(page, "+ Command (produces)");
+  await expect(nodes(page, "command")).toHaveCount(1);
+  await expect(nodes(page, "aggregate")).toHaveCount(0); // no aggregate invented
+  await expect(page.getByText("produces", { exact: true })).toBeVisible();
+});
+
+test("Constraint and Aggregate are offered only at Design [us-00008-AC-1.2, decision-00003]", async ({ page }) => {
+  await page.goto("/"); // Design
+  await palette(page, "Command"); // command created and selected
+  await expect(page.getByRole("button", { name: "+ Constraint (constrains)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "+ Aggregate (handled by)" })).toBeVisible();
+  // drop to Process → the Design-only slice actions disappear (selection kept)
+  await page.getByRole("button", { name: "Process", exact: true }).click();
+  await expect(page.getByRole("button", { name: "+ Constraint (constrains)" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "+ Aggregate (handled by)" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "+ Actor (issues)" })).toBeVisible(); // Process-level still there
 });
 
 test("a second context adds a column group after the first [us-00006-AC-1.1]", async ({ page }) => {

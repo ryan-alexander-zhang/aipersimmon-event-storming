@@ -34,12 +34,44 @@ describe("store v2 (RT3)", () => {
     expect(node(e1)?.data.order).toBe(1);
   });
 
+  it("adds an Ungrouped node when no context is given, with its own timeline [issue-00006]", () => {
+    const e0 = get().addNode("domainEvent");
+    const e1 = get().addNode("domainEvent");
+    expect(node(e0)?.data.context).toBeUndefined();
+    expect(node(e0)?.data.order).toBe(0);
+    expect(node(e1)?.data.order).toBe(1); // ungrouped events share one timeline
+  });
+
+  it("reassigning to an empty context returns a node to Ungrouped [issue-00006]", () => {
+    const ctx = get().addContext("c");
+    const e = get().addNode("domainEvent", ctx);
+    expect(node(e)?.data.context).toBe(ctx);
+    get().reassignContext(e, "");
+    expect(node(e)?.data.context).toBeUndefined();
+  });
+
   it("creates a semantic edge for a valid connection [us-00002-FR-1]", () => {
     const ctx = get().addContext("c");
     const a = get().addNode("actor", ctx);
     const c = get().addNode("command", ctx);
     expect(get().connect({ source: a, target: c, sourceHandle: null, targetHandle: null })).toBe(true);
     expect(get().edges[0]).toMatchObject({ source: a, target: c, data: { relation: "issues" } });
+  });
+
+  it("links a Command directly to the Domain Event it produces [decision-00003]", () => {
+    const ctx = get().addContext("c");
+    const cmd = get().addNode("command", ctx);
+    const e = get().addNode("domainEvent", ctx);
+    expect(get().connect({ source: cmd, target: e, sourceHandle: null, targetHandle: null })).toBe(true);
+    expect(get().edges[0].data?.relation).toBe("produces");
+  });
+
+  it("links a Command to a Constraint that restricts it [decision-00003]", () => {
+    const ctx = get().addContext("c");
+    const cmd = get().addNode("command", ctx);
+    const k = get().addNode("constraint", ctx);
+    get().connect({ source: cmd, target: k, sourceHandle: null, targetHandle: null });
+    expect(get().edges[0].data?.relation).toBe("constrainedBy");
   });
 
   it("creates an updates edge for Domain Event -> Read Model [us-00007-FR-2]", () => {

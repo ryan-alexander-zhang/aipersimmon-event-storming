@@ -6,6 +6,8 @@ import { ELEMENT_TYPES, type ElementType } from "./elements";
 
 export const RELATION_TYPES = [
   "issues",
+  "produces",
+  "constrainedBy",
   "handledBy",
   "emits",
   "triggers",
@@ -25,6 +27,12 @@ export interface ConnectionRule {
 
 export const CONNECTION_RULES: ConnectionRule[] = [
   { relation: "issues", sources: ["actor"], targets: ["command"] },
+  // Process-level causal spine: a Command produces the Domain Event it causes,
+  // without needing an Aggregate (decision-00003).
+  { relation: "produces", sources: ["command"], targets: ["domainEvent"] },
+  // Design-level input: a Constraint restricts performing a Command.
+  { relation: "constrainedBy", sources: ["command"], targets: ["constraint"] },
+  // Design-level output: the Aggregate boundary handles the Command and emits.
   { relation: "handledBy", sources: ["command"], targets: ["aggregate", "externalSystem"] },
   { relation: "emits", sources: ["aggregate", "externalSystem"], targets: ["domainEvent"] },
   { relation: "triggers", sources: ["domainEvent"], targets: ["policy"] },
@@ -35,8 +43,9 @@ export const CONNECTION_RULES: ConnectionRule[] = [
 ];
 
 /** The relation an edge from `source` to `target` would carry, or null if the
- *  connection is not allowed. Rules are mutually exclusive on source type, so
- *  at most one matches. */
+ *  connection is not allowed. Rules are mutually exclusive on the (source,
+ *  target) pair (a Command has several rules, one per target), so at most one
+ *  matches. */
 export function resolveRelation(
   source: ElementType,
   target: ElementType,

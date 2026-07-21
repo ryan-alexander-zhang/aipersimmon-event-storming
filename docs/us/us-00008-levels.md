@@ -26,7 +26,12 @@ so that I can focus on the right abstraction without losing detail.
   Given a model containing every element type
   When the Modeler selects Big Picture
   Then only Actors/Systems, Domain Events, and Hot Spots are shown
-  And Commands, Aggregates, Policies, and Read Models are hidden
+  And Commands, Constraints, Aggregates, Policies, and Read Models are hidden
+- **us-00008-AC-1.2** (us-00008-FR-1)
+  Given a selected Command
+  When the Modeler is at Design
+  Then `+ Constraint (constrains)` and `+ Aggregate (handled by)` are offered
+  And switching to Process hides both (they are Design-only)
 - **us-00008-AC-2.1** (us-00008-FR-2)
   Given a level is set
   When the model is exported and re-imported

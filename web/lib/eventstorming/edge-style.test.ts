@@ -23,8 +23,8 @@ describe("relation edge styling (RA1)", () => {
     const secondary = byTier("secondary");
     expect([...chain, ...secondary].sort()).toEqual([...RELATION_TYPES].sort());
     expect(chain.filter((r) => secondary.includes(r))).toEqual([]);
-    expect(chain).toEqual(["issues", "handledBy", "emits", "triggers", "invokes"]);
-    expect(secondary).toEqual(["updates", "informs", "annotates"]);
+    expect(chain).toEqual(["issues", "produces", "handledBy", "emits", "triggers", "invokes"]);
+    expect(secondary).toEqual(["constrainedBy", "updates", "informs", "annotates"]);
   });
 
   it("draws the causal chain at least as heavy as secondary relations", () => {

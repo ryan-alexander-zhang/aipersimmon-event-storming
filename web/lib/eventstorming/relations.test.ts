@@ -6,6 +6,8 @@ import { isValidConnection, resolveRelation } from "./relations";
 // expressed as valid (source, relation, target) triples.
 const VALID: Array<[ElementType, string, ElementType]> = [
   ["actor", "issues", "command"],
+  ["command", "produces", "domainEvent"],
+  ["command", "constrainedBy", "constraint"],
   ["command", "handledBy", "aggregate"],
   ["command", "handledBy", "externalSystem"],
   ["aggregate", "emits", "domainEvent"],
@@ -32,9 +34,10 @@ describe("connection rules", () => {
     // actor -> domainEvent (us-00002-AC-2.1), and other unlisted pairs
     expect(resolveRelation("actor", "domainEvent")).toBeNull();
     expect(isValidConnection("actor", "domainEvent")).toBe(false);
-    expect(resolveRelation("command", "domainEvent")).toBeNull();
+    // a Command now produces a Domain Event directly, but the reverse is still invalid
     expect(resolveRelation("domainEvent", "command")).toBeNull();
     expect(resolveRelation("readModel", "command")).toBeNull();
+    expect(resolveRelation("constraint", "command")).toBeNull(); // constraint has no outgoing rule
   });
 
   it("only allows the valid pairs (exhaustive over the type matrix)", () => {

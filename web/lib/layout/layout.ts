@@ -65,16 +65,21 @@ function computePlacement(nodes: ESNode[], edges: ESEdge[], contexts: Context[])
       group.sort((a, b) => a.id.localeCompare(b.id));
       group.forEach((ev, lane) => {
         set(ev.id, ctx, col, lane);
-        // 2. propagate the event's slot + lane across its slice
+        // 2. propagate the event's slot + lane upstream across its slice. An
+        //    event is produced either directly by a Command (produces, Process)
+        //    or via an Aggregate boundary (emits, Design); from the Command we
+        //    also pull its Actor, Constraint, and Aggregate into the column.
         const agg = sourceOf(edges, ev.id, "emits");
-        if (agg) {
-          set(agg, ctx, col, lane);
-          const cmd = sourceOf(edges, agg, "handledBy");
-          if (cmd) {
-            set(cmd, ctx, col, lane);
-            const actor = sourceOf(edges, cmd, "issues");
-            if (actor) set(actor, ctx, col, lane);
-          }
+        if (agg) set(agg, ctx, col, lane);
+        const cmd = sourceOf(edges, ev.id, "produces") ?? (agg && sourceOf(edges, agg, "handledBy"));
+        if (cmd) {
+          set(cmd, ctx, col, lane);
+          const actor = sourceOf(edges, cmd, "issues");
+          if (actor) set(actor, ctx, col, lane);
+          const constraint = sourceOf(edges, cmd, "constrainedBy");
+          if (constraint) set(constraint, ctx, col, lane);
+          const aggViaCmd = sourceOf(edges, cmd, "handledBy");
+          if (aggViaCmd) set(aggViaCmd, ctx, col, lane);
         }
         for (const p of targetsOf(edges, ev.id, "triggers")) set(p, ctx, col, lane);
         for (const rm of targetsOf(edges, ev.id, "updates")) set(rm, ctx, col, lane);

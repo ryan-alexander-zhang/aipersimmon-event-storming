@@ -19,6 +19,8 @@ const SECONDARY_W = 1.25;
 
 export const RELATION_STYLE: Record<RelationType, RelationStyle> = {
   issues: { tier: "chain", color: "#2563eb", width: CHAIN_W },
+  produces: { tier: "chain", color: "#b45309", width: CHAIN_W },
+  constrainedBy: { tier: "secondary", color: "#0d9488", width: SECONDARY_W },
   handledBy: { tier: "chain", color: "#7c3aed", width: CHAIN_W },
   emits: { tier: "chain", color: "#ea580c", width: CHAIN_W },
   triggers: { tier: "chain", color: "#9333ea", width: CHAIN_W },

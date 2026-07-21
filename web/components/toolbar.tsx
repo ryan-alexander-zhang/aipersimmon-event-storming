@@ -3,7 +3,8 @@
 import { Download, FilePlus, FolderPlus, Upload } from "lucide-react";
 import { type ChangeEvent, useRef, useState } from "react";
 import { exportJSON, fromModel, importJSON } from "@/lib/dsl/serialize";
-import { LEVEL_LABEL, LEVELS } from "@/lib/eventstorming/levels";
+import { ELEMENT_DEFINITIONS, ELEMENT_TYPES } from "@/lib/eventstorming/elements";
+import { isVisibleAt, LEVEL_LABEL, LEVELS } from "@/lib/eventstorming/levels";
 import { clearSaved } from "@/lib/store/persistence";
 import { useESStore } from "@/lib/store/store";
 
@@ -15,6 +16,8 @@ export function Toolbar() {
   const setLevel = useESStore((s) => s.setLevel);
   const setModel = useESStore((s) => s.setModel);
   const addContext = useESStore((s) => s.addContext);
+  const addNode = useESStore((s) => s.addNode);
+  const setSelected = useESStore((s) => s.setSelected);
   const clear = useESStore((s) => s.clear);
   const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +71,10 @@ export function Toolbar() {
     addContext(`Context ${contexts.length + 1}`);
   };
 
+  // The current level's element types, in a stable palette order (Domain Event
+  // first as the timeline spine).
+  const paletteTypes = ELEMENT_TYPES.filter((t) => isVisibleAt(level, t));
+
   const btn =
     "flex items-center gap-1.5 rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100";
 
@@ -86,6 +93,27 @@ export function Toolbar() {
             onClick={() => setLevel(lv)}
           >
             {LEVEL_LABEL[lv]}
+          </button>
+        ))}
+      </div>
+      {/* Element palette — directly place any element the current level allows,
+          as a free (Ungrouped) sticky. This is what makes e.g. an Actor creatable
+          at Big Picture without going through a Command (decision-00003). */}
+      <div className="ml-3 flex items-center gap-1" role="group" aria-label="Add element">
+        {paletteTypes.map((t) => (
+          <button
+            key={t}
+            type="button"
+            aria-label={`Add ${ELEMENT_DEFINITIONS[t].label}`}
+            title={`Add ${ELEMENT_DEFINITIONS[t].label}`}
+            className="flex items-center gap-1 rounded-md border border-zinc-300 px-1.5 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-100"
+            onClick={() => setSelected(addNode(t))}
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-[3px]"
+              style={{ background: ELEMENT_DEFINITIONS[t].color }}
+            />
+            {ELEMENT_DEFINITIONS[t].label}
           </button>
         ))}
       </div>

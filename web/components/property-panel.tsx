@@ -10,21 +10,25 @@ import { useESStore } from "@/lib/store/store";
 // the relation itself is resolved from the two types by the store.
 type SliceAction = { label: string; type: ElementType; dir: "from" | "to" };
 
+// Grammar-correct next steps per element, following the causal flow
+// (decision-00003). Design-only steps (Constraint, Aggregate) are filtered out
+// below their level by `isVisibleAt`, so the same table serves every level.
 const SLICE: Partial<Record<ElementType, SliceAction[]>> = {
   domainEvent: [
-    { label: "+ Aggregate (produces)", type: "aggregate", dir: "from" },
+    { label: "+ Command (produces)", type: "command", dir: "from" },
     { label: "+ Policy (triggers)", type: "policy", dir: "to" },
     { label: "+ Read Model (updates)", type: "readModel", dir: "to" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
   ],
-  aggregate: [
-    { label: "+ Command (handled by)", type: "command", dir: "from" },
-    { label: "+ Hotspot", type: "hotspot", dir: "from" },
-  ],
   command: [
     { label: "+ Actor (issues)", type: "actor", dir: "from" },
-    { label: "+ Aggregate (acts on)", type: "aggregate", dir: "to" },
-    { label: "+ External System (acts on)", type: "externalSystem", dir: "to" },
+    { label: "+ Domain Event (produces)", type: "domainEvent", dir: "to" },
+    { label: "+ Constraint (constrains)", type: "constraint", dir: "to" },
+    { label: "+ Aggregate (handled by)", type: "aggregate", dir: "to" },
+    { label: "+ Hotspot", type: "hotspot", dir: "from" },
+  ],
+  actor: [
+    { label: "+ Command (issues)", type: "command", dir: "to" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
   ],
   policy: [
@@ -35,12 +39,18 @@ const SLICE: Partial<Record<ElementType, SliceAction[]>> = {
     { label: "+ Actor (informs)", type: "actor", dir: "to" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
   ],
-  actor: [
-    { label: "+ Command (issues)", type: "command", dir: "to" },
+  constraint: [
+    { label: "+ Command (constrains)", type: "command", dir: "from" },
+    { label: "+ Hotspot", type: "hotspot", dir: "from" },
+  ],
+  aggregate: [
+    { label: "+ Command (handled by)", type: "command", dir: "from" },
+    { label: "+ Domain Event (emits)", type: "domainEvent", dir: "to" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
   ],
   externalSystem: [
     { label: "+ Domain Event (emits)", type: "domainEvent", dir: "to" },
+    { label: "+ Command (handled by)", type: "command", dir: "from" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
   ],
 };
@@ -68,7 +78,7 @@ export function PropertyPanel() {
   if (!node) {
     return (
       <aside className={wrap}>
-        <p className="text-xs text-zinc-500">Select an element to edit it, or add a Domain Event from a context header to start a slice.</p>
+        <p className="text-xs text-zinc-500">Select an element to edit it, or add one from the palette above (the current level’s stickies) — or a Domain Event from a context header — to start a slice.</p>
       </aside>
     );
   }
@@ -76,7 +86,7 @@ export function PropertyPanel() {
   const def = ELEMENT_DEFINITIONS[node.type];
   const isHotspot = node.type === "hotspot";
   const field = "mt-1 w-full rounded-md border border-zinc-300 px-2 py-1 text-sm";
-  const ctx = node.data.context ?? contexts[0]?.id ?? "";
+  const ctx = node.data.context; // slice children inherit the selection's context (incl. Ungrouped)
 
   const runSlice = (a: SliceAction) => {
     const newId = addNode(a.type, ctx, a.type === "hotspot" ? { label: "Hotspot?" } : undefined);
@@ -140,7 +150,7 @@ export function PropertyPanel() {
             value={node.data.context ?? ""}
             onChange={(e) => reassignContext(node.id, e.target.value)}
           >
-            {node.data.context === undefined && <option value="">—</option>}
+            <option value="">Ungrouped</option>
             {contexts.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}

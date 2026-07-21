@@ -20,6 +20,7 @@ export const LEVEL_TYPES: Record<Level, ElementType[]> = {
     "actor",
     "externalSystem",
     "command",
+    "constraint",
     "aggregate",
     "domainEvent",
     "policy",
