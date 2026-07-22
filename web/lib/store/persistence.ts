@@ -3,7 +3,7 @@
 // older versions) and the app starts empty instead of crashing (us-00005-FR-2).
 
 import { exportJSON, fromModel, importJSON } from "@/lib/dsl/serialize";
-import type { Context } from "@/lib/dsl/schema";
+import type { Context, ContextRelationship } from "@/lib/dsl/schema";
 import type { Level } from "@/lib/eventstorming/levels";
 import type { DiscoveryItem } from "./store";
 import type { ESEdge, ESNode } from "./types";
@@ -18,14 +18,17 @@ export function saveModel(
   edges: ESEdge[],
   contexts: Context[],
   level: Level,
+  contextRelationships: ContextRelationship[] = [],
 ): void {
   if (typeof window === "undefined") return;
   try {
-    const json = exportJSON(nodes, edges, contexts, {
-      name: "Event Storming",
-      createdAt: new Date().toISOString(),
-      level,
-    });
+    const json = exportJSON(
+      nodes,
+      edges,
+      contexts,
+      { name: "Event Storming", createdAt: new Date().toISOString(), level },
+      contextRelationships,
+    );
     window.localStorage.setItem(STORAGE_KEY, json);
   } catch {
     // Quota or serialisation errors are non-fatal for autosave.
@@ -36,6 +39,7 @@ export function loadModel(): {
   nodes: ESNode[];
   edges: ESEdge[];
   contexts: Context[];
+  contextRelationships: ContextRelationship[];
   level: Level;
 } | null {
   if (typeof window === "undefined") return null;

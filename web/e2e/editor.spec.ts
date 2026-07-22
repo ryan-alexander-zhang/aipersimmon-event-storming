@@ -677,6 +677,47 @@ test("classifies a Bounded Context and shows the badge; export carries it [us-00
   await expect(classify).toHaveValue("");
 });
 
+test("Context Map renders contexts + a typed relationship; edits and deletes it; leaves the board intact [us-00020-AC-1.1/3.1/4.1/7.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("context-map.json"));
+  await expect(nodes(page, "domainEvent")).toHaveCount(1);
+
+  // export the board before opening the map (for the unchanged check)
+  const exportNow = async () => {
+    const [d] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Export" }).click(),
+    ]);
+    return JSON.parse(readFileSync(await d.path(), "utf8"));
+  };
+  const before = await exportNow();
+
+  // open the Context Map → 2 context nodes + 1 relationship edge (us-00020-AC-1.1)
+  await page.getByRole("button", { name: "Context Map" }).click();
+  await expect(page.getByTestId("context-node")).toHaveCount(2);
+  const relLabel = page.getByTestId("context-relation-label");
+  await expect(relLabel).toHaveCount(1);
+  await expect(relLabel.getByLabel("Relationship type")).toHaveValue("customerSupplier");
+
+  // retype it (us-00020-AC-3.1)
+  await relLabel.getByLabel("Relationship type").selectOption("acl");
+  await expect(relLabel.getByLabel("Relationship type")).toHaveValue("acl");
+
+  // delete it (us-00020-AC-4.1)
+  await relLabel.getByRole("button", { name: "Delete relationship" }).click();
+  await expect(page.getByTestId("context-relation-label")).toHaveCount(0);
+
+  // back to the board; nothing about the elements changed (us-00020-AC-7.1)
+  await page.getByRole("button", { name: "Context Map" }).click();
+  await expect(nodes(page, "domainEvent")).toHaveCount(1);
+  const after = await exportNow();
+  expect(after.nodes).toEqual(before.nodes);
+  expect(after.edges).toEqual(before.edges);
+  expect(after.contexts).toEqual(before.contexts);
+});
+
 test("New clears the model and does not restore it on reload", async ({ page }) => {
   await page.goto("/");
   await addContext(page);

@@ -1,0 +1,51 @@
+"use client";
+
+import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
+import { SUBDOMAIN_STYLE, type Subdomain } from "@/lib/eventstorming/context-color";
+
+// A Bounded Context as a node in the Context Map (spec-00004 FR5): its name, its
+// identity tint, and its subdomain classification badge. Four connection handles
+// so a relationship can be drawn in any direction.
+export type ContextFlowNode = Node<
+  { name: string; tint?: string; classification?: Subdomain },
+  "context"
+>;
+
+const HANDLE = { width: 8, height: 8, background: "#94a3b8", border: "1px solid #fff" } as const;
+
+const SIDES = [
+  { id: "l", position: Position.Left },
+  { id: "r", position: Position.Right },
+  { id: "t", position: Position.Top },
+  { id: "b", position: Position.Bottom },
+] as const;
+
+export function ContextNode({ data, selected }: NodeProps<ContextFlowNode>) {
+  const cls = data.classification;
+  return (
+    <div
+      data-testid="context-node"
+      className="min-w-[150px] rounded-lg border-2 bg-white px-3 py-2 shadow-sm"
+      style={{ borderColor: data.tint ?? "#d4d4d8", outline: selected ? "2px solid #111827" : "none" }}
+    >
+      {SIDES.map((s) => (
+        <div key={s.id}>
+          <Handle type="source" id={`s-${s.id}`} position={s.position} style={HANDLE} />
+          <Handle type="target" id={`t-${s.id}`} position={s.position} style={HANDLE} />
+        </div>
+      ))}
+      <div className="flex items-center gap-1.5">
+        <span className="h-3 w-3 shrink-0 rounded-[3px]" style={{ background: data.tint ?? "#d4d4d8" }} />
+        <span className="text-sm font-semibold text-zinc-800">{data.name}</span>
+      </div>
+      {cls && (
+        <span
+          className="mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white"
+          style={{ background: SUBDOMAIN_STYLE[cls].color }}
+        >
+          {SUBDOMAIN_STYLE[cls].label}
+        </span>
+      )}
+    </div>
+  );
+}

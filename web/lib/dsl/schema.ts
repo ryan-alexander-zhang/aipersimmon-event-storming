@@ -3,6 +3,7 @@
 // and import (safeParse).
 
 import { z } from "zod";
+import { CONTEXT_RELATION_TYPES } from "@/lib/eventstorming/context-relations";
 import { ELEMENT_TYPES } from "@/lib/eventstorming/elements";
 import { LEVELS } from "@/lib/eventstorming/levels";
 import { RELATION_TYPES } from "@/lib/eventstorming/relations";
@@ -38,6 +39,15 @@ export const nodeSchema = z.object({
   properties: propertiesSchema.default({}),
 });
 
+// A typed, directed relationship between two Bounded Contexts (spec-00004 FR5):
+// source = upstream, target = downstream. A pair may carry more than one.
+export const contextRelationshipSchema = z.object({
+  id: z.string().min(1),
+  source: z.string().min(1),
+  target: z.string().min(1),
+  type: z.enum(CONTEXT_RELATION_TYPES),
+});
+
 export const edgeSchema = z.object({
   id: z.string().min(1),
   source: z.string().min(1),
@@ -55,12 +65,14 @@ export const modelSchema = z.object({
   version: z.literal(DSL_VERSION),
   meta: metaSchema,
   contexts: z.array(contextSchema).default([]),
+  contextRelationships: z.array(contextRelationshipSchema).default([]),
   nodes: z.array(nodeSchema),
   edges: z.array(edgeSchema),
 });
 
 export type NodeProperties = z.infer<typeof propertiesSchema>;
 export type Context = z.infer<typeof contextSchema>;
+export type ContextRelationship = z.infer<typeof contextRelationshipSchema>;
 export type ModelNode = z.infer<typeof nodeSchema>;
 export type ModelEdge = z.infer<typeof edgeSchema>;
 export type Meta = z.infer<typeof metaSchema>;

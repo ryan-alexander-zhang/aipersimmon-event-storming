@@ -127,6 +127,19 @@ elements: each unordered event becomes an ordinary Domain Event with a global
 Timeline order derived from its left→right position, leaving Discovery Mode.
 _Avoid_: promote, commit, import (when precision matters).
 
+**Context Relationship**:
+A typed, directed integration relationship between two Bounded Contexts —
+source = upstream, target = downstream. Uses the canonical DDD context-mapping
+patterns: Partnership, Shared Kernel, Customer/Supplier, Conformist,
+Anticorruption Layer (decision-00007).
+_Avoid_: dependency, link, connection.
+
+**Context Map**:
+A bird's-eye view of the model's strategic design: each Bounded Context as a node
+(with its Subdomain classification) and each Context Relationship as a directed
+edge. A distinct view over the model — it never mutates the timeline board.
+_Avoid_: architecture diagram, system map.
+
 **Concurrent Events**:
 Two or more Domain Events that occupy the same global timeline position because
 they happen in parallel — including across different Bounded Contexts. They share

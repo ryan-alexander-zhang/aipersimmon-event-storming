@@ -17,6 +17,7 @@ import {
 } from "@xyflow/react";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BoardChrome } from "@/components/board-chrome";
+import { ContextMapCanvas } from "@/components/context-map-canvas";
 import { DiscoveryCanvas } from "@/components/discovery-canvas";
 import { RelationEdge } from "@/components/edges/relation-edge";
 import { HealthPanel } from "@/components/health-panel";
@@ -146,7 +147,7 @@ function useAutosave() {
     const unsubscribe = useESStore.subscribe((s) => {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        saveModel(s.nodes, s.edges, s.contexts, s.level);
+        saveModel(s.nodes, s.edges, s.contexts, s.level, s.contextRelationships);
         saveDiscovery(s.discovery.items);
       }, 400);
     });
@@ -174,6 +175,7 @@ function Canvas() {
   const healthOpen = useESStore((s) => s.healthOpen);
   const walkActive = useESStore((s) => s.walk.active);
   const discoveryActive = useESStore((s) => s.discovery.active);
+  const contextMapOpen = useESStore((s) => s.contextMapOpen);
   const filter = useESStore((s) => s.filter);
   const setEventOrder = useESStore((s) => s.setEventOrder);
   const zoom = useStore((s) => s.transform[2]);
@@ -412,12 +414,18 @@ function Canvas() {
     [nodes],
   );
 
+  // The structured timeline board (and its chrome/panels) shows only when neither
+  // alternate view — Discovery or Context Map — is open.
+  const boardView = !discoveryActive && !contextMapOpen;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Toolbar />
       <div className="flex min-h-0 flex-1">
         <div className="relative flex-1">
-          {discoveryActive ? (
+          {contextMapOpen ? (
+            <ContextMapCanvas />
+          ) : discoveryActive ? (
             <DiscoveryCanvas />
           ) : (
           <ReactFlow
@@ -457,12 +465,12 @@ function Canvas() {
             <Controls />
           </ReactFlow>
           )}
-          {!discoveryActive && <BoardChrome />}
-          {!discoveryActive && drop && <TimelineDropIndicator drop={drop} />}
-          {!discoveryActive && healthOpen && <HealthPanel />}
-          {!discoveryActive && walkActive && <Walkthrough />}
+          {boardView && <BoardChrome />}
+          {boardView && drop && <TimelineDropIndicator drop={drop} />}
+          {boardView && healthOpen && <HealthPanel />}
+          {boardView && walkActive && <Walkthrough />}
         </div>
-        {!discoveryActive && <PropertyPanel />}
+        {boardView && <PropertyPanel />}
       </div>
     </div>
   );

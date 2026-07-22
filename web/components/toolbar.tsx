@@ -7,6 +7,7 @@ import {
   FilePlus,
   FolderPlus,
   Footprints,
+  Network,
   Plus,
   Sparkles,
   Upload,
@@ -22,6 +23,7 @@ export function Toolbar() {
   const nodes = useESStore((s) => s.nodes);
   const edges = useESStore((s) => s.edges);
   const contexts = useESStore((s) => s.contexts);
+  const contextRelationships = useESStore((s) => s.contextRelationships);
   const level = useESStore((s) => s.level);
   const setLevel = useESStore((s) => s.setLevel);
   const setModel = useESStore((s) => s.setModel);
@@ -37,6 +39,8 @@ export function Toolbar() {
   const exitDiscovery = useESStore((s) => s.exitDiscovery);
   const converge = useESStore((s) => s.converge);
   const addDiscoveryItem = useESStore((s) => s.addDiscoveryItem);
+  const contextMapOpen = useESStore((s) => s.contextMapOpen);
+  const toggleContextMap = useESStore((s) => s.toggleContextMap);
   const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,11 +59,13 @@ export function Toolbar() {
   };
 
   const onExport = () => {
-    const json = exportJSON(nodes, edges, contexts, {
-      name: "Event Storming",
-      createdAt: new Date().toISOString(),
-      level,
-    });
+    const json = exportJSON(
+      nodes,
+      edges,
+      contexts,
+      { name: "Event Storming", createdAt: new Date().toISOString(), level },
+      contextRelationships,
+    );
     const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url;
@@ -151,8 +157,16 @@ export function Toolbar() {
         </div>
       )}
       <div className="ml-auto flex items-center gap-2">
-        {/* Search + filter target the structured board; hidden in Discovery Mode. */}
-        {!discoveryActive && <FilterControls />}
+        {/* Search + filter target the structured board; hidden in the alternate views. */}
+        {!discoveryActive && !contextMapOpen && <FilterControls />}
+        <button
+          type="button"
+          className={btn}
+          aria-pressed={contextMapOpen}
+          onClick={toggleContextMap}
+        >
+          <Network size={14} /> Context Map
+        </button>
         {error && (
           <span
             className="max-w-xs truncate text-xs text-red-600"

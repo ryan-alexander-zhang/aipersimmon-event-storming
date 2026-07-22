@@ -224,6 +224,39 @@ describe("store v2 (RT3)", () => {
     expect(get().contexts.find((c) => c.id === a)?.classification).toBeUndefined();
   });
 
+  it("adds, retypes, and removes a context relationship [us-00020-AC-2.1/3.1/4.1]", () => {
+    const a = get().addContext("Ordering");
+    const b = get().addContext("Payment");
+    const rid = get().addContextRelationship(a, b);
+    expect(get().contextRelationships).toEqual([
+      { id: rid, source: a, target: b, type: "customerSupplier" }, // default (AC-2.1)
+    ]);
+    get().setContextRelationshipType(rid, "acl");
+    expect(get().contextRelationships[0].type).toBe("acl"); // (AC-3.1)
+    get().removeContextRelationship(rid);
+    expect(get().contextRelationships).toHaveLength(0); // (AC-4.1)
+  });
+
+  it("prunes relationships touching a removed context [us-00020-AC-5.1]", () => {
+    const a = get().addContext("Ordering");
+    const b = get().addContext("Payment");
+    const c = get().addContext("Shipping");
+    get().addContextRelationship(a, b); // touches Ordering
+    get().addContextRelationship(b, c); // does not touch Ordering
+    get().removeContext(a);
+    expect(get().contextRelationships).toHaveLength(1);
+    expect(get().contextRelationships[0]).toMatchObject({ source: b, target: c });
+  });
+
+  it("toggles the Context Map view and resets it on clear [us-00020-FR-1]", () => {
+    expect(get().contextMapOpen).toBe(false);
+    get().toggleContextMap();
+    expect(get().contextMapOpen).toBe(true);
+    get().clear();
+    expect(get().contextMapOpen).toBe(false);
+    expect(get().contextRelationships).toHaveLength(0);
+  });
+
   it("renames only the target context", () => {
     const c = get().addContext("Old");
     const other = get().addContext("Other");

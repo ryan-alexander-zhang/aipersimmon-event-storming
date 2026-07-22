@@ -13,7 +13,11 @@ import {
 import { nanoid } from "nanoid";
 import { create } from "zustand";
 import { createStore, type StateCreator } from "zustand/vanilla";
-import type { Context } from "@/lib/dsl/schema";
+import type { Context, ContextRelationship } from "@/lib/dsl/schema";
+import {
+  type ContextRelationType,
+  DEFAULT_CONTEXT_RELATION,
+} from "@/lib/eventstorming/context-relations";
 import { ELEMENT_DEFINITIONS, type ElementType } from "@/lib/eventstorming/elements";
 import type { Level } from "@/lib/eventstorming/levels";
 import { resolveRelation } from "@/lib/eventstorming/relations";
@@ -53,6 +57,8 @@ export interface ESState {
   nodes: ESNode[];
   edges: ESEdge[];
   contexts: Context[];
+  /** Typed directed relationships between Bounded Contexts (spec-00004 FR5). */
+  contextRelationships: ContextRelationship[];
   level: Level;
   selectedId: string | null;
   /** Transient hover target; drives the focus highlight, never persisted. */
@@ -69,6 +75,8 @@ export interface ESState {
   discovery: DiscoveryState;
   /** Search + filter view state (spec-00006); view-only, never persisted. */
   filter: FilterState;
+  /** Context Map view visibility (spec-00004 FR5); view-only, never persisted. */
+  contextMapOpen: boolean;
 
   setLevel: (level: Level) => void;
   toggleIsolate: () => void;
@@ -118,6 +126,14 @@ export interface ESState {
     id: string,
     classification: "core" | "supporting" | "generic" | undefined,
   ) => void;
+  /** Add a directed relationship source→target (default Customer/Supplier); returns its id. */
+  addContextRelationship: (source: string, target: string) => string;
+  /** Change a context relationship's type. */
+  setContextRelationshipType: (id: string, type: ContextRelationType) => void;
+  /** Remove a context relationship. */
+  removeContextRelationship: (id: string) => void;
+  /** Toggle the Context Map view. */
+  toggleContextMap: () => void;
   /** Remove a context along with its member nodes and their edges. */
   removeContext: (id: string) => void;
   /** Add a node of `type` in `context` (omit/empty → Ungrouped); Domain Events get
@@ -149,6 +165,7 @@ export interface ESState {
     nodes: ESNode[];
     edges: ESEdge[];
     contexts: Context[];
+    contextRelationships?: ContextRelationship[];
     level?: Level;
   }) => void;
   clear: () => void;
@@ -165,6 +182,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   nodes: [],
   edges: [],
   contexts: [],
+  contextRelationships: [],
   level: "design",
   selectedId: null,
   hoveredId: null,
@@ -174,6 +192,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   walk: { active: false, index: 0 },
   discovery: { active: false, items: [] },
   filter: EMPTY_FILTER,
+  contextMapOpen: false,
 
   setLevel: (level) =>
     set({
@@ -273,12 +292,42 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   setContextClassification: (id, classification) =>
     set({ contexts: get().contexts.map((c) => (c.id === id ? { ...c, classification } : c)) }),
 
+  addContextRelationship: (source, target) => {
+    const id = nanoid();
+    set({
+      contextRelationships: [
+        ...get().contextRelationships,
+        { id, source, target, type: DEFAULT_CONTEXT_RELATION },
+      ],
+    });
+    return id;
+  },
+  setContextRelationshipType: (id, type) =>
+    set({
+      contextRelationships: get().contextRelationships.map((r) =>
+        r.id === id ? { ...r, type } : r,
+      ),
+    }),
+  removeContextRelationship: (id) =>
+    set({ contextRelationships: get().contextRelationships.filter((r) => r.id !== id) }),
+  toggleContextMap: () => set({ contextMapOpen: !get().contextMapOpen }),
+
   removeContext: (id) => {
     const nodes = get().nodes.filter((n) => n.data.context !== id);
     const keep = new Set(nodes.map((n) => n.id));
     const edges = get().edges.filter((e) => keep.has(e.source) && keep.has(e.target));
     const contexts = get().contexts.filter((c) => c.id !== id);
-    set({ nodes: laidOut(nodes, edges, contexts, get().level), edges, contexts, selectedId: null });
+    // Prune any relationship touching the removed context (us-00020-AC-5.1).
+    const contextRelationships = get().contextRelationships.filter(
+      (r) => r.source !== id && r.target !== id,
+    );
+    set({
+      nodes: laidOut(nodes, edges, contexts, get().level),
+      edges,
+      contexts,
+      contextRelationships,
+      selectedId: null,
+    });
   },
 
   addNode: (type, context, data) => {
@@ -378,11 +427,12 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   setSelected: (id) => set({ selectedId: id }),
   setHovered: (id) => set({ hoveredId: id }),
   setHoveredEdge: (id) => set({ hoveredEdgeId: id }),
-  setModel: ({ nodes, edges, contexts, level }) =>
+  setModel: ({ nodes, edges, contexts, contextRelationships, level }) =>
     set({
       nodes: laidOut(nodes, edges, contexts, level ?? get().level),
       edges,
       contexts,
+      contextRelationships: contextRelationships ?? [],
       level: level ?? get().level,
       selectedId: null,
       hoveredId: null,
@@ -391,12 +441,14 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       walk: { active: false, index: 0 },
       discovery: { active: false, items: [] },
       filter: { query: "", types: new Set(), contexts: new Set() },
+      contextMapOpen: false,
     }),
   clear: () =>
     set({
       nodes: [],
       edges: [],
       contexts: [],
+      contextRelationships: [],
       selectedId: null,
       hoveredId: null,
       hoveredEdgeId: null,
@@ -404,6 +456,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       walk: { active: false, index: 0 },
       discovery: { active: false, items: [] },
       filter: { query: "", types: new Set(), contexts: new Set() },
+      contextMapOpen: false,
     }),
 });
 

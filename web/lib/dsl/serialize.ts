@@ -6,7 +6,13 @@
 import type { Level } from "@/lib/eventstorming/levels";
 import type { ESEdge, ESNode } from "@/lib/store/types";
 import { migrateToLatest } from "./migrate";
-import { type Context, DSL_VERSION, type Model, modelSchema } from "./schema";
+import {
+  type Context,
+  type ContextRelationship,
+  DSL_VERSION,
+  type Model,
+  modelSchema,
+} from "./schema";
 
 export interface ModelMeta {
   name: string;
@@ -20,11 +26,13 @@ export function toModel(
   edges: ESEdge[],
   contexts: Context[],
   meta: ModelMeta,
+  contextRelationships: ContextRelationship[] = [],
 ): Model {
   const draft = {
     version: DSL_VERSION,
     meta: { name: meta.name, level: meta.level, createdAt: meta.createdAt },
     contexts,
+    contextRelationships,
     nodes: nodes.map((n) => ({
       id: n.id,
       type: n.type,
@@ -54,10 +62,12 @@ export function fromModel(model: Model): {
   nodes: ESNode[];
   edges: ESEdge[];
   contexts: Context[];
+  contextRelationships: ContextRelationship[];
   level: Level;
 } {
   return {
     contexts: model.contexts,
+    contextRelationships: model.contextRelationships,
     level: model.meta.level,
     nodes: model.nodes.map((n) => ({
       id: n.id,
@@ -91,8 +101,9 @@ export function exportJSON(
   edges: ESEdge[],
   contexts: Context[],
   meta: ModelMeta,
+  contextRelationships: ContextRelationship[] = [],
 ): string {
-  return JSON.stringify(toModel(nodes, edges, contexts, meta), null, 2);
+  return JSON.stringify(toModel(nodes, edges, contexts, meta, contextRelationships), null, 2);
 }
 
 export type ImportResult = { ok: true; model: Model } | { ok: false; error: string };

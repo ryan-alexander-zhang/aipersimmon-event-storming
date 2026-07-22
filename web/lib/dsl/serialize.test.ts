@@ -193,6 +193,17 @@ describe("serialize v2 (T2/RT1)", () => {
     }
   });
 
+  it("round-trips context relationships [us-00020-AC-6.1]", () => {
+    const rels = [{ id: "cr1", source: "ord", target: "pay", type: "conformist" as const }];
+    const model = toModel([], [], CONTEXTS, META, rels);
+    expect(model.contextRelationships).toEqual(rels);
+    const back = fromModel(model);
+    expect(back.contextRelationships).toEqual(rels);
+    const reimported = importJSON(exportJSON([], [], CONTEXTS, META, rels));
+    expect(reimported.ok).toBe(true);
+    if (reimported.ok) expect(reimported.model.contextRelationships).toEqual(rels);
+  });
+
   it("passes through non-object input for the schema to reject", () => {
     expect(importJSON("null").ok).toBe(false);
   });

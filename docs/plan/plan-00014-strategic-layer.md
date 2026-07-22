@@ -2,7 +2,7 @@
 id: plan-00014-strategic-layer
 type: plan
 role: main
-status: open
+status: resolved
 parent: spec-00004-strategic-subdomains-context-map
 ---
 
@@ -57,3 +57,8 @@ checkpoint between. Terms follow [CONTEXT.md](../../CONTEXT.md).
   spec-00004-XAC scenario has a passing test and no requirement is unfinished; a
   `docs/record/` acceptance checklist links the ids (CLAUDE.md §7). Any gap blocks
   `resolved`.
+
+**Verified 2026-07-22** — subagent verdict PASS; the one WEAK item (XAC-2.1 e2e
+missing an `edges` check) closed. Acceptance evidence in
+[record-00014-strategic-layer-acceptance](../record/record-00014-strategic-layer-acceptance.md).
+212 unit + 40 e2e green; tsc/lint/build clean; connect-drag confirmed in a real browser.
