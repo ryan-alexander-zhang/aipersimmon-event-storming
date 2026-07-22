@@ -17,13 +17,16 @@ import { ContextRelationEdge } from "@/components/edges/context-relation-edge";
 import { ContextNode, type ContextFlowNode } from "@/components/nodes/context-node";
 import { contextTint } from "@/lib/eventstorming/context-color";
 import { CONTEXT_RELATION_STYLE } from "@/lib/eventstorming/context-relations";
+import { contextEdgeHandles } from "@/lib/layout/context-map";
 import { useESStore } from "@/lib/store/store";
 
 const nodeTypes: NodeTypes = { context: ContextNode };
 const edgeTypes: EdgeTypes = { contextRelation: ContextRelationEdge };
 
-const COL_W = 260;
-const ROW_H = 150;
+// Generous spacing so adjacent nodes don't touch and the on-edge relationship
+// label (type picker + delete) has clear room between them (issue-00012).
+const COL_W = 440;
+const ROW_H = 220;
 const PER_ROW = 3;
 
 // The Context Map (spec-00004 FR5): Bounded Contexts as nodes, relationships as
@@ -55,17 +58,26 @@ function ContextMapSurface() {
   // editing relationships does not touch this, so drag positions survive.
   useEffect(() => setNodes(seeded), [seeded, setNodes]);
 
+  // Route each edge to the handles facing the other node (issue-00012), from the
+  // live node positions so it re-routes as a context is dragged.
+  const posById = useMemo(() => new Map(nodes.map((n) => [n.id, n.position])), [nodes]);
   const edges = useMemo(
     () =>
-      relationships.map((r) => ({
-        id: r.id,
-        source: r.source,
-        target: r.target,
-        type: "contextRelation",
-        data: { type: r.type },
-        markerEnd: { type: MarkerType.ArrowClosed, color: CONTEXT_RELATION_STYLE[r.type].color },
-      })),
-    [relationships],
+      relationships.map((r) => {
+        const a = posById.get(r.source);
+        const b = posById.get(r.target);
+        const handles = a && b ? contextEdgeHandles(a, b) : undefined;
+        return {
+          id: r.id,
+          source: r.source,
+          target: r.target,
+          ...(handles ?? {}),
+          type: "contextRelation",
+          data: { type: r.type },
+          markerEnd: { type: MarkerType.ArrowClosed, color: CONTEXT_RELATION_STYLE[r.type].color },
+        };
+      }),
+    [relationships, posById],
   );
 
   const onConnect = useCallback(

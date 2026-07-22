@@ -13,11 +13,13 @@ export type ContextFlowNode = Node<
 
 const HANDLE = { width: 8, height: 8, background: "#94a3b8", border: "1px solid #fff" } as const;
 
+// Handle id suffixes match the router in lib/layout/context-map.ts (issue-00012):
+// s-left / t-left / s-right / … so edges bind to the geometry-correct side.
 const SIDES = [
-  { id: "l", position: Position.Left },
-  { id: "r", position: Position.Right },
-  { id: "t", position: Position.Top },
-  { id: "b", position: Position.Bottom },
+  { id: "left", position: Position.Left },
+  { id: "right", position: Position.Right },
+  { id: "top", position: Position.Top },
+  { id: "bottom", position: Position.Bottom },
 ] as const;
 
 export function ContextNode({ data, selected }: NodeProps<ContextFlowNode>) {
