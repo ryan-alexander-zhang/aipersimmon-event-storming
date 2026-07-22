@@ -510,6 +510,82 @@ test("narrative walkthrough steps the timeline, clamps, stays read-only, and exi
   await expect(wt).toHaveCount(0);
 });
 
+test("discovery mode is Big-Picture only; converge builds structured events [us-00016-AC-1.1, us-00017-AC-1.1]", async ({
+  page,
+}) => {
+  await page.goto("/"); // default Design level
+  // unavailable off Big Picture (us-00016-AC-1.1)
+  await expect(page.getByTestId("discovery-controls")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Big Picture" }).click();
+  await expect(page.getByTestId("discovery-controls")).toBeVisible();
+
+  // enter discovery → the structured board is replaced by the wall surface
+  await page.getByRole("button", { name: "Discover" }).click();
+  await expect(page.getByRole("button", { name: "Converge" })).toBeVisible();
+
+  // drop two unordered events via the toolbar (RF pane double-click also works,
+  // but is not needed to exercise the flow); they are wall stickies, not model nodes
+  await page.getByRole("button", { name: "Add discovery event" }).click();
+  await page.getByRole("button", { name: "Add discovery event" }).click();
+  await expect(page.getByTestId("discovery-node")).toHaveCount(2);
+  await expect(nodes(page, "domainEvent")).toHaveCount(0); // model untouched while diverging
+
+  // converge → wall clears, mode exits, structured Domain Events appear
+  await page.getByRole("button", { name: "Converge" }).click();
+  await expect(page.getByRole("button", { name: "Converge" })).toHaveCount(0);
+  await expect(page.getByTestId("discovery-node")).toHaveCount(0);
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+});
+
+test("renames a wall event inline without spawning extra events [us-00016-AC-2.1/4.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Big Picture" }).click();
+  await page.getByRole("button", { name: "Discover" }).click();
+  await page.getByRole("button", { name: "Add discovery event" }).click();
+  await expect(page.getByTestId("discovery-node")).toHaveCount(1);
+
+  // double-clicking the node enters rename mode; the count stays 1 (rename is on
+  // the node's own label, not a board-add gesture)
+  await page.getByTestId("discovery-node").dblclick();
+  await expect(page.getByTestId("discovery-node")).toHaveCount(1);
+  await page.getByTestId("discovery-node").getByRole("textbox").fill("Order Placed");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("discovery-node")).toContainText("Order Placed");
+
+  // the delete affordance removes it from the wall
+  await page.getByTestId("discovery-node").getByRole("button", { name: "Delete event" }).click();
+  await expect(page.getByTestId("discovery-node")).toHaveCount(0);
+});
+
+test("the discovery wall survives a reload and stays out of the exported DSL [us-00016-AC-5.1/6.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Big Picture" }).click();
+  await page.getByRole("button", { name: "Discover" }).click();
+  await page.getByRole("button", { name: "Add discovery event" }).click();
+  await expect(page.getByTestId("discovery-node")).toHaveCount(1);
+
+  // the wall is never in the model DSL: exporting an otherwise-empty model yields
+  // no nodes (us-00016-AC-5.1)
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Export" }).click(),
+  ]);
+  const exported = JSON.parse(readFileSync(await download.path(), "utf8"));
+  expect(exported.nodes).toHaveLength(0);
+
+  // reload restores the wall on re-entry (us-00016-AC-6.1)
+  await page.waitForTimeout(600); // autosave debounce
+  await page.reload();
+  await page.getByRole("button", { name: "Big Picture" }).click();
+  await page.getByRole("button", { name: "Discover" }).click();
+  await expect(page.getByTestId("discovery-node")).toHaveCount(1);
+});
+
 test("New clears the model and does not restore it on reload", async ({ page }) => {
   await page.goto("/");
   await addContext(page);

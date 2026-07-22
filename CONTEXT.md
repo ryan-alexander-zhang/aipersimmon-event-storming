@@ -107,6 +107,19 @@ A read-only traversal of the Timeline that steps through Domain Events in order,
 highlighting each event's slice, to validate the flow by telling its story.
 _Avoid_: playback, replay, tour.
 
+**Discovery Mode**:
+A Big-Picture-only exploration surface where a modeller freely places unordered
+Domain Events at arbitrary positions, with relaxed grammar (no connections, no
+timeline order). Its free positions are transient scratch state, never part of the
+Model or the DSL.
+_Avoid_: brainstorm, free canvas, chaos mode.
+
+**Converge**:
+The single action that turns the Discovery Mode wall into structured-board
+elements: each unordered event becomes an ordinary Domain Event with a global
+Timeline order derived from its left→right position, leaving Discovery Mode.
+_Avoid_: promote, commit, import (when precision matters).
+
 **Concurrent Events**:
 Two or more Domain Events that occupy the same global timeline position because
 they happen in parallel — including across different Bounded Contexts. They share

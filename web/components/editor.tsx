@@ -17,6 +17,7 @@ import {
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BoardChrome } from "@/components/board-chrome";
+import { DiscoveryCanvas } from "@/components/discovery-canvas";
 import { RelationEdge } from "@/components/edges/relation-edge";
 import { HealthPanel } from "@/components/health-panel";
 import { Walkthrough } from "@/components/walkthrough";
@@ -30,7 +31,7 @@ import { isValidConnection as canConnect } from "@/lib/eventstorming/relations";
 import { computeEdgeOffsets } from "@/lib/layout/edge-spread";
 import { COL_W, NODE_W } from "@/lib/layout/layout";
 import { computeFocus, computeNeighborhood, focusSource } from "@/lib/store/focus";
-import { loadModel, saveModel } from "@/lib/store/persistence";
+import { loadDiscovery, loadModel, saveDiscovery, saveModel } from "@/lib/store/persistence";
 import { useESStore } from "@/lib/store/store";
 import { dropOrder, dropTarget, slotOrders } from "@/lib/store/timeline";
 import type { ESEdge, ESNode } from "@/lib/store/types";
@@ -124,17 +125,25 @@ function TimelineDropIndicator({ drop }: { drop: DropView }) {
   );
 }
 
-/** Hydrate from local storage on mount, then debounce-save on every change. */
+/** Hydrate from local storage on mount, then debounce-save on every change. The
+ *  discovery wall is saved under its own key (spec-00002 §5), never in the DSL. */
 function useAutosave() {
   useEffect(() => {
     const loaded = loadModel();
     if (loaded && (loaded.nodes.length > 0 || loaded.contexts.length > 0)) {
       useESStore.getState().setModel(loaded);
     }
+    const wall = loadDiscovery();
+    if (wall.length > 0) {
+      useESStore.setState({ discovery: { active: false, items: wall } });
+    }
     let timer: ReturnType<typeof setTimeout>;
     const unsubscribe = useESStore.subscribe((s) => {
       clearTimeout(timer);
-      timer = setTimeout(() => saveModel(s.nodes, s.edges, s.contexts, s.level), 400);
+      timer = setTimeout(() => {
+        saveModel(s.nodes, s.edges, s.contexts, s.level);
+        saveDiscovery(s.discovery.items);
+      }, 400);
     });
     return () => {
       clearTimeout(timer);
@@ -159,6 +168,7 @@ function Canvas() {
   const isolate = useESStore((s) => s.isolate);
   const healthOpen = useESStore((s) => s.healthOpen);
   const walkActive = useESStore((s) => s.walk.active);
+  const discoveryActive = useESStore((s) => s.discovery.active);
   const setEventOrder = useESStore((s) => s.setEventOrder);
   const zoom = useStore((s) => s.transform[2]);
   const { fitView } = useReactFlow();
@@ -381,6 +391,9 @@ function Canvas() {
       <Toolbar />
       <div className="flex min-h-0 flex-1">
         <div className="relative flex-1">
+          {discoveryActive ? (
+            <DiscoveryCanvas />
+          ) : (
           <ReactFlow
             nodes={decoratedNodes}
             edges={decoratedEdges}
@@ -415,12 +428,13 @@ function Canvas() {
             />
             <Controls />
           </ReactFlow>
-          <BoardChrome />
-          {drop && <TimelineDropIndicator drop={drop} />}
-          {healthOpen && <HealthPanel />}
-          {walkActive && <Walkthrough />}
+          )}
+          {!discoveryActive && <BoardChrome />}
+          {!discoveryActive && drop && <TimelineDropIndicator drop={drop} />}
+          {!discoveryActive && healthOpen && <HealthPanel />}
+          {!discoveryActive && walkActive && <Walkthrough />}
         </div>
-        <PropertyPanel />
+        {!discoveryActive && <PropertyPanel />}
       </div>
     </div>
   );

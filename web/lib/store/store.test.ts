@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { StoreApi } from "zustand";
+import { exportJSON } from "@/lib/dsl/serialize";
 import { BAND_H } from "@/lib/layout/layout";
 import { createESStore, type ESState } from "./store";
 import { gapOrder, slotOrders } from "./timeline";
@@ -463,5 +464,139 @@ describe("timeline editing [us-00010]", () => {
     // Domain Event band collapses up to sit one step below the Actor band.
     get().setLevel("big-picture");
     expect(node(e)!.position.y - node(a)!.position.y).toBe(BAND_H);
+  });
+});
+
+describe("discovery mode [spec-00002]", () => {
+  const events = () => get().nodes.filter((n) => n.type === "domainEvent");
+  // converged events in timeline order, as their labels
+  const timelineLabels = () =>
+    events()
+      .sort((a, b) => (a.data.order ?? 0) - (b.data.order ?? 0))
+      .map((n) => n.data.label);
+
+  it("enters only at Big Picture; toggles off cleanly [us-00016-AC-1.1/1.2]", () => {
+    get().enterDiscovery(); // default level is design → no-op
+    expect(get().discovery.active).toBe(false);
+    get().setLevel("big-picture");
+    get().enterDiscovery();
+    expect(get().discovery.active).toBe(true);
+    get().exitDiscovery();
+    expect(get().discovery.active).toBe(false);
+  });
+
+  it("adds unordered events at free positions without touching the model [us-00016-AC-2.1]", () => {
+    get().setLevel("big-picture");
+    get().enterDiscovery();
+    const a = get().addDiscoveryItem(50, 10, "A");
+    const b = get().addDiscoveryItem(200, 90, "B");
+    expect(get().discovery.items).toHaveLength(2);
+    expect(get().discovery.items.find((i) => i.id === a)).toMatchObject({ x: 50, y: 10, label: "A" });
+    // the structured model is untouched: no nodes, no orders
+    expect(get().nodes).toHaveLength(0);
+    expect(node(b)).toBeUndefined();
+  });
+
+  it("drags a wall event without reordering structured events [us-00016-AC-3.1]", () => {
+    get().setLevel("big-picture");
+    const e = get().addNode("domainEvent"); // structured, order 0
+    const beforeX = node(e)!.position.x;
+    get().enterDiscovery();
+    const d = get().addDiscoveryItem(50, 10, "d");
+    get().moveDiscoveryItem(d, 400, 120);
+    expect(get().discovery.items[0]).toMatchObject({ x: 400, y: 120 });
+    expect(node(e)!.data.order).toBe(0); // structured order unchanged
+    expect(node(e)!.position.x).toBe(beforeX);
+  });
+
+  it("renames and deletes wall events only [us-00016-AC-4.1]", () => {
+    get().setLevel("big-picture");
+    get().enterDiscovery();
+    const a = get().addDiscoveryItem(0, 0, "a");
+    const b = get().addDiscoveryItem(10, 0, "b");
+    get().addDiscoveryItem(20, 0, "c");
+    get().updateDiscoveryItem(a, "renamed");
+    get().removeDiscoveryItem(b);
+    expect(get().discovery.items.map((i) => i.label)).toEqual(["renamed", "c"]);
+    expect(get().nodes).toHaveLength(0); // model untouched
+  });
+
+  it("converges left→right x into Ungrouped ordered events, clearing the wall [us-00017-AC-1.1/2.1/3.1]", () => {
+    get().setLevel("big-picture");
+    get().enterDiscovery();
+    get().addDiscoveryItem(300, 0, "C"); // right-most
+    get().addDiscoveryItem(50, 0, "A"); // left-most
+    get().addDiscoveryItem(150, 0, "B");
+    get().converge();
+    expect(timelineLabels()).toEqual(["A", "B", "C"]); // by x position
+    expect(events().every((n) => n.data.context === undefined)).toBe(true); // Ungrouped
+    expect(get().discovery).toEqual({ active: false, items: [] }); // wall cleared, mode off
+  });
+
+  it("appends the converged block after existing events [us-00017-AC-2.2]", () => {
+    get().setLevel("big-picture");
+    get().addNode("domainEvent", undefined, { label: "existing0" }); // order 0
+    get().addNode("domainEvent", undefined, { label: "existing1" }); // order 1
+    get().enterDiscovery();
+    get().addDiscoveryItem(10, 0, "new-left");
+    get().addDiscoveryItem(99, 0, "new-right");
+    get().converge();
+    expect(timelineLabels()).toEqual(["existing0", "existing1", "new-left", "new-right"]);
+  });
+
+  it("converging an empty wall is a no-op that leaves the mode [us-00017-AC-5.1]", () => {
+    get().setLevel("big-picture");
+    get().enterDiscovery();
+    get().converge();
+    expect(get().nodes).toHaveLength(0);
+    expect(get().discovery).toEqual({ active: false, items: [] });
+  });
+
+  it("exits discovery when leaving Big Picture but keeps the wall items [spec-00002 §5]", () => {
+    get().setLevel("big-picture");
+    get().enterDiscovery();
+    get().addDiscoveryItem(0, 0, "kept");
+    get().setLevel("process");
+    expect(get().discovery.active).toBe(false);
+    expect(get().discovery.items.map((i) => i.label)).toEqual(["kept"]);
+  });
+
+  it("resets the discovery wall on clear [spec-00002]", () => {
+    get().setLevel("big-picture");
+    get().enterDiscovery();
+    get().addDiscoveryItem(0, 0, "x");
+    get().clear();
+    expect(get().discovery).toEqual({ active: false, items: [] });
+  });
+
+  it("a converged event exports with a global order and no position, like a normal event [us-00017-AC-4.1]", () => {
+    get().setLevel("big-picture");
+    get().enterDiscovery();
+    get().addDiscoveryItem(10, 0, "X");
+    get().converge();
+    const json = JSON.parse(
+      exportJSON(get().nodes, get().edges, get().contexts, {
+        name: "t",
+        createdAt: "t",
+        level: "big-picture",
+      }),
+    );
+    const ev = json.nodes.find((n: { label: string }) => n.label === "X");
+    expect(ev.order).toBe(0); // carries a global timeline order
+    expect(ev.context).toBeUndefined(); // Ungrouped
+    expect(ev).not.toHaveProperty("position"); // no free coordinates in the DSL
+  });
+
+  it("keeps grammar validation active at Design while discovery is off [spec-00002-XAC-2.1]", () => {
+    // default level is Design, discovery inactive: the structured board still
+    // enforces the connection grammar (Discovery Mode never relaxes it here).
+    expect(get().discovery.active).toBe(false);
+    const a = get().addNode("actor");
+    const e = get().addNode("domainEvent");
+    // actor → domainEvent is not a valid relation; it must still be rejected
+    expect(get().connect({ source: a, target: e, sourceHandle: null, targetHandle: null })).toBe(
+      false,
+    );
+    expect(get().edges).toHaveLength(0);
   });
 });

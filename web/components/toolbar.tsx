@@ -1,6 +1,16 @@
 "use client";
 
-import { Activity, Download, FilePlus, FolderPlus, Footprints, Upload } from "lucide-react";
+import {
+  Activity,
+  Combine,
+  Download,
+  FilePlus,
+  FolderPlus,
+  Footprints,
+  Plus,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import { type ChangeEvent, useRef, useState } from "react";
 import { exportJSON, fromModel, importJSON } from "@/lib/dsl/serialize";
 import { LEVEL_LABEL, LEVELS } from "@/lib/eventstorming/levels";
@@ -21,6 +31,11 @@ export function Toolbar() {
   const walkActive = useESStore((s) => s.walk.active);
   const startWalkthrough = useESStore((s) => s.startWalkthrough);
   const stopWalkthrough = useESStore((s) => s.stopWalkthrough);
+  const discoveryActive = useESStore((s) => s.discovery.active);
+  const enterDiscovery = useESStore((s) => s.enterDiscovery);
+  const exitDiscovery = useESStore((s) => s.exitDiscovery);
+  const converge = useESStore((s) => s.converge);
+  const addDiscoveryItem = useESStore((s) => s.addDiscoveryItem);
   const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,6 +88,13 @@ export function Toolbar() {
     addContext(`Context ${contexts.length + 1}`);
   };
 
+  // Drop a wall event in a light left→right cascade so freshly added events are
+  // spatially ordered out of the box; the modeller then drags them where they want.
+  const onAddDiscoveryEvent = () => {
+    const n = useESStore.getState().discovery.items.length;
+    addDiscoveryItem(40 + (n % 5) * 180, 40 + Math.floor(n / 5) * 120);
+  };
+
   const btn =
     "flex items-center gap-1.5 rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100";
 
@@ -94,6 +116,39 @@ export function Toolbar() {
           </button>
         ))}
       </div>
+      {/* Discovery Mode: Big-Picture only (decision-00004). The Level control is
+          how you leave — switching off Big Picture exits the mode. */}
+      {level === "big-picture" && (
+        <div className="ml-3 flex items-center gap-2" data-testid="discovery-controls">
+          <button
+            type="button"
+            className={`${btn} ${discoveryActive ? "bg-amber-100 border-amber-300" : ""}`}
+            aria-pressed={discoveryActive}
+            onClick={() => (discoveryActive ? exitDiscovery() : enterDiscovery())}
+          >
+            <Sparkles size={14} /> Discover
+          </button>
+          {discoveryActive && (
+            <>
+              <button
+                type="button"
+                className={btn}
+                aria-label="Add discovery event"
+                onClick={onAddDiscoveryEvent}
+              >
+                <Plus size={14} /> Event
+              </button>
+              <button
+                type="button"
+                className={`${btn} bg-zinc-800 text-white hover:bg-zinc-700`}
+                onClick={converge}
+              >
+                <Combine size={14} /> Converge
+              </button>
+            </>
+          )}
+        </div>
+      )}
       <div className="ml-auto flex items-center gap-2">
         {error && (
           <span

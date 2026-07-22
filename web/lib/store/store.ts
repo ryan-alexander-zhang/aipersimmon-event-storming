@@ -30,6 +30,24 @@ export interface IsolateState {
   depth: number;
 }
 
+/** A Domain Event on the transient discovery wall: a free x/y position and a
+ *  label, with no timeline order and no context (decision-00004). Never written
+ *  into the structured model or the DSL; persisted under a separate key. */
+export interface DiscoveryItem {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+}
+
+/** Discovery Mode ("input funnel") state: a Big-Picture-only wall of unordered
+ *  events that Converge hands to the structured board. `active` is view-only;
+ *  `items` are scratch data mirrored to local storage, never to the DSL. */
+export interface DiscoveryState {
+  active: boolean;
+  items: DiscoveryItem[];
+}
+
 export interface ESState {
   nodes: ESNode[];
   edges: ESEdge[];
@@ -46,6 +64,8 @@ export interface ESState {
   healthOpen: boolean;
   /** Narrative walkthrough cursor (spec-00005); view-only, never persisted. */
   walk: { active: boolean; index: number };
+  /** Discovery Mode wall (spec-00002); transient, persisted outside the DSL. */
+  discovery: DiscoveryState;
 
   setLevel: (level: Level) => void;
   toggleIsolate: () => void;
@@ -57,6 +77,23 @@ export interface ESState {
   /** Move the walkthrough cursor one step (clamped), selecting that event. */
   walkStep: (dir: -1 | 1) => void;
   stopWalkthrough: () => void;
+
+  /** Enter Discovery Mode; no-op unless at Big Picture (decision-00004). */
+  enterDiscovery: () => void;
+  /** Leave Discovery Mode; the wall's items are kept for re-entry. */
+  exitDiscovery: () => void;
+  /** Drop an unordered event on the wall at a free position; returns its id. */
+  addDiscoveryItem: (x: number, y: number, label?: string) => string;
+  /** Move a wall event to a new free position (drag). */
+  moveDiscoveryItem: (id: string, x: number, y: number) => void;
+  /** Rename a wall event. */
+  updateDiscoveryItem: (id: string, label: string) => void;
+  /** Remove a wall event. */
+  removeDiscoveryItem: (id: string) => void;
+  /** Converge the wall: create one Ungrouped Domain Event per item, ordered by
+   *  left→right (x) position on the global timeline, then clear the wall and
+   *  leave Discovery Mode (us-00017). Empty wall → just leave the mode. */
+  converge: () => void;
 
   onNodesChange: (changes: NodeChange<ESNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<ESEdge>[]) => void;
@@ -118,9 +155,17 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   isolate: { active: false, direction: "down", depth: 2 },
   healthOpen: false,
   walk: { active: false, index: 0 },
+  discovery: { active: false, items: [] },
 
   setLevel: (level) =>
-    set({ level, nodes: laidOut(get().nodes, get().edges, get().contexts, level) }),
+    set({
+      level,
+      nodes: laidOut(get().nodes, get().edges, get().contexts, level),
+      // Discovery is Big-Picture only; leaving that level exits the mode but
+      // keeps the wall's items for re-entry (spec-00002 §5).
+      discovery:
+        level === "big-picture" ? get().discovery : { ...get().discovery, active: false },
+    }),
   toggleIsolate: () => set({ isolate: { ...get().isolate, active: !get().isolate.active } }),
   setIsolateDirection: (direction) => set({ isolate: { ...get().isolate, direction } }),
   setIsolateDepth: (depth) => set({ isolate: { ...get().isolate, depth: Math.max(1, depth) } }),
@@ -137,6 +182,47 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     set({ walk: { active: true, index }, selectedId: order[index] });
   },
   stopWalkthrough: () => set({ walk: { ...get().walk, active: false } }),
+
+  enterDiscovery: () => {
+    if (get().level !== "big-picture") return;
+    set({ discovery: { ...get().discovery, active: true } });
+  },
+  exitDiscovery: () => set({ discovery: { ...get().discovery, active: false } }),
+  addDiscoveryItem: (x, y, label) => {
+    const id = nanoid();
+    const item: DiscoveryItem = { id, label: label ?? ELEMENT_DEFINITIONS.domainEvent.label, x, y };
+    set({ discovery: { ...get().discovery, items: [...get().discovery.items, item] } });
+    return id;
+  },
+  moveDiscoveryItem: (id, x, y) =>
+    set({
+      discovery: {
+        ...get().discovery,
+        items: get().discovery.items.map((it) => (it.id === id ? { ...it, x, y } : it)),
+      },
+    }),
+  updateDiscoveryItem: (id, label) =>
+    set({
+      discovery: {
+        ...get().discovery,
+        items: get().discovery.items.map((it) => (it.id === id ? { ...it, label } : it)),
+      },
+    }),
+  removeDiscoveryItem: (id) =>
+    set({
+      discovery: {
+        ...get().discovery,
+        items: get().discovery.items.filter((it) => it.id !== id),
+      },
+    }),
+  converge: () => {
+    // Left→right (x) becomes the timeline order; addNode assigns the next global
+    // order per call, so the wall lands as a contiguous block after any existing
+    // events, Ungrouped (us-00017). Ties broken by id for determinism.
+    const ordered = [...get().discovery.items].sort((a, b) => a.x - b.x || (a.id < b.id ? -1 : 1));
+    for (const it of ordered) get().addNode("domainEvent", undefined, { label: it.label });
+    set({ discovery: { active: false, items: [] } });
+  },
 
   onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) }),
   onEdgesChange: (changes) => set({ edges: applyEdgeChanges(changes, get().edges) }),
@@ -267,6 +353,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       hoveredEdgeId: null,
       isolate: { ...get().isolate, active: false },
       walk: { active: false, index: 0 },
+      discovery: { active: false, items: [] },
     }),
   clear: () =>
     set({
@@ -278,6 +365,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       hoveredEdgeId: null,
       isolate: { ...get().isolate, active: false },
       walk: { active: false, index: 0 },
+      discovery: { active: false, items: [] },
     }),
 });
 
