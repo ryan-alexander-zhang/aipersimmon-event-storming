@@ -13,6 +13,11 @@ parent: idea-00001-visual-event-storming-web-tool
 A single-user, browser-only web tool for doing Event Storming (Process Level) on
 an infinite canvas and exporting the result as a structured, validated JSON DSL.
 
+> **Phase 2**: complex-business *analysis* capabilities extend this product in
+> [prd-00002](./prd-00002-complex-business-analysis.md), which revises some of the
+> non-goals below. This PRD stays the source of truth for the Phase-1 MVP editor
+> and its original scope.
+
 ## Vision & Goals
 
 Teams and individuals do Event Storming on physical walls or generic whiteboards
