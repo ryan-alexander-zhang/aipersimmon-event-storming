@@ -113,6 +113,11 @@ export interface ESState {
   /** Add a bounded context; returns its id. */
   addContext: (name: string) => string;
   renameContext: (id: string, name: string) => void;
+  /** Set (or clear, with undefined) a Bounded Context's subdomain classification. */
+  setContextClassification: (
+    id: string,
+    classification: "core" | "supporting" | "generic" | undefined,
+  ) => void;
   /** Remove a context along with its member nodes and their edges. */
   removeContext: (id: string) => void;
   /** Add a node of `type` in `context` (omit/empty → Ungrouped); Domain Events get
@@ -264,6 +269,9 @@ const initializer: StateCreator<ESState> = (set, get) => ({
 
   renameContext: (id, name) =>
     set({ contexts: get().contexts.map((c) => (c.id === id ? { ...c, name } : c)) }),
+
+  setContextClassification: (id, classification) =>
+    set({ contexts: get().contexts.map((c) => (c.id === id ? { ...c, classification } : c)) }),
 
   removeContext: (id) => {
     const nodes = get().nodes.filter((n) => n.data.context !== id);

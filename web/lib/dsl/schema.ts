@@ -7,7 +7,7 @@ import { ELEMENT_TYPES } from "@/lib/eventstorming/elements";
 import { LEVELS } from "@/lib/eventstorming/levels";
 import { RELATION_TYPES } from "@/lib/eventstorming/relations";
 
-export const DSL_VERSION = "3.0";
+export const DSL_VERSION = "4.0";
 
 export const propertiesSchema = z.object({
   description: z.string().optional(),
@@ -19,10 +19,12 @@ export const propertiesSchema = z.object({
 });
 
 // A bounded context: a named region/attribute over the global timeline (decision-00005).
+// classification is the optional strategic subdomain type (spec-00004 FR4).
 export const contextSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
   order: z.number(),
+  classification: z.enum(["core", "supporting", "generic"]).optional(),
 });
 
 export const nodeSchema = z.object({

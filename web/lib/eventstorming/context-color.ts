@@ -20,3 +20,13 @@ export function contextTint(ctx?: string): string | undefined {
   for (let i = 0; i < ctx.length; i++) h = (h * 31 + ctx.charCodeAt(i)) >>> 0;
   return CONTEXT_TINTS[h % CONTEXT_TINTS.length];
 }
+
+// Strategic subdomain classification (spec-00004 FR4). A label + badge colour per
+// type — independent of the identity tint above. Core is the strong/invest colour.
+export type Subdomain = "core" | "supporting" | "generic";
+
+export const SUBDOMAIN_STYLE: Record<Subdomain, { label: string; color: string }> = {
+  core: { label: "Core", color: "#7c3aed" },
+  supporting: { label: "Supporting", color: "#0891b2" },
+  generic: { label: "Generic", color: "#6b7280" },
+};

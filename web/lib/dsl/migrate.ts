@@ -74,11 +74,20 @@ function migrateV2toV3(v2: Record<string, unknown>): unknown {
   return { ...v2, version: "3.0", nodes: migrated };
 }
 
+// v3 → v4: strategic layer (spec-00004). classification (on contexts) and
+// contextRelationships (top-level) are additive and optional/defaulted, so the
+// migration is a pure version bump — old files load unclassified with no
+// relationships.
+function migrateV3toV4(v3: Record<string, unknown>): unknown {
+  return { ...v3, version: "4.0" };
+}
+
 /** Migrate any supported older document to the latest shape (chained). */
 export function migrateToLatest(raw: unknown): unknown {
   if (!raw || typeof raw !== "object") return raw;
   let r = raw as Record<string, unknown>;
   if (r.version === "1.0") r = migrateV1toV2(r) as Record<string, unknown>;
   if (r.version === "2.0") r = migrateV2toV3(r) as Record<string, unknown>;
+  if (r.version === "3.0") r = migrateV3toV4(r) as Record<string, unknown>;
   return r;
 }

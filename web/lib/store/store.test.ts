@@ -214,6 +214,16 @@ describe("store v2 (RT3)", () => {
     expect(get().level).toBe("big-picture");
   });
 
+  it("sets and clears a context's subdomain classification [us-00019-AC-1.1/2.1]", () => {
+    const a = get().addContext("Ordering");
+    const b = get().addContext("Payment");
+    get().setContextClassification(a, "core");
+    expect(get().contexts.find((c) => c.id === a)?.classification).toBe("core");
+    expect(get().contexts.find((c) => c.id === b)?.classification).toBeUndefined(); // only target
+    get().setContextClassification(a, undefined); // clear
+    expect(get().contexts.find((c) => c.id === a)?.classification).toBeUndefined();
+  });
+
   it("renames only the target context", () => {
     const c = get().addContext("Old");
     const other = get().addContext("Other");

@@ -90,6 +90,13 @@ attribute (e.g. Ordering, Payment) — not a segment of the timeline; contexts m
 overlap in time (decision-00005).
 _Avoid_: module, service, area.
 
+**Subdomain**:
+The strategic classification of a Bounded Context — **core** (a competitive
+advantage, worth the most investment), **supporting** (needed but not
+differentiating), or **generic** (a solved problem, buy or outsource). An optional
+attribute on a Bounded Context; classification is not identity.
+_Avoid_: domain, module, tier.
+
 **Ungrouped**:
 The state of an element that belongs to no Bounded Context. Ungrouped elements are
 collected in a single soft group on the board and can be assigned to a context

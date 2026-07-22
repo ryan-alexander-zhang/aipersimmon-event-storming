@@ -8,7 +8,7 @@ import {
   ELEMENT_BAND,
   ELEMENT_DEFINITIONS,
 } from "@/lib/eventstorming/elements";
-import { contextTint } from "@/lib/eventstorming/context-color";
+import { contextTint, SUBDOMAIN_STYLE, type Subdomain } from "@/lib/eventstorming/context-color";
 import { LEVEL_TYPES } from "@/lib/eventstorming/levels";
 import { computeBandTops } from "@/lib/layout/layout";
 import { useESStore } from "@/lib/store/store";
@@ -47,6 +47,7 @@ export function BoardChrome() {
   const level = useESStore((s) => s.level);
   const addNode = useESStore((s) => s.addNode);
   const renameContext = useESStore((s) => s.renameContext);
+  const setContextClassification = useESStore((s) => s.setContextClassification);
   const removeContext = useESStore((s) => s.removeContext);
   const setSelected = useESStore((s) => s.setSelected);
 
@@ -101,6 +102,30 @@ export function BoardChrome() {
                   onChange={(e) => renameContext(c.id, e.target.value)}
                   aria-label="Context name"
                 />
+                {/* Subdomain classification (spec-00004 FR4): a badge-coloured
+                    selector; empty = unclassified. */}
+                <select
+                  className="rounded border px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide outline-none"
+                  aria-label="Classification"
+                  data-classification={c.classification ?? ""}
+                  value={c.classification ?? ""}
+                  onChange={(e) =>
+                    setContextClassification(c.id, (e.target.value || undefined) as Subdomain | undefined)
+                  }
+                  style={
+                    c.classification
+                      ? {
+                          borderColor: SUBDOMAIN_STYLE[c.classification].color,
+                          color: SUBDOMAIN_STYLE[c.classification].color,
+                        }
+                      : { borderColor: "#d4d4d8", color: "#a1a1aa" }
+                  }
+                >
+                  <option value="">—</option>
+                  <option value="core">Core</option>
+                  <option value="supporting">Supporting</option>
+                  <option value="generic">Generic</option>
+                </select>
                 <button
                   type="button"
                   className="flex items-center gap-1 rounded border border-zinc-300 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 hover:bg-zinc-100"

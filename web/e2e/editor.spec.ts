@@ -652,6 +652,31 @@ test("search and filter never change the exported model [us-00018-AC-5.1, spec-0
   expect(normalize(after)).toEqual(normalize(before)); // identical model
 });
 
+test("classifies a Bounded Context and shows the badge; export carries it [us-00019-AC-1.1/2.1/3.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addContext(page);
+  const classify = page.getByLabel("Classification");
+  await expect(classify).toHaveValue(""); // unclassified by default
+
+  await classify.selectOption("core");
+  await expect(classify).toHaveValue("core"); // badge reflects core
+
+  // export carries the classification (us-00019-AC-3.1)
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Export" }).click(),
+  ]);
+  const exported = JSON.parse(readFileSync(await download.path(), "utf8"));
+  expect(exported.version).toBe("4.0");
+  expect(exported.contexts[0].classification).toBe("core");
+
+  // clearing returns to unclassified (us-00019-AC-2.1)
+  await classify.selectOption("");
+  await expect(classify).toHaveValue("");
+});
+
 test("New clears the model and does not restore it on reload", async ({ page }) => {
   await page.goto("/");
   await addContext(page);
