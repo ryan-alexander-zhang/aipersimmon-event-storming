@@ -23,8 +23,9 @@ boundaries are.
   Context Map, the system shall create a directed relationship (source = upstream,
   target = downstream) whose type defaults to Customer/Supplier.
 - **us-00020-FR-3** (Event) When the Modeler changes a relationship's type, the
-  system shall set it to one of: Partnership, Shared Kernel, Customer/Supplier,
-  Conformist, Anticorruption Layer.
+  system shall set it to one of the canonical DDD context-map patterns: Partnership,
+  Shared Kernel, Customer/Supplier, Conformist, Anticorruption Layer, Open Host
+  Service, Published Language, Separate Ways (decision-00007).
 - **us-00020-FR-4** (Event) When the Modeler deletes a relationship, the system
   shall remove it from the model.
 - **us-00020-FR-5** (Event) When a Bounded Context is removed, the system shall also

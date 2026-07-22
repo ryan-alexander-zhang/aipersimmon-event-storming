@@ -74,7 +74,7 @@ retype and delete all confirmed visually.
 
 ## Deferred (recorded, not gaps)
 
-Per decision-00007, the relationship vocabulary is the focused 5-pattern subset;
-Open Host Service, Published Language, and Separate Ways are out of v1 (addable to
-the enum later without a DSL break). Context-node positions in the map are
-transient (not persisted), holding the decision-00002 invariant.
+Per decision-00007, the relationship vocabulary is the full canonical 8-pattern set
+(expanded from an initial focused 5 on 2026-07-22; only Big Ball of Mud is out of
+scope). Context-node positions in the map are transient (not persisted), holding
+the decision-00002 invariant.

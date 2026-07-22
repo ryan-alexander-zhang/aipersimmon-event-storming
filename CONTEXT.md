@@ -131,7 +131,8 @@ _Avoid_: promote, commit, import (when precision matters).
 A typed, directed integration relationship between two Bounded Contexts —
 source = upstream, target = downstream. Uses the canonical DDD context-mapping
 patterns: Partnership, Shared Kernel, Customer/Supplier, Conformist,
-Anticorruption Layer (decision-00007).
+Anticorruption Layer, Open Host Service, Published Language, Separate Ways
+(decision-00007).
 _Avoid_: dependency, link, connection.
 
 **Context Map**:

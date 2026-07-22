@@ -6,13 +6,16 @@ import {
 } from "./context-relations";
 
 describe("context relationship vocabulary [decision-00007]", () => {
-  it("has the focused 5-pattern set", () => {
+  it("has the full canonical 8-pattern set", () => {
     expect([...CONTEXT_RELATION_TYPES]).toEqual([
       "partnership",
       "sharedKernel",
       "customerSupplier",
       "conformist",
       "acl",
+      "openHostService",
+      "publishedLanguage",
+      "separateWays",
     ]);
   });
 

@@ -33,7 +33,8 @@ New module `lib/eventstorming/context-relations.ts` (sibling to `relations.ts`),
 with the canonical ddd-crew set (decision-00007):
 
 ```
-CONTEXT_RELATION_TYPES = ["partnership","sharedKernel","customerSupplier","conformist","acl"]
+CONTEXT_RELATION_TYPES = ["partnership","sharedKernel","customerSupplier","conformist",
+                          "acl","openHostService","publishedLanguage","separateWays"]
 ```
 
 `CONTEXT_RELATION_STYLE` (label + colour) parallels `RELATION_STYLE`
@@ -86,8 +87,8 @@ arrow's meaning.
 
 ## 3. Boundaries / non-goals
 
-- Relationship set fixed to the 5 in decision-00007 (no OHS / Published Language /
-  Separate Ways in v1).
+- Relationship set fixed to the canonical 8 in decision-00007 (only Big Ball of Mud
+  is out of scope).
 - Context-node positions in the map are transient (not in the DSL), same invariant
   as the timeline board.
 - No auto-derivation of relationships from element edges; relationships are drawn

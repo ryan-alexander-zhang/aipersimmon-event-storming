@@ -1,8 +1,8 @@
-// Strategic context-mapping relationship types (spec-00004 FR5). These are the
-// canonical DDD context-map patterns (Eric Evans; ddd-crew), a focused 5-pattern
-// subset (decision-00007). Every relationship is directed source → target, read
-// as upstream → downstream; symmetric patterns ignore the arrow's meaning. Pure
-// data — no rendering here (parallels edge-style.ts for element relations).
+// Strategic context-mapping relationship types (spec-00004 FR5). The full
+// canonical DDD context-map set (Eric Evans; ddd-crew) — decision-00007. Every
+// relationship is directed source → target, read as upstream → downstream;
+// symmetric patterns ignore the arrow's meaning. Pure data — no rendering here
+// (parallels edge-style.ts for element relations).
 
 export const CONTEXT_RELATION_TYPES = [
   "partnership",
@@ -10,6 +10,9 @@ export const CONTEXT_RELATION_TYPES = [
   "customerSupplier",
   "conformist",
   "acl",
+  "openHostService",
+  "publishedLanguage",
+  "separateWays",
 ] as const;
 
 export type ContextRelationType = (typeof CONTEXT_RELATION_TYPES)[number];
@@ -28,6 +31,9 @@ export const CONTEXT_RELATION_STYLE: Record<ContextRelationType, ContextRelation
   customerSupplier: { label: "Customer/Supplier", color: "#2563eb", symmetric: false },
   conformist: { label: "Conformist", color: "#b45309", symmetric: false },
   acl: { label: "Anticorruption Layer", color: "#dc2626", symmetric: false },
+  openHostService: { label: "Open Host Service", color: "#15803d", symmetric: false },
+  publishedLanguage: { label: "Published Language", color: "#db2777", symmetric: false },
+  separateWays: { label: "Separate Ways", color: "#6b7280", symmetric: true },
 };
 
 /** The default type for a freshly drawn relationship (us-00020-FR-2). */
