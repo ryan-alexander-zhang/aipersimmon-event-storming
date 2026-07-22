@@ -40,6 +40,39 @@ describe("serialize v2 (T2/RT1)", () => {
     expect(back.nodes.every((n) => n.position.x === 0 && n.position.y === 0)).toBe(true);
   });
 
+  it("round-trips hotspot state/kind/priority [us-00012-AC-1.1/2.1]", () => {
+    const nodes: ESNode[] = [
+      {
+        id: "h1",
+        type: "hotspot",
+        position: { x: 0, y: 0 },
+        data: { label: "reserve when?", state: "resolved", kind: "question", priority: "high" },
+      },
+    ];
+    const back = fromModel(toModel(nodes, [], [], META));
+    expect(back.nodes[0].data).toMatchObject({
+      state: "resolved",
+      kind: "question",
+      priority: "high",
+    });
+  });
+
+  it("imports a pre-spec v2.0 file without the new fields [spec-00003-XAC-1.1]", () => {
+    const model = {
+      version: "2.0",
+      meta: { name: "old", level: "design", createdAt: "2026-01-01T00:00:00Z" },
+      contexts: [],
+      nodes: [{ id: "h1", type: "hotspot", label: "old", properties: {} }],
+      edges: [],
+    };
+    const result = importJSON(JSON.stringify(model));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const back = fromModel(result.model);
+      expect(back.nodes[0].data.state).toBeUndefined(); // absent = open, resolved at read time
+    }
+  });
+
   it("export omits position and includes contexts + order + level [us-00004]", () => {
     const { nodes, edges } = sampleCanvas();
     const out = JSON.parse(exportJSON(nodes, edges, CONTEXTS, META));

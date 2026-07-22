@@ -5,6 +5,7 @@ import {
   Box,
   Eye,
   Flame,
+  Lightbulb,
   Lock,
   type LucideIcon,
   Server,
@@ -29,6 +30,7 @@ const ICONS: Record<ElementType, LucideIcon> = {
   readModel: Eye,
   externalSystem: Server,
   hotspot: Flame,
+  opportunity: Lightbulb,
 };
 
 const HANDLE_STYLE = {
@@ -71,6 +73,7 @@ export function routeHandles(
 export function ElementNode({ id, type, data, selected }: NodeProps<ESNode>) {
   const def = ELEMENT_DEFINITIONS[type];
   const Icon = ICONS[type];
+  const resolved = type === "hotspot" && data.state === "resolved";
   const updateNodeData = useESStore((s) => s.updateNodeData);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(data.label);
@@ -93,10 +96,15 @@ export function ElementNode({ id, type, data, selected }: NodeProps<ESNode>) {
   return (
     <div
       data-testid="node-body"
+      data-resolved={resolved ? "true" : undefined}
       className={`relative rounded-md px-3 py-2 text-sm text-zinc-900 shadow-sm ${
         type === "externalSystem" ? "min-w-[168px] max-w-[230px]" : "min-w-[120px] max-w-[200px]"
       }`}
-      style={{ background: def.color, outline: selected ? "2px solid #111827" : "none" }}
+      style={{
+        background: def.color,
+        outline: selected ? "2px solid #111827" : "none",
+        opacity: resolved ? 0.55 : undefined,
+      }}
     >
       {/* Anchor points on all four sides; edges pick the pair that matches the
           slice direction (vertical chain top↔bottom, timeline left↔right). */}
@@ -127,6 +135,20 @@ export function ElementNode({ id, type, data, selected }: NodeProps<ESNode>) {
       ) : (
         <div className="mt-1 cursor-text break-words font-medium" onDoubleClick={startEditing}>
           {data.label}
+        </div>
+      )}
+      {type === "hotspot" && (data.kind || data.priority) && (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {data.kind && (
+            <span className="rounded bg-white/50 px-1 text-[9px] font-semibold uppercase tracking-wide">
+              {data.kind}
+            </span>
+          )}
+          {data.priority && (
+            <span className="rounded bg-white/50 px-1 text-[9px] font-semibold uppercase tracking-wide">
+              {data.priority}
+            </span>
+          )}
         </div>
       )}
     </div>

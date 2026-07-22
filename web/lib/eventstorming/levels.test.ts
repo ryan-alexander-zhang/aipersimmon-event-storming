@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ElementType } from "./elements";
-import { isVisibleAt, LEVEL_TYPES, typesForZoom } from "./levels";
+import { isVisibleAt, LEVELS, LEVEL_TYPES, typesForZoom } from "./levels";
 
 describe("levels", () => {
   it("is cumulative: Big Picture ⊂ Process ⊂ Design", () => {
@@ -26,6 +26,10 @@ describe("levels", () => {
   it("Design introduces both Constraint (input) and Aggregate (output)", () => {
     expect(isVisibleAt("design", "constraint")).toBe(true);
     expect(isVisibleAt("design", "aggregate")).toBe(true);
+  });
+
+  it("shows Opportunity at every level [us-00013-AC-3.1]", () => {
+    for (const lv of LEVELS) expect(isVisibleAt(lv, "opportunity")).toBe(true);
   });
 });
 

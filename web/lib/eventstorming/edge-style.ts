@@ -28,4 +28,5 @@ export const RELATION_STYLE: Record<RelationType, RelationStyle> = {
   updates: { tier: "secondary", color: "#16a34a", width: SECONDARY_W },
   informs: { tier: "secondary", color: "#65a30d", width: SECONDARY_W },
   annotates: { tier: "secondary", color: "#db2777", width: SECONDARY_W },
+  highlights: { tier: "secondary", color: "#059669", width: SECONDARY_W },
 };

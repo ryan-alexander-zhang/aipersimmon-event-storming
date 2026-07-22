@@ -50,8 +50,15 @@ _Avoid_: third party, integration, service.
 
 **Hotspot**:
 A marked conflict, question, risk, or objection attached to any element. The
-neon-pink sticky.
+neon-pink sticky. Carries a **state** (open → resolved), a **kind** (conflict /
+question / risk), and a **priority** (low / medium / high); absent state means
+open.
 _Avoid_: issue, note, problem.
+
+**Opportunity**:
+A marked idea, possibility, or value to pursue, attached to any element — the
+positive counterpart to a Hotspot. Its own distinct sticky.
+_Avoid_: idea, suggestion, hotspot.
 
 **Pivotal Event**:
 The few most significant Domain Events, marked with a vertical line. A marked
@@ -73,6 +80,7 @@ it is refined by the Aggregate boundary (handledBy + emits).
 **updates**: Domain Event → Read Model.
 **informs**: Read Model → Actor.
 **annotates**: Hotspot → any element.
+**highlights**: Opportunity → any element.
 
 ### Structure
 

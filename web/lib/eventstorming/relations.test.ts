@@ -30,6 +30,12 @@ describe("connection rules", () => {
     }
   });
 
+  it("lets an opportunity highlight any element type [us-00013-AC-1.1]", () => {
+    for (const target of ELEMENT_TYPES) {
+      expect(resolveRelation("opportunity", target)).toBe("highlights");
+    }
+  });
+
   it("rejects connections not in the rule table", () => {
     // actor -> domainEvent (us-00002-AC-2.1), and other unlisted pairs
     expect(resolveRelation("actor", "domainEvent")).toBeNull();
@@ -43,6 +49,7 @@ describe("connection rules", () => {
   it("only allows the valid pairs (exhaustive over the type matrix)", () => {
     const allowed = new Set(VALID.map(([s, , t]) => `${s}->${t}`));
     for (const target of ELEMENT_TYPES) allowed.add(`hotspot->${target}`);
+    for (const target of ELEMENT_TYPES) allowed.add(`opportunity->${target}`);
 
     for (const source of ELEMENT_TYPES) {
       for (const target of ELEMENT_TYPES) {

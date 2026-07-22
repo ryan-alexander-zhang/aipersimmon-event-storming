@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, FilePlus, FolderPlus, Upload } from "lucide-react";
+import { Activity, Download, FilePlus, FolderPlus, Upload } from "lucide-react";
 import { type ChangeEvent, useRef, useState } from "react";
 import { exportJSON, fromModel, importJSON } from "@/lib/dsl/serialize";
 import { LEVEL_LABEL, LEVELS } from "@/lib/eventstorming/levels";
@@ -16,6 +16,8 @@ export function Toolbar() {
   const setModel = useESStore((s) => s.setModel);
   const addContext = useESStore((s) => s.addContext);
   const clear = useESStore((s) => s.clear);
+  const healthOpen = useESStore((s) => s.healthOpen);
+  const toggleHealth = useESStore((s) => s.toggleHealth);
   const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,6 +102,14 @@ export function Toolbar() {
             {error}
           </span>
         )}
+        <button
+          type="button"
+          className={btn}
+          aria-pressed={healthOpen}
+          onClick={toggleHealth}
+        >
+          <Activity size={14} /> Health
+        </button>
         <button type="button" className={btn} onClick={onNew}>
           <FilePlus size={14} /> New
         </button>

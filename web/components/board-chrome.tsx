@@ -21,6 +21,7 @@ const BAND_LABEL: Record<Band, string> = {
   policy: "Policies",
   readModel: "Read Models",
   hotspot: "Hot Spots",
+  opportunity: "Opportunities",
 };
 
 const BAND_COLOR: Record<Band, string> = {
@@ -32,6 +33,7 @@ const BAND_COLOR: Record<Band, string> = {
   policy: ELEMENT_DEFINITIONS.policy.color,
   readModel: ELEMENT_DEFINITIONS.readModel.color,
   hotspot: ELEMENT_DEFINITIONS.hotspot.color,
+  opportunity: ELEMENT_DEFINITIONS.opportunity.color,
 };
 
 /** Band rail (left, y-aligned) and context headers (top, x-aligned) that track

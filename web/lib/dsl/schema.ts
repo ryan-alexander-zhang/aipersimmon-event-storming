@@ -12,6 +12,10 @@ export const DSL_VERSION = "2.0";
 export const propertiesSchema = z.object({
   description: z.string().optional(),
   pivotal: z.boolean().optional(),
+  // Hotspot workflow (spec-00003); all optional and additive — absent state = open.
+  state: z.enum(["open", "resolved"]).optional(),
+  kind: z.enum(["conflict", "question", "risk"]).optional(),
+  priority: z.enum(["low", "medium", "high"]).optional(),
 });
 
 // A bounded context: a column group along the timeline.

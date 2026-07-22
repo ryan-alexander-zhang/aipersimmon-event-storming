@@ -34,6 +34,9 @@ export function toModel(
       properties: {
         ...(n.data.description !== undefined ? { description: n.data.description } : {}),
         ...(n.data.pivotal !== undefined ? { pivotal: n.data.pivotal } : {}),
+        ...(n.data.state !== undefined ? { state: n.data.state } : {}),
+        ...(n.data.kind !== undefined ? { kind: n.data.kind } : {}),
+        ...(n.data.priority !== undefined ? { priority: n.data.priority } : {}),
       },
     })),
     edges: edges.map((e) => ({
@@ -68,6 +71,9 @@ export function fromModel(model: Model): {
           ? { description: n.properties.description }
           : {}),
         ...(n.properties.pivotal !== undefined ? { pivotal: n.properties.pivotal } : {}),
+        ...(n.properties.state !== undefined ? { state: n.properties.state } : {}),
+        ...(n.properties.kind !== undefined ? { kind: n.properties.kind } : {}),
+        ...(n.properties.priority !== undefined ? { priority: n.properties.priority } : {}),
       },
     })),
     edges: model.edges.map((e) => ({

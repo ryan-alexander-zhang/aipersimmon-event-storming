@@ -12,6 +12,7 @@ export const ELEMENT_TYPES = [
   "readModel",
   "externalSystem",
   "hotspot",
+  "opportunity",
 ] as const;
 
 export type ElementType = (typeof ELEMENT_TYPES)[number];
@@ -32,6 +33,7 @@ export const ELEMENT_DEFINITIONS: Record<ElementType, ElementDefinition> = {
   readModel: { type: "readModel", label: "Read Model", color: "#7ED321" },
   externalSystem: { type: "externalSystem", label: "External System", color: "#F48FB1" },
   hotspot: { type: "hotspot", label: "Hotspot", color: "#FF4081" },
+  opportunity: { type: "opportunity", label: "Opportunity", color: "#00C853" },
 };
 
 // Fixed row-bands, top→bottom. Actors and External Systems share the top band.
@@ -44,6 +46,7 @@ export const BAND_ORDER = [
   "policy",
   "readModel",
   "hotspot",
+  "opportunity",
 ] as const;
 
 export type Band = (typeof BAND_ORDER)[number];
@@ -58,6 +61,7 @@ export const ELEMENT_BAND: Record<ElementType, Band> = {
   policy: "policy",
   readModel: "readModel",
   hotspot: "hotspot",
+  opportunity: "opportunity",
 };
 
 export const bandIndex = (type: ElementType): number =>

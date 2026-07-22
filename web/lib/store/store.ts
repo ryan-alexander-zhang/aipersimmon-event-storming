@@ -42,11 +42,14 @@ export interface ESState {
   hoveredEdgeId: string | null;
   /** Isolate/focus mode; view-only, never persisted. */
   isolate: IsolateState;
+  /** Model-health panel visibility (spec-00007); view-only, never persisted. */
+  healthOpen: boolean;
 
   setLevel: (level: Level) => void;
   toggleIsolate: () => void;
   setIsolateDirection: (direction: IsolateDirection) => void;
   setIsolateDepth: (depth: number) => void;
+  toggleHealth: () => void;
 
   onNodesChange: (changes: NodeChange<ESNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<ESEdge>[]) => void;
@@ -63,6 +66,8 @@ export interface ESState {
   removeNode: (id: string) => void;
   /** Attach a hotspot to `targetId` (inherits its context); returns the hotspot id. */
   addHotspot: (targetId: string, text: string) => string;
+  /** Attach an opportunity to `targetId` (inherits its context); returns its id. */
+  addOpportunity: (targetId: string, text: string) => string;
   /** Create a semantic edge if the connection is valid; returns success. */
   connect: (connection: Connection) => boolean;
   /** Set a Domain Event's timeline order, then normalize its context to a
@@ -105,12 +110,14 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   hoveredId: null,
   hoveredEdgeId: null,
   isolate: { active: false, direction: "down", depth: 2 },
+  healthOpen: false,
 
   setLevel: (level) =>
     set({ level, nodes: laidOut(get().nodes, get().edges, get().contexts, level) }),
   toggleIsolate: () => set({ isolate: { ...get().isolate, active: !get().isolate.active } }),
   setIsolateDirection: (direction) => set({ isolate: { ...get().isolate, direction } }),
   setIsolateDepth: (depth) => set({ isolate: { ...get().isolate, depth: Math.max(1, depth) } }),
+  toggleHealth: () => set({ healthOpen: !get().healthOpen }),
 
   onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) }),
   onEdgesChange: (changes) => set({ edges: applyEdgeChanges(changes, get().edges) }),
@@ -169,6 +176,13 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   addHotspot: (targetId, text) => {
     const target = get().nodes.find((n) => n.id === targetId);
     const id = get().addNode("hotspot", target?.data.context, { label: text });
+    get().connect({ source: id, target: targetId, sourceHandle: null, targetHandle: null });
+    return id;
+  },
+
+  addOpportunity: (targetId, text) => {
+    const target = get().nodes.find((n) => n.id === targetId);
+    const id = get().addNode("opportunity", target?.data.context, { label: text });
     get().connect({ source: id, target: targetId, sourceHandle: null, targetHandle: null });
     return id;
   },

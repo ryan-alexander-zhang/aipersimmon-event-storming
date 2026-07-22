@@ -18,6 +18,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BoardChrome } from "@/components/board-chrome";
 import { RelationEdge } from "@/components/edges/relation-edge";
+import { HealthPanel } from "@/components/health-panel";
 import { ElementNode, routeHandles } from "@/components/nodes/element-node";
 import { PropertyPanel } from "@/components/property-panel";
 import { Toolbar } from "@/components/toolbar";
@@ -168,6 +169,7 @@ function Canvas() {
   const hoveredId = useESStore((s) => s.hoveredId);
   const level = useESStore((s) => s.level);
   const isolate = useESStore((s) => s.isolate);
+  const healthOpen = useESStore((s) => s.healthOpen);
   const contexts = useESStore((s) => s.contexts);
   const setEventOrder = useESStore((s) => s.setEventOrder);
   const zoom = useStore((s) => s.transform[2]);
@@ -427,6 +429,7 @@ function Canvas() {
           </ReactFlow>
           <BoardChrome />
           {drop && <TimelineDropIndicator drop={drop} />}
+          {healthOpen && <HealthPanel />}
         </div>
         <PropertyPanel />
       </div>

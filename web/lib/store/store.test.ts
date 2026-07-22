@@ -102,6 +102,19 @@ describe("store v2 (RT3)", () => {
     );
   });
 
+  it("attaches an opportunity via a highlights edge, inheriting context [us-00013-AC-1.1]", () => {
+    const ctx = get().addContext("c");
+    const e = get().addNode("domainEvent", ctx);
+    const o = get().addOpportunity(e, "batch discounts?");
+    expect(node(o)).toMatchObject({
+      type: "opportunity",
+      data: { context: ctx, label: "batch discounts?" },
+    });
+    expect(get().edges).toContainEqual(
+      expect.objectContaining({ source: o, target: e, data: { relation: "highlights" } }),
+    );
+  });
+
   it("removes a node and its attached edges [us-00001-FR-4]", () => {
     const ctx = get().addContext("c");
     const a = get().addNode("actor", ctx);
@@ -272,6 +285,14 @@ describe("store v2 (RT3)", () => {
     get().clear();
     expect(get().isolate.active).toBe(false);
     expect(get().isolate.direction).toBe("up"); // preference kept
+  });
+
+  it("toggles the model-health panel visibility [spec-00007]", () => {
+    expect(get().healthOpen).toBe(false);
+    get().toggleHealth();
+    expect(get().healthOpen).toBe(true);
+    get().toggleHealth();
+    expect(get().healthOpen).toBe(false);
   });
 
   it("tracks the hovered edge and clears it on clear (HE1)", () => {

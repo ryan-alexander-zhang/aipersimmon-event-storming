@@ -368,6 +368,100 @@ test("hovering an edge isolates it and dims the rest [design-00003]", async ({ p
   expect(await nodeOpacity("e1")).toBe("1");
 });
 
+test("model health lists a smell, focuses its element, and never blocks editing [us-00011-AC-1.1/3.1/5.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addContext(page);
+  // a Domain Event with no producing Command is an orphan-event smell
+  await addLabeledEvent(page, "Order Placed");
+  // deselect so the property panel closes (proves the finding-click re-selects it)
+  await page.locator(".react-flow__pane").click({ position: { x: 10, y: 10 } });
+
+  await page.getByRole("button", { name: "Health" }).click();
+  const panel = page.getByTestId("health-panel");
+  await expect(panel).toBeVisible();
+  const finding = panel.getByTestId("health-finding").filter({ hasText: "Order Placed" });
+  await expect(finding).toBeVisible();
+
+  // selecting the finding focuses the event → its Label field reappears
+  await finding.click();
+  await expect(page.getByLabel("Label", { exact: true })).toHaveValue("Order Placed");
+
+  // findings are advisory: editing stays enabled while the panel is open
+  await expect(panel).toBeVisible();
+  await page.getByLabel("Label", { exact: true }).fill("Order Confirmed");
+  await expect(nodes(page, "domainEvent")).toContainText("Order Confirmed");
+});
+
+test("model health shows a healthy empty state when the model has no smells [us-00011-AC-4.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Health" }).click();
+  const panel = page.getByTestId("health-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByTestId("health-empty")).toBeVisible();
+  await expect(panel.getByTestId("health-empty")).toContainText("No issues found");
+  await expect(panel.getByTestId("health-finding")).toHaveCount(0);
+});
+
+test("hotspot workflow: resolving mutes it and drops it from model health [us-00012-AC-1.1/3.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addContext(page);
+  await addLabeledEvent(page, "Order Placed");
+  // attach a hotspot to the selected event, then open model health
+  await slice(page, "+ Hotspot");
+  await expect(nodes(page, "hotspot")).toHaveCount(1);
+  // classify + prioritise the hotspot (us-00012-AC-2.1): both are shown on the node
+  await page.getByLabel("Kind").selectOption("question");
+  await page.getByLabel("Priority").selectOption("high");
+  await expect(nodes(page, "hotspot")).toContainText("question");
+  await expect(nodes(page, "hotspot")).toContainText("high");
+  await page.getByRole("button", { name: "Health" }).click();
+  const panel = page.getByTestId("health-panel");
+  const hotspotFinding = panel.getByTestId("health-finding").filter({ hasText: "unresolved hotspot" });
+  await expect(hotspotFinding).toBeVisible();
+
+  // resolve it (the new hotspot is selected) → muted, and dropped from health
+  await page.getByLabel("Resolved").check();
+  await expect(nodes(page, "hotspot").locator("[data-testid=node-body]")).toHaveAttribute(
+    "data-resolved",
+    "true",
+  );
+  await expect(hotspotFinding).toHaveCount(0);
+
+  // reopening un-mutes it (us-00012-AC-1.1 reopen clause)
+  await page.getByLabel("Resolved").uncheck();
+  await expect(nodes(page, "hotspot").locator("[data-testid=node-body]")).not.toHaveAttribute(
+    "data-resolved",
+    "true",
+  );
+});
+
+test("opportunity: attach to an element, distinct from a hotspot, visible at Big Picture [us-00013-AC-1.1/3.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addContext(page);
+  await addLabeledEvent(page, "Order Placed");
+  await slice(page, "+ Opportunity");
+  const opp = nodes(page, "opportunity");
+  await expect(opp).toHaveCount(1);
+  await expect(edges(page)).toHaveCount(1); // the highlights edge
+  // edit its text (us-00013-AC-2.1): the new text shows and is held in the model
+  await page.getByLabel("Text", { exact: true }).fill("bundle upsell");
+  await expect(opp).toContainText("bundle upsell");
+  // conventional colour (#00C853), distinct from the hotspot pink
+  const body = opp.locator("[data-testid=node-body]");
+  expect(await body.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(0, 200, 83)");
+  // annotations are visible at Big Picture too
+  await page.getByRole("button", { name: "Big Picture" }).click();
+  await expect(opp).toHaveCount(1);
+});
+
 test("New clears the model and does not restore it on reload", async ({ page }) => {
   await page.goto("/");
   await addContext(page);

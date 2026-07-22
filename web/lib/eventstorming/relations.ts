@@ -15,6 +15,7 @@ export const RELATION_TYPES = [
   "updates",
   "informs",
   "annotates",
+  "highlights",
 ] as const;
 
 export type RelationType = (typeof RELATION_TYPES)[number];
@@ -40,6 +41,8 @@ export const CONNECTION_RULES: ConnectionRule[] = [
   { relation: "updates", sources: ["domainEvent"], targets: ["readModel"] },
   { relation: "informs", sources: ["readModel"], targets: ["actor"] },
   { relation: "annotates", sources: ["hotspot"], targets: [...ELEMENT_TYPES] },
+  // Opportunity is the positive counterpart to Hotspot; it highlights any element.
+  { relation: "highlights", sources: ["opportunity"], targets: [...ELEMENT_TYPES] },
 ];
 
 /** The relation an edge from `source` to `target` would carry, or null if the

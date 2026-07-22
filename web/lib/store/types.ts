@@ -10,6 +10,10 @@ export type ESNodeData = {
   label: string;
   description?: string;
   pivotal?: boolean;
+  // Hotspot workflow (spec-00003); absent state = open.
+  state?: "open" | "resolved";
+  kind?: "conflict" | "question" | "risk";
+  priority?: "low" | "medium" | "high";
   // bounded context membership; timeline index (Domain Events carry order).
   context?: string;
   order?: number;

@@ -25,6 +25,7 @@ const SLICE: Partial<Record<ElementType, SliceAction[]>> = {
     { label: "+ Policy (triggers)", type: "policy", dir: "to" },
     { label: "+ Read Model (updates)", type: "readModel", dir: "to" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
+    { label: "+ Opportunity", type: "opportunity", dir: "from" },
   ],
   command: [
     { label: "+ Actor (issues)", type: "actor", dir: "from" },
@@ -32,32 +33,39 @@ const SLICE: Partial<Record<ElementType, SliceAction[]>> = {
     { label: "+ Constraint (constrains)", type: "constraint", dir: "to" },
     { label: "+ Aggregate (handled by)", type: "aggregate", dir: "to" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
+    { label: "+ Opportunity", type: "opportunity", dir: "from" },
   ],
   actor: [
     { label: "+ Command (issues)", type: "command", dir: "to" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
+    { label: "+ Opportunity", type: "opportunity", dir: "from" },
   ],
   policy: [
     { label: "+ Command (invokes)", type: "command", dir: "to" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
+    { label: "+ Opportunity", type: "opportunity", dir: "from" },
   ],
   readModel: [
     { label: "+ Actor (informs)", type: "actor", dir: "to" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
+    { label: "+ Opportunity", type: "opportunity", dir: "from" },
   ],
   constraint: [
     { label: "+ Command (constrains)", type: "command", dir: "from" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
+    { label: "+ Opportunity", type: "opportunity", dir: "from" },
   ],
   aggregate: [
     { label: "+ Command (handled by)", type: "command", dir: "from" },
     { label: "+ Domain Event (emits)", type: "domainEvent", dir: "to" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
+    { label: "+ Opportunity", type: "opportunity", dir: "from" },
   ],
   externalSystem: [
     { label: "+ Domain Event (emits)", type: "domainEvent", dir: "to" },
     { label: "+ Command (handled by)", type: "command", dir: "from" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
+    { label: "+ Opportunity", type: "opportunity", dir: "from" },
   ],
 };
 
@@ -118,11 +126,22 @@ export function PropertyPanel() {
 
   const def = ELEMENT_DEFINITIONS[node.type];
   const isHotspot = node.type === "hotspot";
+  // Hotspot and Opportunity are free-text annotations: they use "Text", not a
+  // "Label"/"Description" pair.
+  const isAnnotation = isHotspot || node.type === "opportunity";
   const field = "mt-1 w-full rounded-md border border-zinc-300 px-2 py-1 text-sm";
   const ctx = node.data.context; // slice children inherit the selection's context (incl. Ungrouped)
 
   const runSlice = (a: SliceAction) => {
-    const newId = addNode(a.type, ctx, a.type === "hotspot" ? { label: "Hotspot?" } : undefined);
+    const newId = addNode(
+      a.type,
+      ctx,
+      a.type === "hotspot"
+        ? { label: "Hotspot?" }
+        : a.type === "opportunity"
+          ? { label: "Opportunity!" }
+          : undefined,
+    );
     const conn =
       a.dir === "from"
         ? { source: newId, target: node.id }
@@ -143,7 +162,7 @@ export function PropertyPanel() {
       </div>
 
       <label className="block text-xs font-medium text-zinc-600">
-        {isHotspot ? "Text" : "Label"}
+        {isAnnotation ? "Text" : "Label"}
         <input
           className={field}
           value={node.data.label}
@@ -151,7 +170,60 @@ export function PropertyPanel() {
         />
       </label>
 
-      {!isHotspot && (
+      {isHotspot && (
+        <div className="mt-3 flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-sm text-zinc-700">
+            <input
+              type="checkbox"
+              checked={node.data.state === "resolved"}
+              onChange={(e) =>
+                updateNodeData(node.id, { state: e.target.checked ? "resolved" : "open" })
+              }
+            />
+            Resolved
+          </label>
+          <label className="block text-xs font-medium text-zinc-600">
+            Kind
+            <select
+              className={field}
+              value={node.data.kind ?? ""}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  kind: (e.target.value || undefined) as
+                    | "conflict"
+                    | "question"
+                    | "risk"
+                    | undefined,
+                })
+              }
+            >
+              <option value="">—</option>
+              <option value="conflict">Conflict</option>
+              <option value="question">Question</option>
+              <option value="risk">Risk</option>
+            </select>
+          </label>
+          <label className="block text-xs font-medium text-zinc-600">
+            Priority
+            <select
+              className={field}
+              value={node.data.priority ?? ""}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  priority: (e.target.value || undefined) as "low" | "medium" | "high" | undefined,
+                })
+              }
+            >
+              <option value="">—</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+        </div>
+      )}
+
+      {!isAnnotation && (
         <label className="mt-3 block text-xs font-medium text-zinc-600">
           Description
           <textarea

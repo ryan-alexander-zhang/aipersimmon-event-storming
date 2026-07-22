@@ -14,8 +14,8 @@ export const LEVEL_LABEL: Record<Level, string> = {
 };
 
 export const LEVEL_TYPES: Record<Level, ElementType[]> = {
-  "big-picture": ["actor", "externalSystem", "domainEvent", "hotspot"],
-  process: ["actor", "externalSystem", "command", "domainEvent", "policy", "readModel", "hotspot"],
+  "big-picture": ["actor", "externalSystem", "domainEvent", "hotspot", "opportunity"],
+  process: ["actor", "externalSystem", "command", "domainEvent", "policy", "readModel", "hotspot", "opportunity"],
   design: [
     "actor",
     "externalSystem",
@@ -26,6 +26,7 @@ export const LEVEL_TYPES: Record<Level, ElementType[]> = {
     "policy",
     "readModel",
     "hotspot",
+    "opportunity",
   ],
 };
 
