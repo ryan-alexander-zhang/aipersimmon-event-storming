@@ -32,8 +32,10 @@ export function ContextNode({ data, selected }: NodeProps<ContextFlowNode>) {
     >
       {SIDES.map((s) => (
         <div key={s.id}>
-          <Handle type="source" id={`s-${s.id}`} position={s.position} style={HANDLE} />
+          {/* target rendered first, source on top: a drag starts on the source
+              handle so the drag-start node becomes the edge's source (issue-00013). */}
           <Handle type="target" id={`t-${s.id}`} position={s.position} style={HANDLE} />
+          <Handle type="source" id={`s-${s.id}`} position={s.position} style={HANDLE} />
         </div>
       ))}
       <div className="flex items-center gap-1.5">
