@@ -12,6 +12,7 @@ import {
   Upload,
 } from "lucide-react";
 import { type ChangeEvent, useRef, useState } from "react";
+import { FilterControls } from "@/components/filter-controls";
 import { exportJSON, fromModel, importJSON } from "@/lib/dsl/serialize";
 import { LEVEL_LABEL, LEVELS } from "@/lib/eventstorming/levels";
 import { clearSaved } from "@/lib/store/persistence";
@@ -150,6 +151,8 @@ export function Toolbar() {
         </div>
       )}
       <div className="ml-auto flex items-center gap-2">
+        {/* Search + filter target the structured board; hidden in Discovery Mode. */}
+        {!discoveryActive && <FilterControls />}
         {error && (
           <span
             className="max-w-xs truncate text-xs text-red-600"

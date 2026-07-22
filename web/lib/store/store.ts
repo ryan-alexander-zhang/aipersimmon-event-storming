@@ -18,6 +18,7 @@ import { ELEMENT_DEFINITIONS, type ElementType } from "@/lib/eventstorming/eleme
 import type { Level } from "@/lib/eventstorming/levels";
 import { resolveRelation } from "@/lib/eventstorming/relations";
 import { computeLayout } from "@/lib/layout/layout";
+import { EMPTY_FILTER, type FilterState } from "./filter";
 import type { IsolateDirection } from "./focus";
 import { eventSlotIndex, gapOrder, normalizeOrders, slotOrders, timelineOrder } from "./timeline";
 import type { ESEdge, ESNode, ESNodeData } from "./types";
@@ -66,6 +67,8 @@ export interface ESState {
   walk: { active: boolean; index: number };
   /** Discovery Mode wall (spec-00002); transient, persisted outside the DSL. */
   discovery: DiscoveryState;
+  /** Search + filter view state (spec-00006); view-only, never persisted. */
+  filter: FilterState;
 
   setLevel: (level: Level) => void;
   toggleIsolate: () => void;
@@ -94,6 +97,15 @@ export interface ESState {
    *  left→right (x) position on the global timeline, then clear the wall and
    *  leave Discovery Mode (us-00017). Empty wall → just leave the mode. */
   converge: () => void;
+
+  /** Set the free-text search query (spec-00006). */
+  setFilterQuery: (query: string) => void;
+  /** Toggle an element type in the type filter (empty set = all types). */
+  toggleFilterType: (type: ElementType) => void;
+  /** Toggle a Bounded Context in the context filter (`null` = Ungrouped). */
+  toggleFilterContext: (context: string | null) => void;
+  /** Reset search + filters to show everything. */
+  clearFilter: () => void;
 
   onNodesChange: (changes: NodeChange<ESNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<ESEdge>[]) => void;
@@ -156,6 +168,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   healthOpen: false,
   walk: { active: false, index: 0 },
   discovery: { active: false, items: [] },
+  filter: EMPTY_FILTER,
 
   setLevel: (level) =>
     set({
@@ -223,6 +236,21 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     for (const it of ordered) get().addNode("domainEvent", undefined, { label: it.label });
     set({ discovery: { active: false, items: [] } });
   },
+
+  setFilterQuery: (query) => set({ filter: { ...get().filter, query } }),
+  toggleFilterType: (type) => {
+    const types = new Set(get().filter.types);
+    if (types.has(type)) types.delete(type);
+    else types.add(type);
+    set({ filter: { ...get().filter, types } });
+  },
+  toggleFilterContext: (context) => {
+    const contexts = new Set(get().filter.contexts);
+    if (contexts.has(context)) contexts.delete(context);
+    else contexts.add(context);
+    set({ filter: { ...get().filter, contexts } });
+  },
+  clearFilter: () => set({ filter: { query: "", types: new Set(), contexts: new Set() } }),
 
   onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) }),
   onEdgesChange: (changes) => set({ edges: applyEdgeChanges(changes, get().edges) }),
@@ -354,6 +382,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       isolate: { ...get().isolate, active: false },
       walk: { active: false, index: 0 },
       discovery: { active: false, items: [] },
+      filter: { query: "", types: new Set(), contexts: new Set() },
     }),
   clear: () =>
     set({
@@ -366,6 +395,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       isolate: { ...get().isolate, active: false },
       walk: { active: false, index: 0 },
       discovery: { active: false, items: [] },
+      filter: { query: "", types: new Set(), contexts: new Set() },
     }),
 });
 

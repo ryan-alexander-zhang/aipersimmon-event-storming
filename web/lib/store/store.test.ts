@@ -600,3 +600,47 @@ describe("discovery mode [spec-00002]", () => {
     expect(get().edges).toHaveLength(0);
   });
 });
+
+describe("search + filter view state [spec-00006]", () => {
+  it("sets the search query without touching the model [us-00018-FR-1]", () => {
+    get().addNode("domainEvent");
+    get().setFilterQuery("order");
+    expect(get().filter.query).toBe("order");
+    expect(get().nodes).toHaveLength(1); // model untouched
+  });
+
+  it("toggles a type in and out of the type filter [us-00018-FR-3]", () => {
+    get().toggleFilterType("command");
+    expect(get().filter.types.has("command")).toBe(true);
+    get().toggleFilterType("command");
+    expect(get().filter.types.has("command")).toBe(false);
+  });
+
+  it("toggles a context, including Ungrouped (null) [us-00018-FR-4]", () => {
+    get().toggleFilterContext("ord");
+    get().toggleFilterContext(null);
+    expect([...get().filter.contexts].sort()).toEqual([null, "ord"]);
+    get().toggleFilterContext("ord");
+    expect([...get().filter.contexts]).toEqual([null]);
+  });
+
+  it("clears search + filters back to show-everything", () => {
+    get().setFilterQuery("x");
+    get().toggleFilterType("policy");
+    get().toggleFilterContext("c");
+    get().clearFilter();
+    expect(get().filter.query).toBe("");
+    expect(get().filter.types.size).toBe(0);
+    expect(get().filter.contexts.size).toBe(0);
+  });
+
+  it("resets the filter on clear and setModel [spec-00006-XFR-1]", () => {
+    get().setFilterQuery("x");
+    get().toggleFilterType("policy");
+    get().clear();
+    expect(get().filter).toEqual({ query: "", types: new Set(), contexts: new Set() });
+    get().setFilterQuery("y");
+    get().setModel({ nodes: [], edges: [], contexts: [] });
+    expect(get().filter).toEqual({ query: "", types: new Set(), contexts: new Set() });
+  });
+});

@@ -79,7 +79,7 @@ libraries; AI assistance.
 | 3 | Hotspot workflow (vote / prioritise / assign / resolve) + Opportunity element | spec-00003 |
 | 4 | Strategic layer: subdomain classification + bounded-context relationships (context map) | spec-00004 |
 | 5 | Narrative walkthrough: step the timeline forward/backward to validate | spec-00005 |
-| 6 | Scale: search / filter / minimap navigation + event-level drill-down (nesting) | spec-00006 |
+| 6 | Scale: search / filter / minimap navigation (event-level drill-down dropped — see decision-00006) | spec-00006 |
 | 7 | Model-health analysis: detect model smells from the structured model | spec-00007 |
 | 8 | Model versioning: named snapshots + as-is / to-be side-by-side compare | spec-00008 |
 
@@ -110,8 +110,11 @@ stories.
    backward, highlighting the current event's slice, to validate the flow.
 7. **Navigation at scale** — Search and filter elements by text / type / context;
    a minimap or outline aids navigation of large boards.
-8. **Event drill-down (nesting)** — Drill from a Big Picture Domain Event into a
-   nested Process-level board scoped to that event, and back.
+8. ~~**Event drill-down (nesting)**~~ — **Dropped** ([decision-00006](../decision/decision-00006-no-event-nesting-scale-via-navigation.md)):
+   nesting a board inside a Domain Event is not an Event Storming construct (an
+   event is an instant, not a container). Scale is handled by FR7 (navigation);
+   Event-Storming-faithful decomposition would scope a *region / Bounded Context*,
+   not a single event, and is deferred beyond this phase.
 9. **Model-health analysis** — Detect and list model smells (orphan events with no
    producing Command, dangling Commands, overloaded Aggregates, Policy cycles,
    unresolved-hotspot counts) as non-blocking findings linking back to elements.
@@ -133,9 +136,10 @@ stories.
 
 - **Discovery ↔ structured-board boundary** (FR1): the converge hand-off is the
   hard part; positions must not leak into the persisted model. See decision-00004.
-- **DSL evolution**: FR3/FR4/FR5/FR8/FR10 extend the schema (Opportunity, subdomain,
-  context relationships, nesting, snapshots) — must version and migrate
-  (`web/lib/dsl/schema.ts`, `web/lib/dsl/migrate.ts`).
+- **DSL evolution**: FR3/FR4/FR5/FR10 extend the schema (Opportunity, subdomain,
+  context relationships, snapshots) — must version and migrate
+  (`web/lib/dsl/schema.ts`, `web/lib/dsl/migrate.ts`). (FR8 nesting was dropped —
+  decision-00006 — so FR7/spec-00006 needs no schema change.)
 - **CONTEXT.md**: new canonical terms (Opportunity, Subdomain, Context Relationship,
   Context Map, Discovery Mode, Walkthrough, Snapshot, Model Health / Smell) are
   introduced here and must be defined in `CONTEXT.md` at spec time, not before.

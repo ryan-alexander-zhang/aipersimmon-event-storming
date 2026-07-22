@@ -586,6 +586,72 @@ test("the discovery wall survives a reload and stays out of the exported DSL [us
   await expect(page.getByTestId("discovery-node")).toHaveCount(1);
 });
 
+test("search highlights matching elements and reports a count [us-00018-AC-1.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addContext(page);
+  await addLabeledEvent(page, "Order Placed");
+  await page.locator(".react-flow__pane").click({ position: { x: 10, y: 10 } });
+  await addLabeledEvent(page, "Payment Taken");
+
+  await page.getByLabel("Search elements").fill("order");
+  await expect(page.getByTestId("search-count")).toHaveText("1");
+  // the matching node carries the search ring (boxShadow); the other does not
+  const ring = (label: string) =>
+    nodes(page, "domainEvent")
+      .filter({ hasText: label })
+      .evaluate((el) => getComputedStyle(el).boxShadow);
+  expect(await ring("Order Placed")).not.toBe("none");
+  expect(await ring("Payment Taken")).toBe("none");
+});
+
+test("type filter hides non-selected types; composes with Level [us-00018-AC-3.1/7.1, spec-00006-XAC-2.1]", async ({
+  page,
+}) => {
+  await page.goto("/"); // Design
+  await addUngroupedEvent(page); // a Domain Event, selected
+  await slice(page, "+ Command (produces)"); // adds a Command
+  await expect(nodes(page, "command")).toHaveCount(1);
+
+  // filter to Domain Events only → the Command is hidden
+  await page.getByRole("button", { name: "Filter" }).click();
+  await page.getByTestId("filter-popover").getByRole("button", { name: "Domain Event" }).click();
+  await expect(nodes(page, "command")).toHaveCount(0);
+  await expect(nodes(page, "domainEvent")).toHaveCount(1);
+
+  // Big Picture already hides Commands; selecting Command in the filter can't
+  // reveal it (Level still bounds the view) [us-00018-AC-7.1]
+  await page.getByTestId("filter-popover").getByRole("button", { name: "Command" }).click();
+  await page.getByRole("button", { name: "Big Picture" }).click();
+  await expect(nodes(page, "command")).toHaveCount(0);
+});
+
+test("search and filter never change the exported model [us-00018-AC-5.1, spec-00006-XAC-1.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+
+  const exportNow = async () => {
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Export" }).click(),
+    ]);
+    return JSON.parse(readFileSync(await download.path(), "utf8"));
+  };
+  const before = await exportNow();
+
+  // apply a query + type filter, then export again
+  await page.getByLabel("Search elements").fill("order");
+  await page.getByRole("button", { name: "Filter" }).click();
+  await page.getByTestId("filter-popover").getByRole("button", { name: "Domain Event" }).click();
+  const after = await exportNow();
+
+  expect(normalize(after)).toEqual(normalize(before)); // identical model
+});
+
 test("New clears the model and does not restore it on reload", async ({ page }) => {
   await page.goto("/");
   await addContext(page);

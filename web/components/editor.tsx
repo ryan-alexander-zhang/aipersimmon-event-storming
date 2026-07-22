@@ -15,7 +15,7 @@ import {
   useStore,
   useViewport,
 } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BoardChrome } from "@/components/board-chrome";
 import { DiscoveryCanvas } from "@/components/discovery-canvas";
 import { RelationEdge } from "@/components/edges/relation-edge";
@@ -30,6 +30,7 @@ import { typesForZoom } from "@/lib/eventstorming/levels";
 import { isValidConnection as canConnect } from "@/lib/eventstorming/relations";
 import { computeEdgeOffsets } from "@/lib/layout/edge-spread";
 import { COL_W, NODE_W } from "@/lib/layout/layout";
+import { isShownByFilter, matchesQuery } from "@/lib/store/filter";
 import { computeFocus, computeNeighborhood, focusSource } from "@/lib/store/focus";
 import { loadDiscovery, loadModel, saveDiscovery, saveModel } from "@/lib/store/persistence";
 import { useESStore } from "@/lib/store/store";
@@ -43,6 +44,10 @@ const defaultEdgeOptions = {
 };
 
 const NODE_DIM_OPACITY = 0.15;
+
+// Search-hit ring (spec-00006): a blue halo around matched nodes, distinct from
+// the selection outline and from focus dimming.
+const SEARCH_RING = "0 0 0 3px #2563eb, 0 0 10px 2px rgba(37, 99, 235, 0.45)";
 
 // Timeline drag (us-00010 / design-00004 §5–6). Dragging a Domain Event edits
 // its `order`, never its position: the drop x is hit-tested against a snapshot
@@ -169,6 +174,7 @@ function Canvas() {
   const healthOpen = useESStore((s) => s.healthOpen);
   const walkActive = useESStore((s) => s.walk.active);
   const discoveryActive = useESStore((s) => s.discovery.active);
+  const filter = useESStore((s) => s.filter);
   const setEventOrder = useESStore((s) => s.setEventOrder);
   const zoom = useStore((s) => s.transform[2]);
   const { fitView } = useReactFlow();
@@ -277,9 +283,27 @@ function Canvas() {
     [isolate.active, isolate.depth, isolate.direction, selectedId, edges],
   );
 
+  // Level (+ semantic zoom) → Isolate neighbourhood → search/filter (spec-00006).
+  // Each stage only narrows, so filter never widens past what Level/Isolate allow.
   const visibleNodes = useMemo(
-    () => nodes.filter((n) => visibleTypes.has(n.type) && (!isoNodeIds || isoNodeIds.has(n.id))),
-    [nodes, visibleTypes, isoNodeIds],
+    () =>
+      nodes.filter(
+        (n) =>
+          visibleTypes.has(n.type) &&
+          (!isoNodeIds || isoNodeIds.has(n.id)) &&
+          isShownByFilter(n, filter),
+      ),
+    [nodes, visibleTypes, isoNodeIds, filter],
+  );
+
+  // Search highlight: visible nodes whose label/description match the query. Null
+  // when no query, so nothing is ringed until the modeller types.
+  const matchIds = useMemo(
+    () =>
+      filter.query.trim()
+        ? new Set(visibleNodes.filter((n) => matchesQuery(n, filter.query)).map((n) => n.id))
+        : null,
+    [visibleNodes, filter.query],
   );
 
   // Dimming (Tier A) applies only when NOT isolating — isolate already removed
@@ -299,12 +323,14 @@ function Canvas() {
     const bright = hoveredEndpoints ?? (dimActive ? focus.nodeIds : null);
     // Domain Events are draggable to adjust the timeline (us-00010); every other
     // type stays locked. Dragging edits `order`, not position (design-00004 §1).
-    return visibleNodes.map((n) => ({
-      ...n,
-      draggable: n.type === "domainEvent",
-      ...(bright ? { style: { ...n.style, opacity: bright.has(n.id) ? 1 : NODE_DIM_OPACITY } } : {}),
-    }));
-  }, [visibleNodes, hoveredEndpoints, dimActive, focus]);
+    return visibleNodes.map((n) => {
+      const style: CSSProperties = { ...n.style };
+      if (bright) style.opacity = bright.has(n.id) ? 1 : NODE_DIM_OPACITY;
+      // Search hit: a blue ring, kept separate from focus dimming (spec-00006).
+      if (matchIds?.has(n.id)) style.boxShadow = SEARCH_RING;
+      return { ...n, draggable: n.type === "domainEvent", style };
+    });
+  }, [visibleNodes, hoveredEndpoints, dimActive, focus, matchIds]);
   const visibleEdges = useMemo(() => {
     const ids = new Set(visibleNodes.map((n) => n.id));
     return routedEdges.filter((e) => ids.has(e.source) && ids.has(e.target));
@@ -424,6 +450,8 @@ function Canvas() {
           >
             <Background />
             <MiniMap
+              zoomable
+              pannable
               nodeColor={(n) => ELEMENT_DEFINITIONS[n.type as ElementType]?.color ?? "#ccc"}
             />
             <Controls />
