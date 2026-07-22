@@ -8,6 +8,15 @@ parent: spec-00001-mvp-editor
 
 # Event Storming is a deterministic structured board, not a free canvas
 
+> **Revisited (2026-07-22)**: clause 3 (Bounded contexts as column groups) and the
+> "bounded context + timeline order → column" half of clause 1 are superseded by
+> [decision-00005](./decision-00005-global-timeline-bc-as-region.md) — one global
+> timeline, Bounded Context as an orthogonal region. The rest of this decision
+> (structured board, layout derived not dragged, fixed type-bands, slice builder)
+> stands. **In effect since spec-00009 / plan-00011**: the per-context column
+> model described below is superseded for Bounded Context placement (context is
+> now an attribute/region on one global timeline).
+
 ## Context
 
 The first implementation (plan-00001) rendered a free React Flow whiteboard:

@@ -23,13 +23,12 @@ import { Walkthrough } from "@/components/walkthrough";
 import { ElementNode, routeHandles } from "@/components/nodes/element-node";
 import { PropertyPanel } from "@/components/property-panel";
 import { Toolbar } from "@/components/toolbar";
-import type { Context } from "@/lib/dsl/schema";
 import { RELATION_STYLE } from "@/lib/eventstorming/edge-style";
 import { ELEMENT_DEFINITIONS, ELEMENT_TYPES, type ElementType } from "@/lib/eventstorming/elements";
 import { typesForZoom } from "@/lib/eventstorming/levels";
 import { isValidConnection as canConnect } from "@/lib/eventstorming/relations";
 import { computeEdgeOffsets } from "@/lib/layout/edge-spread";
-import { COL_W, CTX_GAP_COLS, computeContextBoxes, NODE_W } from "@/lib/layout/layout";
+import { COL_W, NODE_W } from "@/lib/layout/layout";
 import { computeFocus, computeNeighborhood, focusSource } from "@/lib/store/focus";
 import { loadModel, saveModel } from "@/lib/store/persistence";
 import { useESStore } from "@/lib/store/store";
@@ -59,43 +58,33 @@ interface DragSnapshot {
   slots: { order: number; x: number }[]; // pre-drag columns, sorted left→right
   orders: number[]; // slot orders, for gap insertion
   band: { top: number; height: number };
-  box: { x: number; width: number } | undefined; // context box, for out-of-context cancel
 }
 
-// One representative x per distinct order in the context, from the pre-drag layout.
-function ctxSlots(nodes: ESNode[], ctx: string | undefined) {
+// One representative x per distinct global order, from the pre-drag layout
+// (decision-00005: one timeline, not per-context).
+function timelineSlots(nodes: ESNode[]) {
   const x = new Map<number, number>();
   for (const n of nodes) {
-    if (n.type !== "domainEvent" || n.data.context !== ctx) continue;
+    if (n.type !== "domainEvent") continue;
     const o = n.data.order ?? 0;
     if (!x.has(o)) x.set(o, n.position.x);
   }
   return [...x.entries()].map(([order, xx]) => ({ order, x: xx })).sort((a, b) => a.x - b.x);
 }
 
-function bandExtent(nodes: ESNode[], ctx: string | undefined) {
-  const ys = nodes
-    .filter((n) => n.type === "domainEvent" && n.data.context === ctx)
-    .map((n) => n.position.y);
+function bandExtent(nodes: ESNode[]) {
+  const ys = nodes.filter((n) => n.type === "domainEvent").map((n) => n.position.y);
   const top = ys.length ? Math.min(...ys) : 0;
   const bottom = ys.length ? Math.max(...ys) : 0;
   return { top: top - 6, height: bottom - top + STICKY_H };
 }
 
-function buildSnapshot(
-  nodes: ESNode[],
-  edges: ESEdge[],
-  contexts: Context[],
-  eventId: string,
-  ctx: string | undefined,
-): DragSnapshot {
-  const box = computeContextBoxes(nodes, edges, contexts).find((b) => b.id === (ctx ?? "__none"));
+function buildSnapshot(nodes: ESNode[], eventId: string): DragSnapshot {
   return {
     eventId,
-    slots: ctxSlots(nodes, ctx),
-    orders: slotOrders(nodes, ctx),
-    band: bandExtent(nodes, ctx),
-    box: box && { x: box.x, width: box.width },
+    slots: timelineSlots(nodes),
+    orders: slotOrders(nodes),
+    band: bandExtent(nodes),
   };
 }
 
@@ -104,8 +93,6 @@ function gapX(slots: { order: number; x: number }[], index: number) {
   if (index >= slots.length) return slots[slots.length - 1].x + NODE_W + (COL_W - NODE_W) / 2;
   return (slots[index - 1].x + slots[index].x) / 2 + NODE_W / 2;
 }
-
-const OUT_MARGIN = (COL_W * CTX_GAP_COLS) / 2; // half the inter-context gap → out-of-context cancel
 
 function dropView(snap: DragSnapshot, x: number): DropView {
   const t = dropTarget(snap.slots, x, ONTO_BAND);
@@ -172,7 +159,6 @@ function Canvas() {
   const isolate = useESStore((s) => s.isolate);
   const healthOpen = useESStore((s) => s.healthOpen);
   const walkActive = useESStore((s) => s.walk.active);
-  const contexts = useESStore((s) => s.contexts);
   const setEventOrder = useESStore((s) => s.setEventOrder);
   const zoom = useStore((s) => s.transform[2]);
   const { fitView } = useReactFlow();
@@ -190,9 +176,9 @@ function Canvas() {
     (_: unknown, node: ESNode) => {
       if (node.type !== "domainEvent") return;
       cancelRef.current = false;
-      dragRef.current = buildSnapshot(nodes, edges, contexts, node.id, node.data.context);
+      dragRef.current = buildSnapshot(nodes, node.id);
     },
-    [nodes, edges, contexts],
+    [nodes],
   );
 
   const onNodeDrag = useCallback((_: unknown, node: ESNode) => {
@@ -210,8 +196,7 @@ function Canvas() {
       // still snaps the freely-dragged node back to its computed column.
       const ord = cancelRef.current
         ? current
-        : (dropOrder(snap.slots, snap.orders, snap.box, node.position.x, ONTO_BAND, OUT_MARGIN) ??
-          current);
+        : dropOrder(snap.slots, snap.orders, node.position.x, ONTO_BAND);
       setEventOrder(snap.eventId, ord);
     },
     [nodes, setEventOrder],

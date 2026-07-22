@@ -1,40 +1,35 @@
-// Timeline order helpers for Domain Events (design-00004 §3). A context's
-// timeline is the sorted distinct `order` values of its Domain Events; each
-// distinct value is one column slot, and events sharing a value are a
-// concurrency group stacked in that slot. Edits write a (possibly fractional)
-// target order, then normalize the context back to contiguous 0..k-1 — so
-// "slot index i" always means "order === i".
+// Timeline order helpers for Domain Events. The board has ONE global timeline
+// (decision-00005): the sorted distinct global `order` values of all Domain
+// Events are its column slots; events sharing a value are a concurrency group
+// stacked in that slot. Edits write a (possibly fractional) target order, then
+// normalize back to contiguous 0..k-1 — so "slot index i" always means
+// "order === i". Bounded Context is an attribute, not part of the ordering.
 
 import type { ESNode } from "./types";
 
 const isEvent = (n: ESNode) => n.type === "domainEvent";
 const orderOf = (n: ESNode) => n.data.order ?? 0;
 
-/** Sorted distinct orders of a context's Domain Events = its column slots. */
-export function slotOrders(nodes: ESNode[], ctx: string | undefined): number[] {
-  const orders = nodes.filter((n) => isEvent(n) && n.data.context === ctx).map(orderOf);
+/** Sorted distinct global orders of all Domain Events = the timeline's slots. */
+export function slotOrders(nodes: ESNode[]): number[] {
+  const orders = nodes.filter(isEvent).map(orderOf);
   return [...new Set(orders)].sort((a, b) => a - b);
 }
 
-/** The slot index (0-based) of an event within its context's timeline, or -1. */
+/** The slot index (0-based) of an event on the global timeline, or -1. */
 export function eventSlotIndex(nodes: ESNode[], eventId: string): number {
   const ev = nodes.find((n) => n.id === eventId);
   if (!ev || !isEvent(ev)) return -1;
-  return slotOrders(nodes, ev.data.context).indexOf(orderOf(ev));
+  return slotOrders(nodes).indexOf(orderOf(ev));
 }
 
-/** All Domain Event ids in timeline order across contexts — sorted by order,
- *  then context, then id (deterministic). The narrative walkthrough (spec-00005)
- *  steps through these; concurrent events (equal order) become adjacent steps. */
+/** All Domain Event ids in global timeline order — sorted by (order, id). The
+ *  board's left→right order and the narrative walkthrough (spec-00005) both use
+ *  this; concurrent events (equal order) become adjacent by id. */
 export function timelineOrder(nodes: ESNode[]): string[] {
   return nodes
     .filter(isEvent)
-    .sort(
-      (a, b) =>
-        orderOf(a) - orderOf(b) ||
-        (a.data.context ?? "").localeCompare(b.data.context ?? "") ||
-        a.id.localeCompare(b.id),
-    )
+    .sort((a, b) => orderOf(a) - orderOf(b) || a.id.localeCompare(b.id))
     .map((n) => n.id);
 }
 
@@ -48,14 +43,12 @@ export function gapOrder(orders: number[], index: number): number {
   return (orders[index - 1] + orders[index]) / 2;
 }
 
-/** Remap a context's Domain Event orders to contiguous 0..k-1, preserving
+/** Remap all Domain Events' global orders to contiguous 0..k-1, preserving
  *  concurrency groups (equal orders stay equal). Other nodes are untouched. */
-export function normalizeContextOrders(nodes: ESNode[], ctx: string | undefined): ESNode[] {
-  const rank = new Map(slotOrders(nodes, ctx).map((o, i) => [o, i]));
+export function normalizeOrders(nodes: ESNode[]): ESNode[] {
+  const rank = new Map(slotOrders(nodes).map((o, i) => [o, i]));
   return nodes.map((n) =>
-    isEvent(n) && n.data.context === ctx
-      ? { ...n, data: { ...n.data, order: rank.get(orderOf(n)) ?? 0 } }
-      : n,
+    isEvent(n) ? { ...n, data: { ...n.data, order: rank.get(orderOf(n)) ?? 0 } } : n,
   );
 }
 
@@ -68,10 +61,10 @@ export interface TimelineSlot {
 
 export type DropTarget = { kind: "gap"; index: number } | { kind: "onto"; order: number };
 
-/** Resolve a drag's flow-space `x` against a context's slots into a drop target:
- *  within `ontoBand` of a slot's anchor → make concurrent with it (onto, drawn as
- *  a column highlight); otherwise insert at the gap boundary the x falls into
- *  (0..slotCount, drawn as an insertion line). */
+/** Resolve a drag's flow-space `x` against the timeline's slots into a drop
+ *  target: within `ontoBand` of a slot's anchor → make concurrent with it (onto,
+ *  drawn as a column highlight); otherwise insert at the gap boundary the x falls
+ *  into (0..slotCount, drawn as an insertion line). */
 export function dropTarget(slots: TimelineSlot[], x: number, ontoBand: number): DropTarget {
   if (slots.length === 0) return { kind: "gap", index: 0 };
   for (const s of slots) {
@@ -82,20 +75,16 @@ export function dropTarget(slots: TimelineSlot[], x: number, ontoBand: number): 
   return { kind: "gap", index };
 }
 
-/** The order to commit when a Domain Event is dropped at flow-space `x`, given its
- *  context's slot anchors, slot orders, and box — or null to cancel (dropped more
- *  than `outMargin` outside the context; cross-context moves are out of scope,
- *  us-00010-FR-7). `onto` → the target slot's order (concurrent); a gap → an
- *  insertion order between/beyond slots. */
+/** The order to commit when a Domain Event is dropped at flow-space `x` on the
+ *  single global timeline (decision-00005): `onto` → the target slot's order
+ *  (concurrent); a gap → an insertion order between/beyond slots. The event's
+ *  Bounded Context is unaffected by the drag (us-00015). */
 export function dropOrder(
   slots: TimelineSlot[],
   orders: number[],
-  box: { x: number; width: number } | undefined,
   x: number,
   ontoBand: number,
-  outMargin: number,
-): number | null {
-  if (box && (x < box.x - outMargin || x > box.x + box.width + outMargin)) return null;
+): number {
   const t = dropTarget(slots, x, ontoBand);
   return t.kind === "onto" ? t.order : gapOrder(orders, t.index);
 }

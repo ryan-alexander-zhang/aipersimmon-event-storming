@@ -1,5 +1,5 @@
 {
-  "version": "2.0",
+  "version": "3.0",
   "meta": { "name": "Fixture", "level": "process", "createdAt": "2026-07-20T00:00:00Z" },
   "contexts": [
     { "id": "ord", "name": "Ordering", "order": 0 },
@@ -13,7 +13,7 @@
     { "id": "rm1", "type": "readModel", "label": "Order View", "context": "ord", "properties": {} },
     { "id": "ex1", "type": "externalSystem", "label": "Payment Gateway", "context": "pay", "properties": {} },
     { "id": "c2", "type": "command", "label": "Charge Payment", "context": "pay", "properties": {} },
-    { "id": "e2", "type": "domainEvent", "label": "Payment Authorized", "context": "pay", "order": 0, "properties": {} }
+    { "id": "e2", "type": "domainEvent", "label": "Payment Authorized", "context": "pay", "order": 1, "properties": {} }
   ],
   "edges": [
     { "id": "r1", "source": "a1", "target": "c1", "relation": "issues" },

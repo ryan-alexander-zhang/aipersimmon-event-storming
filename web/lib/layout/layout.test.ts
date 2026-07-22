@@ -27,7 +27,7 @@ function sliceModel(): { nodes: ESNode[]; edges: ESEdge[] } {
     n("pol", "policy", "A"),
     n("rm", "readModel", "A"),
     n("hot", "hotspot", "A"),
-    n("ev2", "domainEvent", "B", 0),
+    n("ev2", "domainEvent", "B", 1),
   ];
   const e = (id: string, s: string, t: string, relation: RelationType): ESEdge => ({
     id,
@@ -65,11 +65,37 @@ describe("layout engine (RT2)", () => {
     }
   });
 
-  it("places a later context to the right", () => {
+  it("orders events on one global timeline regardless of context [us-00015-AC-1.1]", () => {
     const { nodes, edges } = sliceModel();
     const out = computeLayout(nodes, edges, contexts);
     const x = Object.fromEntries(out.map((n) => [n.id, n.position.x]));
-    expect(x.ev2).toBeGreaterThan(x.ev); // context B after context A
+    expect(x.ev2).toBeGreaterThan(x.ev); // ev2 (global order 1) sits after ev (order 0)
+  });
+
+  it("places one context's event strictly between two of another [us-00015-AC-1.1]", () => {
+    const ev = (id: string, ctx: string, order: number): ESNode => ({
+      id,
+      type: "domainEvent",
+      position: { x: 0, y: 0 },
+      data: { label: id, context: ctx, order },
+    });
+    const out = computeLayout([ev("a", "A", 0), ev("b", "B", 1), ev("c", "A", 2)], [], contexts);
+    const x = Object.fromEntries(out.map((n) => [n.id, n.position.x]));
+    expect(x.a).toBeLessThan(x.b);
+    expect(x.b).toBeLessThan(x.c); // b (context B) sits between a and c (context A)
+  });
+
+  it("makes events of different contexts at the same order concurrent (one column) [us-00015-AC-4.1]", () => {
+    const ev = (id: string, ctx: string, order: number): ESNode => ({
+      id,
+      type: "domainEvent",
+      position: { x: 0, y: 0 },
+      data: { label: id, context: ctx, order },
+    });
+    const out = computeLayout([ev("a", "A", 0), ev("b", "B", 0)], [], contexts);
+    const by = Object.fromEntries(out.map((n) => [n.id, n.position]));
+    expect(by.a.x).toBe(by.b.x); // same global order → same column, across contexts
+    expect(by.a.y).not.toBe(by.b.y); // parallel sub-lanes
   });
 
   it("orders events within a context left→right by their order", () => {
@@ -172,20 +198,19 @@ describe("layout engine (RT2)", () => {
     expect(ys[0]).toBe(ys[1]);
   });
 
-  it("reserves a column box per context, including empty ones", () => {
-    const one: ESNode = {
-      id: "ev",
+  it("derives a context box from its events' columns; empty contexts collapse to the origin [us-00015-AC-3.1]", () => {
+    const ev = (id: string, order: number): ESNode => ({
+      id,
       type: "domainEvent",
       position: { x: 0, y: 0 },
-      data: { label: "ev", context: "A", order: 0 },
-    };
-    const boxes = computeContextBoxes([one], [], contexts); // context B has no nodes
-    const a = boxes.find((b) => b.id === "A");
-    const b = boxes.find((b) => b.id === "B");
-    expect(a).toBeDefined();
-    expect(b).toBeDefined();
-    expect(b!.x).toBeGreaterThan(a!.x); // empty B still sits after A
-    expect(a!.width).toBeGreaterThan(0);
+      data: { label: id, context: "A", order },
+    });
+    const boxes = computeContextBoxes([ev("e0", 0), ev("e1", 1)], [], contexts); // B empty
+    const a = boxes.find((b) => b.id === "A")!;
+    const b = boxes.find((b) => b.id === "B")!;
+    expect(a.x).toBe(0); // spans its events' columns 0..1
+    expect(a.width).toBeGreaterThan(0);
+    expect(b.x).toBeGreaterThan(a.x); // empty context parks after the timeline
   });
 
   it("collapses bands hidden at a coarse level so visible bands sit adjacent [issue-00009]", () => {

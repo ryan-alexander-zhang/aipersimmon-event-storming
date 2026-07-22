@@ -1,6 +1,8 @@
 // Deterministic banded layout. Position is a pure function of the model:
-//   y = band(type)             (fixed row per element type)
-//   x = column(context, order) (timeline slot; a Domain Event's slice shares its column)
+//   y = band(type)   (fixed row per element type)
+//   x = column(order) (ONE global timeline slot; a Domain Event's slice shares
+//                      its column). Bounded Context is an attribute (tint/region),
+//                      not part of x — decision-00005.
 // The user never sets positions — this is what keeps the board readable.
 
 import type { Context } from "@/lib/dsl/schema";
@@ -12,12 +14,11 @@ import type { ESEdge, ESNode } from "@/lib/store/types";
 export const COL_W = 230;
 export const BAND_H = 132;
 export const STACK_H = 70;
-export const CTX_GAP_COLS = 0.5; // extra spacing between contexts, in columns
 export const NODE_W = 190;
 
 interface Placement {
-  col: number; // local column within the node's context (timeline slot)
-  ctx: string; // context id
+  col: number; // global column (timeline slot)
+  ctx: string; // context id (attribute — tint/region only)
   lane: number; // parallel sub-lane within the slot (concurrent events)
 }
 
@@ -31,61 +32,50 @@ function targetsOf(edges: ESEdge[], source: string, rel: RelationType): string[]
 interface Placed {
   place: Map<string, Placement>;
   ctxIds: string[];
-  base: Map<string, number>; // context id → base column
-  width: Map<string, number>; // context id → column span
 }
 
-// Assign every node a (context, local column) and reserve an ordered column slot
-// per context — including empty contexts, so their headers never pile up.
+// Assign every node a global column. Bounded Context is carried only as the
+// node's own attribute (for tint/region), never as a column offset.
 function computePlacement(nodes: ESNode[], edges: ESEdge[], contexts: Context[]): Placed {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const ctxOf = (id: string) => byId.get(id)?.data.context ?? "__none";
   const place = new Map<string, Placement>();
-  const set = (id: string, ctx: string, col: number, lane: number) => {
-    if (id && byId.has(id) && !place.has(id)) place.set(id, { ctx, col, lane });
+  const set = (id: string | undefined, col: number, lane: number) => {
+    if (id && byId.has(id) && !place.has(id)) place.set(id, { ctx: ctxOf(id), col, lane });
   };
 
-  // 1. Domain Events carry the timeline order. Distinct orders → columns; events
-  //    that share an order are concurrent → same column, stacked in sub-lanes.
-  const eventsByCtx = new Map<string, ESNode[]>();
-  for (const n of nodes) {
-    if (n.type !== "domainEvent") continue;
-    const c = n.data.context ?? "__none";
-    (eventsByCtx.get(c) ?? eventsByCtx.set(c, []).get(c)!).push(n);
+  // 1. Domain Events on the single global timeline. Distinct orders → columns;
+  //    events sharing an order are concurrent → same column, stacked in sub-lanes
+  //    (across contexts too).
+  const events = nodes.filter((n) => n.type === "domainEvent");
+  const orders = [...new Set(events.map((e) => e.data.order ?? 0))].sort((a, b) => a - b);
+  const colByOrder = new Map(orders.map((o, i) => [o, i]));
+  const byOrder = new Map<number, ESNode[]>();
+  for (const ev of events) {
+    const o = ev.data.order ?? 0;
+    (byOrder.get(o) ?? byOrder.set(o, []).get(o)!).push(ev);
   }
-  for (const [ctx, evs] of eventsByCtx) {
-    const orders = [...new Set(evs.map((e) => e.data.order ?? 0))].sort((a, b) => a - b);
-    const colByOrder = new Map(orders.map((o, i) => [o, i]));
-    const byOrder = new Map<number, ESNode[]>();
-    for (const ev of evs) {
-      const o = ev.data.order ?? 0;
-      (byOrder.get(o) ?? byOrder.set(o, []).get(o)!).push(ev);
-    }
-    for (const [o, group] of byOrder) {
-      const col = colByOrder.get(o) ?? 0;
-      group.sort((a, b) => a.id.localeCompare(b.id));
-      group.forEach((ev, lane) => {
-        set(ev.id, ctx, col, lane);
-        // 2. propagate the event's slot + lane upstream across its slice. An
-        //    event is produced either directly by a Command (produces, Process)
-        //    or via an Aggregate boundary (emits, Design); from the Command we
-        //    also pull its Actor, Constraint, and Aggregate into the column.
-        const agg = sourceOf(edges, ev.id, "emits");
-        if (agg) set(agg, ctx, col, lane);
-        const cmd = sourceOf(edges, ev.id, "produces") ?? (agg && sourceOf(edges, agg, "handledBy"));
-        if (cmd) {
-          set(cmd, ctx, col, lane);
-          const actor = sourceOf(edges, cmd, "issues");
-          if (actor) set(actor, ctx, col, lane);
-          const constraint = sourceOf(edges, cmd, "constrainedBy");
-          if (constraint) set(constraint, ctx, col, lane);
-          const aggViaCmd = sourceOf(edges, cmd, "handledBy");
-          if (aggViaCmd) set(aggViaCmd, ctx, col, lane);
-        }
-        for (const p of targetsOf(edges, ev.id, "triggers")) set(p, ctx, col, lane);
-        for (const rm of targetsOf(edges, ev.id, "updates")) set(rm, ctx, col, lane);
-      });
-    }
+  for (const [o, group] of byOrder) {
+    const col = colByOrder.get(o) ?? 0;
+    group.sort((a, b) => a.id.localeCompare(b.id));
+    group.forEach((ev, lane) => {
+      set(ev.id, col, lane);
+      // 2. propagate the event's slot + lane upstream across its slice. An event
+      //    is produced directly by a Command (produces, Process) or via an
+      //    Aggregate boundary (emits, Design); from the Command we also pull its
+      //    Actor, Constraint, and Aggregate into the column.
+      const agg = sourceOf(edges, ev.id, "emits");
+      if (agg) set(agg, col, lane);
+      const cmd = sourceOf(edges, ev.id, "produces") ?? (agg && sourceOf(edges, agg, "handledBy"));
+      if (cmd) {
+        set(cmd, col, lane);
+        set(sourceOf(edges, cmd, "issues"), col, lane);
+        set(sourceOf(edges, cmd, "constrainedBy"), col, lane);
+        set(sourceOf(edges, cmd, "handledBy"), col, lane);
+      }
+      for (const p of targetsOf(edges, ev.id, "triggers")) set(p, col, lane);
+      for (const rm of targetsOf(edges, ev.id, "updates")) set(rm, col, lane);
+    });
   }
 
   // 3. hotspots take the slot + lane of the element they annotate
@@ -93,55 +83,37 @@ function computePlacement(nodes: ESNode[], edges: ESEdge[], contexts: Context[])
     if (n.type !== "hotspot") continue;
     const tgt = targetsOf(edges, n.id, "annotates")[0];
     const p = tgt ? place.get(tgt) : undefined;
-    if (p) set(n.id, p.ctx, p.col, p.lane);
+    if (p) set(n.id, p.col, p.lane);
   }
 
-  // 4. free (unplaced) nodes have no timeline slot; tile them horizontally in
-  //    their band, side by side. They must not share a column within a band —
-  //    the sub-lane stacking a shared column triggers means *concurrency*, which
-  //    does not apply here. Fill the LOWEST available columns per (context, band),
-  //    skipping only columns a placed node in that same band holds. This keeps
-  //    free nodes compact from column 0 and stops one placed node (e.g. a Command
-  //    connected to a far Event) from evacuating the rest to higher columns.
-  const occupied = new Map<string, Set<number>>(); // `${ctx}:${band}` → placed columns
+  // 4. free (unplaced) nodes have no timeline slot; tile them per band, side by
+  //    side in the lowest available columns (a shared column within a band would
+  //    read as concurrency, which does not apply). Global per band — context no
+  //    longer partitions the column space.
+  const occupied = new Map<number, Set<number>>(); // band → placed columns
   for (const [id, p] of place) {
     const t = byId.get(id)?.type;
     if (!t) continue;
-    const k = `${p.ctx}:${bandIndex(t)}`;
-    (occupied.get(k) ?? occupied.set(k, new Set()).get(k)!).add(p.col);
+    const b = bandIndex(t);
+    (occupied.get(b) ?? occupied.set(b, new Set()).get(b)!).add(p.col);
   }
-  const nextFree = new Map<string, number>(); // `${ctx}:${band}` → next column to try
+  const nextFree = new Map<number, number>(); // band → next column to try
   for (const n of nodes) {
     if (place.has(n.id)) continue;
-    const ctx = ctxOf(n.id);
-    const key = `${ctx}:${bandIndex(n.type)}`;
-    const taken = occupied.get(key);
-    let col = nextFree.get(key) ?? 0;
+    const band = bandIndex(n.type);
+    const taken = occupied.get(band);
+    let col = nextFree.get(band) ?? 0;
     while (taken?.has(col)) col++;
-    nextFree.set(key, col + 1);
-    set(n.id, ctx, col, 0);
+    nextFree.set(band, col + 1);
+    set(n.id, col, 0);
   }
 
-  // 5. ordered contexts (declared first, then any referenced-only) each reserve
-  //    a slot; an empty context still gets width 1.
+  // 5. context ids (declared first, then any referenced-only) — for tint/region.
   const ordered = [...contexts].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
   const ctxIds = ordered.map((c) => c.id);
   for (const p of place.values()) if (!ctxIds.includes(p.ctx)) ctxIds.push(p.ctx);
 
-  const width = new Map<string, number>();
-  for (const id of ctxIds) {
-    let max = 0;
-    for (const p of place.values()) if (p.ctx === id) max = Math.max(max, p.col);
-    width.set(id, max + 1);
-  }
-  const base = new Map<string, number>();
-  let acc = 0;
-  for (const id of ctxIds) {
-    base.set(id, acc);
-    acc += (width.get(id) ?? 1) + CTX_GAP_COLS;
-  }
-
-  return { place, ctxIds, base, width };
+  return { place, ctxIds };
 }
 
 interface Rows {
@@ -155,24 +127,16 @@ interface Rows {
 // concurrent lanes never overflow into the band below (issue-00002). Bands
 // hidden at `level` reserve no height, so the visible bands collapse adjacent
 // (issue-00009) — layout is a function of (model, level), never of zoom.
-function computeRows(
-  nodes: ESNode[],
-  place: Placed["place"],
-  base: Placed["base"],
-  level: Level,
-): Rows {
+function computeRows(nodes: ESNode[], place: Placed["place"], level: Level): Rows {
   const visibleBand = new Set(LEVEL_TYPES[level].map((t) => bandIndex(t)));
   const cellCount = new Map<string, number>();
   const subRow = new Map<string, number>();
   const globalCol = new Map<string, number>();
   const maxSubRow = new Array(BAND_ORDER.length).fill(0);
   for (const n of nodes) {
-    // computePlacement places every node and bases every referenced context.
-    const p = place.get(n.id)!;
-    const gcol = base.get(p.ctx)! + p.col;
+    const p = place.get(n.id)!; // computePlacement places every node
+    const gcol = p.col; // one global timeline — no per-context offset
     const row = bandIndex(n.type);
-    // parallel lane offsets the whole slice within its band; a residual counter
-    // separates any exact (band, column, lane) collisions.
     const cellKey = `${row}:${gcol.toFixed(2)}:${p.lane}`;
     const stack = cellCount.get(cellKey) ?? 0;
     cellCount.set(cellKey, stack + 1);
@@ -183,10 +147,6 @@ function computeRows(
   }
   const bandTops = new Array(BAND_ORDER.length).fill(0);
   for (let r = 1; r < bandTops.length; r++) {
-    // a band with maxSubRow s occupies s*STACK_H + BAND_H; an un-stacked band
-    // keeps BAND_H, so a board with no concurrency lays out exactly as before.
-    // A band hidden at this level occupies nothing, so the next visible band
-    // sits directly below the previous visible one.
     const prevH = visibleBand.has(r - 1) ? maxSubRow[r - 1] * STACK_H + BAND_H : 0;
     bandTops[r] = bandTops[r - 1] + prevH;
   }
@@ -202,8 +162,8 @@ export function computeLayout(
   contexts: Context[],
   level: Level = "design",
 ): ESNode[] {
-  const { place, base } = computePlacement(nodes, edges, contexts);
-  const { subRow, globalCol, bandTops } = computeRows(nodes, place, base, level);
+  const { place } = computePlacement(nodes, edges, contexts);
+  const { subRow, globalCol, bandTops } = computeRows(nodes, place, level);
   return nodes.map((n) => ({
     ...n,
     position: {
@@ -221,21 +181,31 @@ export function computeBandTops(
   contexts: Context[],
   level: Level = "design",
 ): number[] {
-  const { place, base } = computePlacement(nodes, edges, contexts);
-  return computeRows(nodes, place, base, level).bandTops;
+  const { place } = computePlacement(nodes, edges, contexts);
+  return computeRows(nodes, place, level).bandTops;
 }
 
-/** Flow-space horizontal box of each context (including empty ones), for the
- *  context headers — reserved by order, never piled at the origin. */
+/** Flow-space horizontal box of each context, derived from the columns its member
+ *  nodes occupy on the global timeline (decision-00005). Contexts may overlap in
+ *  x when they interleave in time; an empty context collapses to the origin. */
 export function computeContextBoxes(
   nodes: ESNode[],
   edges: ESEdge[],
   contexts: Context[],
 ): Array<{ id: string; x: number; width: number }> {
-  const { ctxIds, base, width } = computePlacement(nodes, edges, contexts);
-  return ctxIds.map((id) => ({
-    id,
-    x: base.get(id)! * COL_W,
-    width: width.get(id)! * COL_W - (COL_W - NODE_W),
-  }));
+  const { place, ctxIds } = computePlacement(nodes, edges, contexts);
+  let maxCol = -1;
+  for (const p of place.values()) if (p.col > maxCol) maxCol = p.col;
+  let empty = 0;
+  return ctxIds.map((id) => {
+    const cols = [...place.values()].filter((p) => p.ctx === id).map((p) => p.col);
+    // An empty context has no timeline span; park it in its own header slot after
+    // the timeline so its header stays visible and clickable (never overlapping).
+    if (cols.length === 0) {
+      return { id, x: (maxCol + 1 + empty++) * COL_W, width: NODE_W };
+    }
+    const min = Math.min(...cols);
+    const max = Math.max(...cols);
+    return { id, x: min * COL_W, width: (max - min + 1) * COL_W - (COL_W - NODE_W) };
+  });
 }

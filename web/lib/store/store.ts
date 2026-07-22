@@ -19,7 +19,7 @@ import type { Level } from "@/lib/eventstorming/levels";
 import { resolveRelation } from "@/lib/eventstorming/relations";
 import { computeLayout } from "@/lib/layout/layout";
 import type { IsolateDirection } from "./focus";
-import { eventSlotIndex, gapOrder, normalizeContextOrders, slotOrders, timelineOrder } from "./timeline";
+import { eventSlotIndex, gapOrder, normalizeOrders, slotOrders, timelineOrder } from "./timeline";
 import type { ESEdge, ESNode, ESNodeData } from "./types";
 
 /** Isolate ("focus mode") view state: hide everything outside the selected
@@ -67,7 +67,7 @@ export interface ESState {
   /** Remove a context along with its member nodes and their edges. */
   removeContext: (id: string) => void;
   /** Add a node of `type` in `context` (omit/empty → Ungrouped); Domain Events get
-   *  the next timeline order within that context. */
+   *  the next order on the global timeline (decision-00005). */
   addNode: (type: ElementType, context?: string, data?: Partial<ESNodeData>) => string;
   updateNodeData: (id: string, patch: Partial<ESNodeData>) => void;
   removeNode: (id: string) => void;
@@ -77,14 +77,13 @@ export interface ESState {
   addOpportunity: (targetId: string, text: string) => string;
   /** Create a semantic edge if the connection is valid; returns success. */
   connect: (connection: Connection) => boolean;
-  /** Set a Domain Event's timeline order, then normalize its context to a
+  /** Set a Domain Event's global timeline order, then normalize the timeline to a
    *  contiguous slot sequence (preserving concurrency). Fractional orders are
    *  allowed — the UI uses them to insert between slots. */
   setEventOrder: (eventId: string, order: number) => void;
-  /** Move a Domain Event one timeline column toward the start (-1) or end (1)
-   *  within its context. */
+  /** Move a Domain Event one timeline column toward the start (-1) or end (1). */
   nudgeEvent: (eventId: string, dir: -1 | 1) => void;
-  /** Send a Domain Event to the start (-1) or end (1) of its context timeline. */
+  /** Send a Domain Event to the start (-1) or end (1) of the global timeline. */
   moveEventToEnd: (eventId: string, dir: -1 | 1) => void;
   /** Move a node into another bounded context. */
   reassignContext: (nodeId: string, context: string) => void;
@@ -165,9 +164,10 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     const ctx = context || undefined; // "" and undefined both mean Ungrouped
     const nodeData: ESNodeData = { label: ELEMENT_DEFINITIONS[type].label, context: ctx, ...data };
     if (type === "domainEvent" && nodeData.order === undefined) {
+      // Next slot on the single global timeline (decision-00005), across contexts.
       nodeData.order =
         get()
-          .nodes.filter((n) => n.type === "domainEvent" && n.data.context === ctx)
+          .nodes.filter((n) => n.type === "domainEvent")
           .reduce((m, n) => Math.max(m, n.data.order ?? 0), -1) + 1;
     }
     const node: ESNode = { id, type, position: { x: 0, y: 0 }, data: nodeData };
@@ -228,14 +228,14 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     const written = get().nodes.map((n) =>
       n.id === eventId ? { ...n, data: { ...n.data, order } } : n,
     );
-    const normalized = normalizeContextOrders(written, ev.data.context);
+    const normalized = normalizeOrders(written);
     set({ nodes: laidOut(normalized, get().edges, get().contexts, get().level) });
   },
 
   nudgeEvent: (eventId, dir) => {
     const ev = get().nodes.find((n) => n.id === eventId);
     if (ev?.type !== "domainEvent") return;
-    const orders = slotOrders(get().nodes, ev.data.context);
+    const orders = slotOrders(get().nodes);
     const i = eventSlotIndex(get().nodes, eventId);
     if (i < 0) return;
     // toward start: insert before the previous slot; toward end: after the next.
@@ -245,7 +245,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   moveEventToEnd: (eventId, dir) => {
     const ev = get().nodes.find((n) => n.id === eventId);
     if (ev?.type !== "domainEvent") return;
-    const orders = slotOrders(get().nodes, ev.data.context);
+    const orders = slotOrders(get().nodes);
     get().setEventOrder(eventId, gapOrder(orders, dir < 0 ? 0 : orders.length));
   },
 

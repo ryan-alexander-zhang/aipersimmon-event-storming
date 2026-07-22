@@ -7,7 +7,7 @@ import { ELEMENT_TYPES } from "@/lib/eventstorming/elements";
 import { LEVELS } from "@/lib/eventstorming/levels";
 import { RELATION_TYPES } from "@/lib/eventstorming/relations";
 
-export const DSL_VERSION = "2.0";
+export const DSL_VERSION = "3.0";
 
 export const propertiesSchema = z.object({
   description: z.string().optional(),
@@ -18,7 +18,7 @@ export const propertiesSchema = z.object({
   priority: z.enum(["low", "medium", "high"]).optional(),
 });
 
-// A bounded context: a column group along the timeline.
+// A bounded context: a named region/attribute over the global timeline (decision-00005).
 export const contextSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
@@ -31,7 +31,7 @@ export const nodeSchema = z.object({
   label: z.string(),
   // bounded context membership (optional for global actors/systems)
   context: z.string().optional(),
-  // timeline index within the context (Domain Events carry it)
+  // global timeline index (Domain Events carry it; decision-00005)
   order: z.number().optional(),
   properties: propertiesSchema.default({}),
 });

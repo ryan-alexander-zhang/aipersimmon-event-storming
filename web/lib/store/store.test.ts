@@ -238,13 +238,16 @@ describe("store v2 (RT3)", () => {
     expect(node(e0)!.position.x).toBeGreaterThan(node(e1)!.position.x);
   });
 
-  it("reassigning context moves a node into the other context's column [us-00006-AC-4.1]", () => {
+  it("reassigning context updates the attribute without moving the timeline column [us-00006-AC-4.1]", () => {
     const a = get().addContext("A");
-    const b = get().addContext("B"); // ordered after A → to the right
+    const b = get().addContext("B");
     const ev = get().addNode("domainEvent", a);
     const before = node(ev)!.position.x;
     get().reassignContext(ev, b);
-    expect(node(ev)!.position.x).toBeGreaterThan(before);
+    // decision-00005: context is an attribute (tint/region), not an x segment —
+    // reassigning changes the attribute but not the event's global timeline column.
+    expect(node(ev)!.data.context).toBe(b);
+    expect(node(ev)!.position.x).toBe(before);
   });
 
   it("replaces state on setModel and resets on clear", () => {
@@ -380,19 +383,21 @@ describe("timeline editing [us-00010]", () => {
   it("inserts a dragged event into a gap, shifting the rest [us-00010-AC-1.1]", () => {
     const { ctx, ids: [a, b, c] } = events(3);
     // drop C in the gap between A and B (gap index 1)
-    get().setEventOrder(c, gapOrder(slotOrders(get().nodes, ctx), 1));
+    get().setEventOrder(c, gapOrder(slotOrders(get().nodes), 1));
     expect(sequence(ctx)).toEqual([a, c, b]);
   });
 
   it("moves a dragged event after the last column [us-00010-AC-1.2]", () => {
     const { ctx, ids: [a, b, c] } = events(3);
-    get().setEventOrder(a, gapOrder(slotOrders(get().nodes, ctx), 3));
+    get().setEventOrder(a, gapOrder(slotOrders(get().nodes), 3));
     expect(sequence(ctx)).toEqual([b, c, a]);
   });
 
   it("makes two events concurrent when one is dropped onto the other [us-00010-AC-2.1]", () => {
-    const { ctx, ids: [a, b] } = events(2);
-    get().setEventOrder(b, slotOrders(get().nodes, ctx)[0]); // onto A's slot
+    const {
+      ids: [a, b],
+    } = events(2);
+    get().setEventOrder(b, slotOrders(get().nodes)[0]); // onto A's slot
     expect(orderOf(a)).toBe(orderOf(b)); // one shared slot
     // concurrent → same timeline column (x), different parallel sub-lane (y)
     expect(node(a)!.position.x).toBe(node(b)!.position.x);
@@ -401,10 +406,10 @@ describe("timeline editing [us-00010]", () => {
 
   it("splits a concurrent event back into its own column [us-00010-AC-3.1]", () => {
     const { ctx, ids: [a, b] } = events(2);
-    get().setEventOrder(b, slotOrders(get().nodes, ctx)[0]); // concurrent with A
+    get().setEventOrder(b, slotOrders(get().nodes)[0]); // concurrent with A
     expect(orderOf(a)).toBe(orderOf(b));
     // drag B into the gap after the (now single) column
-    get().setEventOrder(b, gapOrder(slotOrders(get().nodes, ctx), 1));
+    get().setEventOrder(b, gapOrder(slotOrders(get().nodes), 1));
     expect(orderOf(a)).not.toBe(orderOf(b));
     expect(sequence(ctx)).toEqual([a, b]);
   });
@@ -426,6 +431,14 @@ describe("timeline editing [us-00010]", () => {
     get().removeNode(b); // A at order 0, C at order 2 → a gap at slot 1
     get().setEventOrder(c, 2); // any adjustment re-normalizes the context
     expect([orderOf(a), orderOf(c)].sort((x, y) => (x ?? 0) - (y ?? 0))).toEqual([0, 1]);
+  });
+
+  it("a reorder keeps the event's Bounded Context unchanged [us-00015-FR-1]", () => {
+    const a = get().addContext("A");
+    const ev = get().addNode("domainEvent", a);
+    get().addNode("domainEvent", a);
+    get().setEventOrder(ev, 5); // reorder on the global timeline
+    expect(node(ev)!.data.context).toBe(a); // drag changes order only, not context
   });
 
   it("ignores timeline moves on non-events [us-00010 scope]", () => {

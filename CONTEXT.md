@@ -85,8 +85,9 @@ it is refined by the Aggregate boundary (handledBy + emits).
 ### Structure
 
 **Bounded Context**:
-A named grouping of a slice of the model that forms one column group along the
-timeline (e.g. Ordering, Payment). The board's columns are organized by it.
+A named grouping of events on the single shared timeline, shown as a colour/region
+attribute (e.g. Ordering, Payment) — not a segment of the timeline; contexts may
+overlap in time (decision-00005).
 _Avoid_: module, service, area.
 
 **Ungrouped**:
@@ -96,8 +97,9 @@ later — context membership is optional.
 _Avoid_: orphan, unassigned, none.
 
 **Timeline**:
-The left→right ordering of Domain Events that forms the board's spine; every
-other element is placed relative to the event it serves.
+The single global left→right ordering of all Domain Events that forms the board's
+spine, shared across every Bounded Context; every other element is placed relative
+to the event it serves.
 _Avoid_: flow, sequence (when precision matters).
 
 **Walkthrough**:
@@ -106,8 +108,9 @@ highlighting each event's slice, to validate the flow by telling its story.
 _Avoid_: playback, replay, tour.
 
 **Concurrent Events**:
-Two or more Domain Events that occupy the same timeline position because they
-happen in parallel. They share one column and stack in parallel sub-lanes.
+Two or more Domain Events that occupy the same global timeline position because
+they happen in parallel — including across different Bounded Contexts. They share
+one column and stack in parallel sub-lanes.
 _Avoid_: parallel events, simultaneous, same-slot (when precision matters).
 
 ### Artifacts

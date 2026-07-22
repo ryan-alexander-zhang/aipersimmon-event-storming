@@ -41,25 +41,28 @@ test("adds a Domain Event into its band via a context header [us-00001-AC-1.1, u
   expect(await body.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(246, 166, 35)");
 });
 
-test("creates a Domain Event on an empty board, grouped as Ungrouped [issue-00006]", async ({
+test("creates ungrouped Domain Events on the timeline — no context bar or tint [issue-00006, issue-00011]", async ({
   page,
 }) => {
   await page.goto("/");
   // empty board — no context created first
   await addUngroupedEvent(page);
   await expect(nodes(page, "domainEvent")).toHaveCount(1);
-  await expect(page.getByText("Ungrouped", { exact: true })).toBeVisible();
+  // decision-00005: no spanning "Ungrouped" group bar; an ungrouped event has no tint
+  await expect(page.getByText("Ungrouped", { exact: true })).toHaveCount(0);
+  await expect(nodes(page, "domainEvent").locator("[data-testid=node-body]")).not.toHaveAttribute(
+    "data-context-tint",
+  );
 
   // deselect (the palette lives in the empty panel) so a second ungrouped event
-  // can be added; it joins the same soft group and takes the next timeline slot
+  // can be added; it takes the next global timeline slot
   await page.locator(".react-flow__pane").click({ position: { x: 10, y: 10 } });
   await addUngroupedEvent(page);
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
-  await expect(page.getByText("Ungrouped", { exact: true })).toHaveCount(1);
   const xs = await nodes(page, "domainEvent").evaluateAll((els) =>
     els.map((e) => e.getBoundingClientRect().x),
   );
-  expect(Math.max(...xs)).toBeGreaterThan(Math.min(...xs));
+  expect(Math.max(...xs)).toBeGreaterThan(Math.min(...xs)); // distinct global columns
 });
 
 test("creates an Actor directly at Big Picture, no Command needed [us-00007-AC-5.1, decision-00003]", async ({
@@ -99,18 +102,28 @@ test("Constraint and Aggregate are offered only at Design [us-00008-AC-1.2, deci
   await expect(page.getByRole("button", { name: "+ Actor (issues)" })).toBeVisible(); // Process-level still there
 });
 
-test("a second context adds a column group after the first [us-00006-AC-1.1]", async ({ page }) => {
+test("adds events across two contexts on one global timeline [us-00006-AC-1.1, us-00015-AC-1.1]", async ({
+  page,
+}) => {
   await page.goto("/");
   await addContext(page);
   await addContext(page);
   const evBtns = page.getByRole("button", { name: "Event", exact: true });
-  await evBtns.nth(0).click();
-  await evBtns.nth(1).click();
+  await evBtns.nth(0).click(); // global order 0
+  await evBtns.nth(1).click(); // global order 1 (across contexts, one timeline)
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
   const xs = await nodes(page, "domainEvent").evaluateAll((els) =>
     els.map((e) => e.getBoundingClientRect().x),
   );
-  expect(Math.max(...xs)).toBeGreaterThan(Math.min(...xs)); // second context to the right
+  expect(Math.max(...xs)).toBeGreaterThan(Math.min(...xs)); // sequential global order → distinct columns
+});
+
+test("a context'd event shows a context tint stripe [us-00015-AC-3.1]", async ({ page }) => {
+  await page.goto("/");
+  await addContext(page);
+  await addEvent(page);
+  const body = nodes(page, "domainEvent").locator("[data-testid=node-body]");
+  await expect(body).toHaveAttribute("data-context-tint", /^#[0-9a-f]{6}$/i);
 });
 
 test("only timeline elements are drag-enabled; others stay locked [us-00007-AC-4.1]", async ({

@@ -73,10 +73,40 @@ describe("serialize v2 (T2/RT1)", () => {
     }
   });
 
+  it("migrates a v2 per-context doc to one global order, preserving concurrency [spec-00009-XAC-1.1]", () => {
+    const v2 = JSON.stringify({
+      version: "2.0",
+      meta: { name: "old", level: "design", createdAt: "t" },
+      contexts: [
+        { id: "ord", name: "Ordering", order: 0 },
+        { id: "pay", name: "Payment", order: 1 },
+      ],
+      nodes: [
+        { id: "A", type: "domainEvent", label: "A", context: "ord", order: 0, properties: {} },
+        { id: "A2", type: "domainEvent", label: "A2", context: "ord", order: 0, properties: {} },
+        { id: "C", type: "domainEvent", label: "C", context: "ord", order: 1, properties: {} },
+        { id: "B", type: "domainEvent", label: "B", context: "pay", order: 0, properties: {} },
+      ],
+      edges: [],
+    });
+    const result = importJSON(v2);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.model.version).toBe("3.0");
+      const o = Object.fromEntries(result.model.nodes.map((n) => [n.id, n.order]));
+      // dense-rank by (context.order, per-context order): {A, A2} concurrent → 0,
+      // C → 1, then Payment's B → 2 (block-sequential, design-00005 §2).
+      expect(o.A).toBe(0);
+      expect(o.A2).toBe(0);
+      expect(o.C).toBe(1);
+      expect(o.B).toBe(2);
+    }
+  });
+
   it("export omits position and includes contexts + order + level [us-00004]", () => {
     const { nodes, edges } = sampleCanvas();
     const out = JSON.parse(exportJSON(nodes, edges, CONTEXTS, META));
-    expect(out.version).toBe("2.0");
+    expect(out.version).toBe("3.0");
     expect(out.contexts).toEqual(CONTEXTS);
     expect(out.meta.level).toBe("design");
     expect(out.nodes[0].position).toBeUndefined();
@@ -114,7 +144,7 @@ describe("serialize v2 (T2/RT1)", () => {
     const result = importJSON(v1);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.model.version).toBe("2.0");
+      expect(result.model.version).toBe("3.0"); // chained v1 → v2 → v3
       expect(result.model.contexts).toEqual([{ id: "default", name: "Default", order: 0 }]);
       const byId = Object.fromEntries(result.model.nodes.map((n) => [n.id, n]));
       expect(byId.e1.context).toBe("default");

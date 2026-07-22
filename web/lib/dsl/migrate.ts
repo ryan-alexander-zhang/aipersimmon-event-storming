@@ -40,10 +40,45 @@ function readX(n: Record<string, unknown>): number {
   return typeof p?.x === "number" ? p.x : 0;
 }
 
-/** Migrate any supported older document to the latest shape. */
+// v2 → v3: per-context `order` becomes a single global `order` (decision-00005).
+// Sort events by their current visible sequence (context.order, per-context
+// order), then dense-rank into a global order — events that were concurrent
+// within a context (same context + order) keep an equal global order
+// (design-00005 §2). Contexts stay as attributes; nothing is lost.
+function migrateV2toV3(v2: Record<string, unknown>): unknown {
+  const nodes = Array.isArray(v2.nodes) ? (v2.nodes as Record<string, unknown>[]) : [];
+  const contexts = Array.isArray(v2.contexts) ? (v2.contexts as Record<string, unknown>[]) : [];
+  const ctxOrder = new Map(contexts.map((c) => [c.id as string, (c.order as number) ?? 0]));
+  const events = nodes
+    .filter((n) => n.type === "domainEvent")
+    .map((n) => ({
+      id: n.id as string,
+      c: ctxOrder.get(n.context as string) ?? 0,
+      o: (n.order as number) ?? 0,
+    }))
+    .sort((a, b) => a.c - b.c || a.o - b.o);
+  const rank = new Map<string, number>();
+  let r = -1;
+  let prev = "";
+  for (const e of events) {
+    const key = `${e.c}:${e.o}`;
+    if (key !== prev) {
+      r++;
+      prev = key;
+    }
+    rank.set(e.id, r);
+  }
+  const migrated = nodes.map((n) =>
+    n.type === "domainEvent" ? { ...n, order: rank.get(n.id as string) ?? 0 } : n,
+  );
+  return { ...v2, version: "3.0", nodes: migrated };
+}
+
+/** Migrate any supported older document to the latest shape (chained). */
 export function migrateToLatest(raw: unknown): unknown {
   if (!raw || typeof raw !== "object") return raw;
-  const r = raw as Record<string, unknown>;
-  if (r.version === "1.0") return migrateV1toV2(r);
-  return raw;
+  let r = raw as Record<string, unknown>;
+  if (r.version === "1.0") r = migrateV1toV2(r) as Record<string, unknown>;
+  if (r.version === "2.0") r = migrateV2toV3(r) as Record<string, unknown>;
+  return r;
 }
