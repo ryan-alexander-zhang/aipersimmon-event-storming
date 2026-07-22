@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Download, FilePlus, FolderPlus, Upload } from "lucide-react";
+import { Activity, Download, FilePlus, FolderPlus, Footprints, Upload } from "lucide-react";
 import { type ChangeEvent, useRef, useState } from "react";
 import { exportJSON, fromModel, importJSON } from "@/lib/dsl/serialize";
 import { LEVEL_LABEL, LEVELS } from "@/lib/eventstorming/levels";
@@ -18,6 +18,9 @@ export function Toolbar() {
   const clear = useESStore((s) => s.clear);
   const healthOpen = useESStore((s) => s.healthOpen);
   const toggleHealth = useESStore((s) => s.toggleHealth);
+  const walkActive = useESStore((s) => s.walk.active);
+  const startWalkthrough = useESStore((s) => s.startWalkthrough);
+  const stopWalkthrough = useESStore((s) => s.stopWalkthrough);
   const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,6 +112,14 @@ export function Toolbar() {
           onClick={toggleHealth}
         >
           <Activity size={14} /> Health
+        </button>
+        <button
+          type="button"
+          className={btn}
+          aria-pressed={walkActive}
+          onClick={() => (walkActive ? stopWalkthrough() : startWalkthrough())}
+        >
+          <Footprints size={14} /> Walk
         </button>
         <button type="button" className={btn} onClick={onNew}>
           <FilePlus size={14} /> New

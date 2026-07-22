@@ -19,7 +19,7 @@ import type { Level } from "@/lib/eventstorming/levels";
 import { resolveRelation } from "@/lib/eventstorming/relations";
 import { computeLayout } from "@/lib/layout/layout";
 import type { IsolateDirection } from "./focus";
-import { eventSlotIndex, gapOrder, normalizeContextOrders, slotOrders } from "./timeline";
+import { eventSlotIndex, gapOrder, normalizeContextOrders, slotOrders, timelineOrder } from "./timeline";
 import type { ESEdge, ESNode, ESNodeData } from "./types";
 
 /** Isolate ("focus mode") view state: hide everything outside the selected
@@ -44,12 +44,19 @@ export interface ESState {
   isolate: IsolateState;
   /** Model-health panel visibility (spec-00007); view-only, never persisted. */
   healthOpen: boolean;
+  /** Narrative walkthrough cursor (spec-00005); view-only, never persisted. */
+  walk: { active: boolean; index: number };
 
   setLevel: (level: Level) => void;
   toggleIsolate: () => void;
   setIsolateDirection: (direction: IsolateDirection) => void;
   setIsolateDepth: (depth: number) => void;
   toggleHealth: () => void;
+  /** Start the walkthrough at the first Domain Event in timeline order. */
+  startWalkthrough: () => void;
+  /** Move the walkthrough cursor one step (clamped), selecting that event. */
+  walkStep: (dir: -1 | 1) => void;
+  stopWalkthrough: () => void;
 
   onNodesChange: (changes: NodeChange<ESNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<ESEdge>[]) => void;
@@ -111,6 +118,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   hoveredEdgeId: null,
   isolate: { active: false, direction: "down", depth: 2 },
   healthOpen: false,
+  walk: { active: false, index: 0 },
 
   setLevel: (level) =>
     set({ level, nodes: laidOut(get().nodes, get().edges, get().contexts, level) }),
@@ -118,6 +126,18 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   setIsolateDirection: (direction) => set({ isolate: { ...get().isolate, direction } }),
   setIsolateDepth: (depth) => set({ isolate: { ...get().isolate, depth: Math.max(1, depth) } }),
   toggleHealth: () => set({ healthOpen: !get().healthOpen }),
+
+  startWalkthrough: () => {
+    const order = timelineOrder(get().nodes);
+    set({ walk: { active: true, index: 0 }, selectedId: order[0] ?? null });
+  },
+  walkStep: (dir) => {
+    const order = timelineOrder(get().nodes);
+    if (order.length === 0) return;
+    const index = Math.min(order.length - 1, Math.max(0, get().walk.index + dir));
+    set({ walk: { active: true, index }, selectedId: order[index] });
+  },
+  stopWalkthrough: () => set({ walk: { ...get().walk, active: false } }),
 
   onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) }),
   onEdgesChange: (changes) => set({ edges: applyEdgeChanges(changes, get().edges) }),
@@ -246,6 +266,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       hoveredId: null,
       hoveredEdgeId: null,
       isolate: { ...get().isolate, active: false },
+      walk: { active: false, index: 0 },
     }),
   clear: () =>
     set({
@@ -256,6 +277,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       hoveredId: null,
       hoveredEdgeId: null,
       isolate: { ...get().isolate, active: false },
+      walk: { active: false, index: 0 },
     }),
 });
 

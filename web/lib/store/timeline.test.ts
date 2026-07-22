@@ -7,6 +7,7 @@ import {
   gapOrder,
   normalizeContextOrders,
   slotOrders,
+  timelineOrder,
 } from "./timeline";
 
 // Minimal Domain Event node for the pure timeline helpers.
@@ -29,6 +30,17 @@ describe("timeline helpers [us-00010]", () => {
     expect(slotOrders(nodes, "c")).toEqual([0, 2]); // 0 shared → one slot
     expect(slotOrders(nodes, "x")).toEqual([5]);
     expect(slotOrders(nodes, "none")).toEqual([]);
+  });
+
+  it("timelineOrder sorts events by order, then context, then id; excludes non-events [us-00014-AC-2.1]", () => {
+    const nodes = [
+      ev("e2", 1, "a"),
+      other("cmd", "a"),
+      ev("e1", 0, "a"),
+      ev("e3", 1, "b"), // same order as e2 but later context
+      ev("e0", 1, "a"), // same order/context as e2 → tiebreak by id (e0 < e2)
+    ];
+    expect(timelineOrder(nodes)).toEqual(["e1", "e0", "e2", "e3"]);
   });
 
   it("eventSlotIndex locates an event's slot; -1 for non-events/unknown", () => {

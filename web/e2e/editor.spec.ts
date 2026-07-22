@@ -462,6 +462,41 @@ test("opportunity: attach to an element, distinct from a hotspot, visible at Big
   await expect(opp).toHaveCount(1);
 });
 
+test("narrative walkthrough steps the timeline, clamps, stays read-only, and exits [us-00014-AC-1.1/2.1/3.1/4.1/5.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addContext(page);
+  await addLabeledEvent(page, "Order Placed"); // order 0
+  await addLabeledEvent(page, "Payment Taken"); // order 1
+
+  // start → first event framed (us-00014-AC-1.1)
+  await page.getByRole("button", { name: "Walk" }).click();
+  const wt = page.getByTestId("walkthrough");
+  await expect(wt).toBeVisible();
+  await expect(wt).toContainText("1 / 2");
+  await expect(page.getByTestId("walkthrough-label")).toHaveText("Order Placed");
+
+  // forward → second (last) event; Next then disables = clamped at the end (us-00014-AC-3.1)
+  await page.getByRole("button", { name: "Next event" }).click();
+  await expect(wt).toContainText("2 / 2");
+  await expect(page.getByTestId("walkthrough-label")).toHaveText("Payment Taken");
+  await expect(page.getByRole("button", { name: "Next event" })).toBeDisabled();
+
+  // read-only: a timeline arrow key does not reorder (us-00014-AC-4.1) — the label
+  // would flip to the other event if the nudge were not suppressed
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("walkthrough-label")).toHaveText("Payment Taken");
+
+  // backward → first event again (us-00014-AC-2.1)
+  await page.getByRole("button", { name: "Previous event" }).click();
+  await expect(page.getByTestId("walkthrough-label")).toHaveText("Order Placed");
+
+  // exit → overlay gone (us-00014-AC-5.1)
+  await page.getByRole("button", { name: "Exit walkthrough" }).click();
+  await expect(wt).toHaveCount(0);
+});
+
 test("New clears the model and does not restore it on reload", async ({ page }) => {
   await page.goto("/");
   await addContext(page);

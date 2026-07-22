@@ -295,6 +295,52 @@ describe("store v2 (RT3)", () => {
     expect(get().healthOpen).toBe(false);
   });
 
+  it("walkthrough steps the timeline read-only: start, step, clamp, stop [us-00014-AC-1.1/2.1/3.1/5.1]", () => {
+    const ctx = get().addContext("c");
+    const e0 = get().addNode("domainEvent", ctx); // order 0
+    const e1 = get().addNode("domainEvent", ctx); // order 1
+    const before = JSON.stringify(get().nodes);
+
+    get().startWalkthrough();
+    expect(get().walk).toEqual({ active: true, index: 0 });
+    expect(get().selectedId).toBe(e0); // first event (AC-1.1)
+
+    get().walkStep(1);
+    expect(get().walk.index).toBe(1);
+    expect(get().selectedId).toBe(e1); // forward (AC-2.1)
+
+    get().walkStep(1); // clamp at last (AC-3.1)
+    expect(get().walk.index).toBe(1);
+
+    get().walkStep(-1);
+    expect(get().selectedId).toBe(e0); // backward (AC-2.1)
+    get().walkStep(-1); // clamp at first
+    expect(get().walk.index).toBe(0);
+
+    get().stopWalkthrough();
+    expect(get().walk.active).toBe(false);
+    expect(JSON.stringify(get().nodes)).toBe(before); // model unchanged (AC-5.1)
+  });
+
+  it("walkthrough on an empty board activates with no selection and no-op steps", () => {
+    get().startWalkthrough();
+    expect(get().walk.active).toBe(true);
+    expect(get().selectedId).toBeNull();
+    get().walkStep(1); // no events → no-op, no throw
+    expect(get().walk.index).toBe(0);
+  });
+
+  it("resets the walkthrough on clear [plan-00010 P1.2]", () => {
+    const ctx = get().addContext("c");
+    get().addNode("domainEvent", ctx);
+    get().addNode("domainEvent", ctx);
+    get().startWalkthrough();
+    get().walkStep(1);
+    expect(get().walk).toEqual({ active: true, index: 1 });
+    get().clear();
+    expect(get().walk).toEqual({ active: false, index: 0 });
+  });
+
   it("tracks the hovered edge and clears it on clear (HE1)", () => {
     get().setHoveredEdge("e1");
     expect(get().hoveredEdgeId).toBe("e1");

@@ -23,6 +23,21 @@ export function eventSlotIndex(nodes: ESNode[], eventId: string): number {
   return slotOrders(nodes, ev.data.context).indexOf(orderOf(ev));
 }
 
+/** All Domain Event ids in timeline order across contexts — sorted by order,
+ *  then context, then id (deterministic). The narrative walkthrough (spec-00005)
+ *  steps through these; concurrent events (equal order) become adjacent steps. */
+export function timelineOrder(nodes: ESNode[]): string[] {
+  return nodes
+    .filter(isEvent)
+    .sort(
+      (a, b) =>
+        orderOf(a) - orderOf(b) ||
+        (a.data.context ?? "").localeCompare(b.data.context ?? "") ||
+        a.id.localeCompare(b.id),
+    )
+    .map((n) => n.id);
+}
+
 /** An order value that lands an event at gap `index` (0..slotCount): before the
  *  first slot, between two slots (midpoint), or after the last. Normalization
  *  then collapses the fractional value back to an integer. */

@@ -100,6 +100,11 @@ The left→right ordering of Domain Events that forms the board's spine; every
 other element is placed relative to the event it serves.
 _Avoid_: flow, sequence (when precision matters).
 
+**Walkthrough**:
+A read-only traversal of the Timeline that steps through Domain Events in order,
+highlighting each event's slice, to validate the flow by telling its story.
+_Avoid_: playback, replay, tour.
+
 **Concurrent Events**:
 Two or more Domain Events that occupy the same timeline position because they
 happen in parallel. They share one column and stack in parallel sub-lanes.

@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BoardChrome } from "@/components/board-chrome";
 import { RelationEdge } from "@/components/edges/relation-edge";
 import { HealthPanel } from "@/components/health-panel";
+import { Walkthrough } from "@/components/walkthrough";
 import { ElementNode, routeHandles } from "@/components/nodes/element-node";
 import { PropertyPanel } from "@/components/property-panel";
 import { Toolbar } from "@/components/toolbar";
@@ -170,6 +171,7 @@ function Canvas() {
   const level = useESStore((s) => s.level);
   const isolate = useESStore((s) => s.isolate);
   const healthOpen = useESStore((s) => s.healthOpen);
+  const walkActive = useESStore((s) => s.walk.active);
   const contexts = useESStore((s) => s.contexts);
   const setEventOrder = useESStore((s) => s.setEventOrder);
   const zoom = useStore((s) => s.transform[2]);
@@ -228,6 +230,7 @@ function Canvas() {
       const tag = document.activeElement?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       const s = useESStore.getState();
+      if (s.walk.active) return; // walkthrough is read-only (spec-00005-XFR-1)
       const n = s.nodes.find((x) => x.id === s.selectedId);
       if (n?.type !== "domainEvent") return;
       e.preventDefault();
@@ -430,6 +433,7 @@ function Canvas() {
           <BoardChrome />
           {drop && <TimelineDropIndicator drop={drop} />}
           {healthOpen && <HealthPanel />}
+          {walkActive && <Walkthrough />}
         </div>
         <PropertyPanel />
       </div>
