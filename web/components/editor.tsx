@@ -287,6 +287,13 @@ function Canvas() {
     return computeFocus(hoveredId, edges);
   }, [focusedContext, selectedId, hoveredId, nodes, edges]);
 
+  // Edge-hover tracing works on any edge in the neutral state, but inside a
+  // committed scope (focused Bounded Context / selected element) only on edges
+  // within that scope — hovering an out-of-scope line does nothing.
+  const committed = !!(focusedContext || selectedId);
+  const activeHoveredEdgeId =
+    hoveredEdgeId && (!committed || focus.edgeIds.has(hoveredEdgeId)) ? hoveredEdgeId : null;
+
   // Attach handle anchors per edge from current node positions, so the vertical
   // slice chain draws top↔bottom and timeline links left↔right.
   const routedEdges = useMemo(() => {
@@ -346,10 +353,10 @@ function Canvas() {
   // single connection reads as just "source → target". Otherwise the focus
   // neighbourhood is the bright set.
   const hoveredEndpoints = useMemo(() => {
-    if (!hoveredEdgeId) return null;
-    const e = edges.find((x) => x.id === hoveredEdgeId);
+    if (!activeHoveredEdgeId) return null;
+    const e = edges.find((x) => x.id === activeHoveredEdgeId);
     return e ? new Set([e.source, e.target]) : null;
-  }, [hoveredEdgeId, edges]);
+  }, [activeHoveredEdgeId, edges]);
 
   const decoratedNodes = useMemo(() => {
     const bright = hoveredEndpoints ?? (dimActive ? focus.nodeIds : null);
@@ -398,9 +405,10 @@ function Canvas() {
               ? "off"
               : "none";
         // Edge-hover isolation overrides focus: the hovered edge is emphasised,
-        // every other edge dims — so a single connection can be traced.
-        const hover = hoveredEdgeId
-          ? e.id === hoveredEdgeId
+        // every other edge dims — so a single connection can be traced. Gated to
+        // in-scope edges while committed (activeHoveredEdgeId).
+        const hover = activeHoveredEdgeId
+          ? e.id === activeHoveredEdgeId
             ? "on"
             : "dim"
           : undefined;
@@ -419,7 +427,7 @@ function Canvas() {
             : e.markerEnd,
         };
       }),
-    [visibleEdges, focus, offsets, dimActive, hoveredEdgeId],
+    [visibleEdges, focus, offsets, dimActive, activeHoveredEdgeId],
   );
 
   // Refit the view when isolate frames a subset (or clears back to the board).

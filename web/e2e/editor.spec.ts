@@ -1034,7 +1034,7 @@ test("the context header stays one fixed-height row as contexts scale [us-00024-
   expect(Math.abs(manyRows - oneRow)).toBeLessThan(4); // no vertical growth
 });
 
-test("a committed scope is sticky against node hover; edge hover still traces [design-00003]", async ({
+test("a committed scope is sticky vs node hover; only in-scope lines trace [design-00003]", async ({
   page,
 }) => {
   await page.goto("/");
@@ -1043,8 +1043,9 @@ test("a committed scope is sticky against node hover; edge hover still traces [d
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
   const nodeOpacity = (id: string) =>
     page.locator(`.react-flow__node[data-id="${id}"]`).evaluate((el) => getComputedStyle(el).opacity);
+  const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
 
-  // commit a scope: select rm1 → its chain bright, an unrelated node dims
+  // commit a scope: select rm1 → chain {rm1, e1} bright, an unrelated node dims
   await nodes(page, "readModel").click();
   expect(await nodeOpacity("rm1")).toBe("1");
   expect(Number(await nodeOpacity("ex1"))).toBeLessThan(1);
@@ -1054,9 +1055,14 @@ test("a committed scope is sticky against node hover; edge hover still traces [d
   expect(await nodeOpacity("rm1")).toBe("1"); // still bright
   expect(Number(await nodeOpacity("ex1"))).toBeLessThan(1); // hover ignored, still dim
 
-  // hovering a relation LINE still traces it, even inside the committed scope
-  await page.locator('.react-flow__edge[data-id="r1"]').hover({ force: true });
-  await expect(page.locator('.react-flow__edge[data-id="r1"]')).toHaveClass(/animated/);
-  expect(await nodeOpacity("a1")).toBe("1"); // the edge's endpoint is bright
-  expect(Number(await nodeOpacity("rm1"))).toBeLessThan(1); // edge hover overrides the committed node
+  // hovering an OUT-OF-SCOPE line (r1: a1→c1) does nothing while committed
+  await edge("r1").hover({ force: true });
+  await expect(edge("r1")).not.toHaveClass(/animated/);
+  expect(await nodeOpacity("rm1")).toBe("1"); // committed scope unchanged
+  expect(Number(await nodeOpacity("a1"))).toBeLessThan(1); // out-of-scope endpoint stays dim
+
+  // hovering an IN-SCOPE line (r4: e1→rm1) still traces it
+  await edge("r4").hover({ force: true });
+  await expect(edge("r4")).toHaveClass(/animated/);
+  expect(await nodeOpacity("rm1")).toBe("1"); // endpoint bright
 });
