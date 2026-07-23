@@ -687,3 +687,82 @@ describe("search + filter view state [spec-00006]", () => {
     expect(get().filter).toEqual({ query: "", types: new Set(), contexts: new Set() });
   });
 });
+
+describe("snapshots + compare [spec-00008]", () => {
+  it("captures the current model as a named snapshot without mutating it [us-00021-AC-1.1]", () => {
+    const ctx = get().addContext("Ordering");
+    get().addNode("domainEvent", ctx, { label: "Order Placed" });
+    const before = get().nodes;
+    const id = get().captureSnapshot("as-is");
+    const snap = get().snapshots.find((s) => s.id === id);
+    expect(snap?.name).toBe("as-is");
+    expect(snap?.model.nodes.map((n) => n.label)).toEqual(["Order Placed"]);
+    expect(get().nodes).toBe(before); // live model untouched
+  });
+
+  it("excludes the discovery wall from a snapshot [spec-00008-XAC-2.1]", () => {
+    get().setLevel("big-picture");
+    get().addNode("domainEvent", undefined, { label: "On Board" });
+    get().addDiscoveryItem(0, 0, "On Wall");
+    get().captureSnapshot("s");
+    const labels = get().snapshots[0].model.nodes.map((n) => n.label);
+    expect(labels).toContain("On Board");
+    expect(labels).not.toContain("On Wall");
+  });
+
+  it("renames and deletes snapshots [us-00021-AC-3.1/4.1]", () => {
+    const a = get().captureSnapshot("a");
+    const b = get().captureSnapshot("b");
+    get().renameSnapshot(a, "baseline");
+    expect(get().snapshots.find((s) => s.id === a)?.name).toBe("baseline");
+    expect(get().snapshots.find((s) => s.id === b)?.name).toBe("b");
+    get().deleteSnapshot(a);
+    expect(get().snapshots.map((s) => s.id)).toEqual([b]);
+  });
+
+  it("restores a snapshot as the live model [us-00021-AC-5.1]", () => {
+    const ctx = get().addContext("Ordering");
+    get().addNode("domainEvent", ctx, { label: "Order Placed" });
+    get().captureSnapshot("as-is");
+    get().addNode("domainEvent", ctx, { label: "Order Shipped" }); // model diverges
+    expect(get().nodes.filter((n) => n.type === "domainEvent")).toHaveLength(2);
+    const id = get().snapshots[0].id;
+    get().restoreSnapshot(id);
+    const events = get().nodes.filter((n) => n.type === "domainEvent");
+    expect(events.map((n) => n.data.label)).toEqual(["Order Placed"]);
+  });
+
+  it("opens compare only when both sides are chosen [us-00022-AC-1.1/5.1]", () => {
+    const a = get().captureSnapshot("a");
+    const b = get().captureSnapshot("b");
+    get().setCompareSide("left", a);
+    get().openCompare();
+    expect(get().compare.active).toBe(false); // one side only
+    get().setCompareSide("right", b);
+    get().openCompare();
+    expect(get().compare).toEqual({ active: true, leftId: a, rightId: b });
+    get().closeCompare();
+    expect(get().compare.active).toBe(false);
+  });
+
+  it("clears a deleted snapshot out of the compare selection", () => {
+    const a = get().captureSnapshot("a");
+    const b = get().captureSnapshot("b");
+    get().setCompareSide("left", a);
+    get().setCompareSide("right", b);
+    get().openCompare();
+    get().deleteSnapshot(a);
+    expect(get().compare).toEqual({ active: false, leftId: null, rightId: b });
+  });
+
+  it("keeps snapshots through setModel but wipes them on clear [decision-00008]", () => {
+    get().captureSnapshot("a");
+    get().toggleVersions();
+    get().setModel({ nodes: [], edges: [], contexts: [] });
+    expect(get().snapshots).toHaveLength(1); // survives a model swap
+    expect(get().versionsOpen).toBe(false); // view flag resets
+    expect(get().compare).toEqual({ active: false, leftId: null, rightId: null });
+    get().clear();
+    expect(get().snapshots).toEqual([]); // "New model" discards them
+  });
+});

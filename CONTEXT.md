@@ -159,6 +159,19 @@ The structured, validated JSON representation of a Model, used for export,
 import, and local save. The single source of truth for the Model's shape.
 _Avoid_: schema (that is the Zod definition of the DSL), export format.
 
+**Snapshot**:
+A named, timestamped copy of the whole Model captured at a point in time, kept
+locally so a modeller can save an as-is version and return to it. Stored outside
+the model DSL and never part of the current Model's export (decision-00008).
+_Avoid_: version (unqualified), backup, save.
+
+**Version Compare**:
+A read-only unified diff of two Snapshots (base → target, e.g. as-is → to-be): the
+target's board with unchanged elements dimmed, added and changed elements
+highlighted, and removed elements listed. A distinct view over the Snapshots — it
+never mutates the live Model.
+_Avoid_: merge, side-by-side.
+
 ## Example Dialogue
 
 > **Dev**: When the Actor issues the "Place Order" Command, which sticky emits

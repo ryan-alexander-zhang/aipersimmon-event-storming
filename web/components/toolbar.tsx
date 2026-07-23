@@ -7,6 +7,7 @@ import {
   FilePlus,
   FolderPlus,
   Footprints,
+  History,
   Network,
   Plus,
   Sparkles,
@@ -16,7 +17,7 @@ import { type ChangeEvent, useRef, useState } from "react";
 import { FilterControls } from "@/components/filter-controls";
 import { exportJSON, fromModel, importJSON } from "@/lib/dsl/serialize";
 import { LEVEL_LABEL, LEVELS } from "@/lib/eventstorming/levels";
-import { clearSaved } from "@/lib/store/persistence";
+import { clearSaved, clearSnapshots } from "@/lib/store/persistence";
 import { useESStore } from "@/lib/store/store";
 
 export function Toolbar() {
@@ -41,6 +42,9 @@ export function Toolbar() {
   const addDiscoveryItem = useESStore((s) => s.addDiscoveryItem);
   const contextMapOpen = useESStore((s) => s.contextMapOpen);
   const toggleContextMap = useESStore((s) => s.toggleContextMap);
+  const versionsOpen = useESStore((s) => s.versionsOpen);
+  const toggleVersions = useESStore((s) => s.toggleVersions);
+  const compareActive = useESStore((s) => s.compare.active);
   const fileRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +60,7 @@ export function Toolbar() {
     setError(null);
     clear();
     clearSaved();
+    clearSnapshots();
   };
 
   const onExport = () => {
@@ -158,7 +163,7 @@ export function Toolbar() {
       )}
       <div className="ml-auto flex items-center gap-2">
         {/* Search + filter target the structured board; hidden in the alternate views. */}
-        {!discoveryActive && !contextMapOpen && <FilterControls />}
+        {!discoveryActive && !contextMapOpen && !compareActive && <FilterControls />}
         <button
           type="button"
           className={btn}
@@ -166,6 +171,14 @@ export function Toolbar() {
           onClick={toggleContextMap}
         >
           <Network size={14} /> Context Map
+        </button>
+        <button
+          type="button"
+          className={btn}
+          aria-pressed={versionsOpen}
+          onClick={toggleVersions}
+        >
+          <History size={14} /> Versions
         </button>
         {error && (
           <span

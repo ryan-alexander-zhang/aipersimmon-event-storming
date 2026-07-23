@@ -13,7 +13,8 @@ import {
 import { nanoid } from "nanoid";
 import { create } from "zustand";
 import { createStore, type StateCreator } from "zustand/vanilla";
-import type { Context, ContextRelationship } from "@/lib/dsl/schema";
+import type { Context, ContextRelationship, Model } from "@/lib/dsl/schema";
+import { fromModel, toModel } from "@/lib/dsl/serialize";
 import {
   type ContextRelationType,
   DEFAULT_CONTEXT_RELATION,
@@ -53,6 +54,24 @@ export interface DiscoveryState {
   items: DiscoveryItem[];
 }
 
+/** A named snapshot of the model (spec-00008 FR10): a full DSL Model captured at a
+ *  point in time. Persisted outside the model DSL under its own key
+ *  (decision-00008); never part of the current model's export. */
+export interface Snapshot {
+  id: string;
+  name: string;
+  createdAt: string;
+  model: Model;
+}
+
+/** Side-by-side compare (spec-00008 FR10): which two snapshots and whether the
+ *  read-only compare view is open. View-only, never persisted. */
+export interface CompareState {
+  active: boolean;
+  leftId: string | null;
+  rightId: string | null;
+}
+
 export interface ESState {
   nodes: ESNode[];
   edges: ESEdge[];
@@ -77,6 +96,13 @@ export interface ESState {
   filter: FilterState;
   /** Context Map view visibility (spec-00004 FR5); view-only, never persisted. */
   contextMapOpen: boolean;
+  /** Named model snapshots (spec-00008 FR10); persisted under their own key,
+   *  outside the model DSL (decision-00008). */
+  snapshots: Snapshot[];
+  /** Versions panel visibility (spec-00008); view-only, never persisted. */
+  versionsOpen: boolean;
+  /** Side-by-side compare view (spec-00008 FR10); view-only, never persisted. */
+  compare: CompareState;
 
   setLevel: (level: Level) => void;
   toggleIsolate: () => void;
@@ -158,6 +184,24 @@ export interface ESState {
   /** Move a node into another bounded context. */
   reassignContext: (nodeId: string, context: string) => void;
 
+  /** Capture the current model as a named snapshot; returns its id. Reads state
+   *  only — the live model is not mutated. */
+  captureSnapshot: (name: string) => string;
+  /** Rename a snapshot. */
+  renameSnapshot: (id: string, name: string) => void;
+  /** Delete a snapshot; also clears it from the compare selection. */
+  deleteSnapshot: (id: string) => void;
+  /** Replace the live model with a copy of a snapshot's model (confirm in the UI). */
+  restoreSnapshot: (id: string) => void;
+  /** Toggle the Versions panel. */
+  toggleVersions: () => void;
+  /** Choose the snapshot shown on one side of the compare view. */
+  setCompareSide: (side: "left" | "right", id: string) => void;
+  /** Open the compare view (no-op unless both sides are chosen). */
+  openCompare: () => void;
+  /** Close the compare view. */
+  closeCompare: () => void;
+
   setSelected: (id: string | null) => void;
   setHovered: (id: string | null) => void;
   setHoveredEdge: (id: string | null) => void;
@@ -193,6 +237,9 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   discovery: { active: false, items: [] },
   filter: EMPTY_FILTER,
   contextMapOpen: false,
+  snapshots: [],
+  versionsOpen: false,
+  compare: { active: false, leftId: null, rightId: null },
 
   setLevel: (level) =>
     set({
@@ -424,6 +471,44 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   reassignContext: (nodeId, context) =>
     get().updateNodeData(nodeId, { context: context || undefined }),
 
+  captureSnapshot: (name) => {
+    const id = nanoid();
+    const model = toModel(get().nodes, get().edges, get().contexts, {
+      name: "Event Storming",
+      createdAt: new Date().toISOString(),
+      level: get().level,
+    }, get().contextRelationships);
+    set({ snapshots: [...get().snapshots, { id, name, createdAt: model.meta.createdAt, model }] });
+    return id;
+  },
+  renameSnapshot: (id, name) =>
+    set({ snapshots: get().snapshots.map((s) => (s.id === id ? { ...s, name } : s)) }),
+  deleteSnapshot: (id) => {
+    const compare = get().compare;
+    const leftId = compare.leftId === id ? null : compare.leftId;
+    const rightId = compare.rightId === id ? null : compare.rightId;
+    set({
+      snapshots: get().snapshots.filter((s) => s.id !== id),
+      compare: {
+        leftId,
+        rightId,
+        active: compare.active && leftId !== null && rightId !== null,
+      },
+    });
+  },
+  restoreSnapshot: (id) => {
+    const snap = get().snapshots.find((s) => s.id === id);
+    if (snap) get().setModel(fromModel(snap.model));
+  },
+  toggleVersions: () => set({ versionsOpen: !get().versionsOpen }),
+  setCompareSide: (side, id) =>
+    set({ compare: { ...get().compare, [side === "left" ? "leftId" : "rightId"]: id } }),
+  openCompare: () => {
+    const { leftId, rightId } = get().compare;
+    if (leftId && rightId) set({ compare: { ...get().compare, active: true } });
+  },
+  closeCompare: () => set({ compare: { ...get().compare, active: false } }),
+
   setSelected: (id) => set({ selectedId: id }),
   setHovered: (id) => set({ hoveredId: id }),
   setHoveredEdge: (id) => set({ hoveredEdgeId: id }),
@@ -442,6 +527,10 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       discovery: { active: false, items: [] },
       filter: { query: "", types: new Set(), contexts: new Set() },
       contextMapOpen: false,
+      // Snapshots are model-scoped but survive a model swap (import/restore); only
+      // the compare/versions view flags reset here (decision-00008).
+      versionsOpen: false,
+      compare: { active: false, leftId: null, rightId: null },
     }),
   clear: () =>
     set({
@@ -457,6 +546,10 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       discovery: { active: false, items: [] },
       filter: { query: "", types: new Set(), contexts: new Set() },
       contextMapOpen: false,
+      // "New model" discards the model and its snapshots (decision-00008).
+      snapshots: [],
+      versionsOpen: false,
+      compare: { active: false, leftId: null, rightId: null },
     }),
 });
 

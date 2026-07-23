@@ -17,8 +17,10 @@ import {
 } from "@xyflow/react";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BoardChrome } from "@/components/board-chrome";
+import { CompareDiffView } from "@/components/compare-diff-view";
 import { ContextMapCanvas } from "@/components/context-map-canvas";
 import { DiscoveryCanvas } from "@/components/discovery-canvas";
+import { VersionsPanel } from "@/components/versions-panel";
 import { RelationEdge } from "@/components/edges/relation-edge";
 import { HealthPanel } from "@/components/health-panel";
 import { Walkthrough } from "@/components/walkthrough";
@@ -33,7 +35,14 @@ import { computeEdgeOffsets } from "@/lib/layout/edge-spread";
 import { COL_W, NODE_W } from "@/lib/layout/layout";
 import { isShownByFilter, matchesQuery } from "@/lib/store/filter";
 import { computeFocus, computeNeighborhood, focusSource } from "@/lib/store/focus";
-import { loadDiscovery, loadModel, saveDiscovery, saveModel } from "@/lib/store/persistence";
+import {
+  loadDiscovery,
+  loadModel,
+  loadSnapshots,
+  saveDiscovery,
+  saveModel,
+  saveSnapshots,
+} from "@/lib/store/persistence";
 import { useESStore } from "@/lib/store/store";
 import { dropOrder, dropTarget, slotOrders } from "@/lib/store/timeline";
 import type { ESEdge, ESNode } from "@/lib/store/types";
@@ -143,12 +152,17 @@ function useAutosave() {
     if (wall.length > 0) {
       useESStore.setState({ discovery: { active: false, items: wall } });
     }
+    const snaps = loadSnapshots();
+    if (snaps.length > 0) {
+      useESStore.setState({ snapshots: snaps });
+    }
     let timer: ReturnType<typeof setTimeout>;
     const unsubscribe = useESStore.subscribe((s) => {
       clearTimeout(timer);
       timer = setTimeout(() => {
         saveModel(s.nodes, s.edges, s.contexts, s.level, s.contextRelationships);
         saveDiscovery(s.discovery.items);
+        saveSnapshots(s.snapshots);
       }, 400);
     });
     return () => {
@@ -176,6 +190,8 @@ function Canvas() {
   const walkActive = useESStore((s) => s.walk.active);
   const discoveryActive = useESStore((s) => s.discovery.active);
   const contextMapOpen = useESStore((s) => s.contextMapOpen);
+  const compareActive = useESStore((s) => s.compare.active);
+  const versionsOpen = useESStore((s) => s.versionsOpen);
   const filter = useESStore((s) => s.filter);
   const setEventOrder = useESStore((s) => s.setEventOrder);
   const zoom = useStore((s) => s.transform[2]);
@@ -414,16 +430,18 @@ function Canvas() {
     [nodes],
   );
 
-  // The structured timeline board (and its chrome/panels) shows only when neither
-  // alternate view — Discovery or Context Map — is open.
-  const boardView = !discoveryActive && !contextMapOpen;
+  // The structured timeline board (and its chrome/panels) shows only when no
+  // alternate view — Discovery, Context Map, or Compare — is open.
+  const boardView = !discoveryActive && !contextMapOpen && !compareActive;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Toolbar />
       <div className="flex min-h-0 flex-1">
         <div className="relative flex-1">
-          {contextMapOpen ? (
+          {compareActive ? (
+            <CompareDiffView />
+          ) : contextMapOpen ? (
             <ContextMapCanvas />
           ) : discoveryActive ? (
             <DiscoveryCanvas />
@@ -468,6 +486,7 @@ function Canvas() {
           {boardView && <BoardChrome />}
           {boardView && drop && <TimelineDropIndicator drop={drop} />}
           {boardView && healthOpen && <HealthPanel />}
+          {boardView && versionsOpen && <VersionsPanel />}
           {boardView && walkActive && <Walkthrough />}
         </div>
         {boardView && <PropertyPanel />}

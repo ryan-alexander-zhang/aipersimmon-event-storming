@@ -21,7 +21,7 @@ import { ELEMENT_DEFINITIONS, type ElementType } from "@/lib/eventstorming/eleme
 import { useESStore } from "@/lib/store/store";
 import type { ESNode } from "@/lib/store/types";
 
-const ICONS: Record<ElementType, LucideIcon> = {
+export const ICONS: Record<ElementType, LucideIcon> = {
   domainEvent: Zap,
   command: Terminal,
   actor: User,
@@ -34,7 +34,7 @@ const ICONS: Record<ElementType, LucideIcon> = {
   opportunity: Lightbulb,
 };
 
-const HANDLE_STYLE = {
+export const HANDLE_STYLE = {
   width: 7,
   height: 7,
   background: "#94a3b8",
@@ -42,7 +42,7 @@ const HANDLE_STYLE = {
   opacity: 0.5,
 } as const;
 
-const HANDLES = [
+export const HANDLES = [
   { id: "s-top", type: "source", position: Position.Top },
   { id: "t-top", type: "target", position: Position.Top },
   { id: "s-bottom", type: "source", position: Position.Bottom },

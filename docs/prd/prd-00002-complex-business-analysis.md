@@ -136,10 +136,13 @@ stories.
 
 - **Discovery ↔ structured-board boundary** (FR1): the converge hand-off is the
   hard part; positions must not leak into the persisted model. See decision-00004.
-- **DSL evolution**: FR3/FR4/FR5/FR10 extend the schema (Opportunity, subdomain,
-  context relationships, snapshots) — must version and migrate
+- **DSL evolution**: FR3/FR4/FR5 extend the schema (Opportunity, subdomain,
+  context relationships) — must version and migrate
   (`web/lib/dsl/schema.ts`, `web/lib/dsl/migrate.ts`). (FR8 nesting was dropped —
-  decision-00006 — so FR7/spec-00006 needs no schema change.)
+  decision-00006 — so FR7/spec-00006 needs no schema change. FR10 snapshots were
+  moved *out* of the DSL — [decision-00008](../decision/decision-00008-snapshots-outside-dsl.md):
+  they persist under their own local key and each is a versioned/migrated `Model`,
+  so FR10 needs no schema change either.)
 - **CONTEXT.md**: new canonical terms (Opportunity, Subdomain, Context Relationship,
   Context Map, Discovery Mode, Walkthrough, Snapshot, Model Health / Smell) are
   introduced here and must be defined in `CONTEXT.md` at spec time, not before.

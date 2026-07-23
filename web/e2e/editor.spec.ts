@@ -718,6 +718,214 @@ test("Context Map renders contexts + a typed relationship; edits and deletes it;
   expect(after.contexts).toEqual(before.contexts);
 });
 
+test("captures a named snapshot, keeps it out of the export, and restores it [us-00021-AC-1.1/2.1/5.1, spec-00008-XAC-1.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addContext(page);
+  await addLabeledEvent(page, "Order Placed");
+  await expect(nodes(page, "domainEvent")).toHaveCount(1);
+
+  // capture the current model as "as-is" (us-00021-AC-1.1/2.1)
+  await page.getByRole("button", { name: "Versions", exact: true }).click();
+  page.once("dialog", (d) => d.accept("as-is"));
+  await page.getByRole("button", { name: "Capture snapshot" }).click();
+  await expect(page.getByTestId("snapshot-row")).toHaveCount(1);
+  await expect(page.getByTestId("snapshot-row")).toContainText("as-is");
+  // the row also shows the creation time (us-00021-AC-2.1)
+  await expect(page.getByTestId("snapshot-time")).toHaveText(/\d/);
+  await page.getByRole("button", { name: "Versions", exact: true }).click(); // close the panel
+
+  // the snapshot never appears in the model's export (spec-00008-XAC-1.1)
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Export" }).click(),
+  ]);
+  const exported = JSON.parse(readFileSync(await download.path(), "utf8"));
+  expect(exported.snapshots).toBeUndefined();
+
+  // diverge the model, then restore the snapshot (us-00021-AC-5.1)
+  await page.locator(".react-flow__pane").click({ position: { x: 10, y: 10 } });
+  await addLabeledEvent(page, "Order Shipped");
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+
+  await page.getByRole("button", { name: "Versions", exact: true }).click();
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Restore as-is" }).click();
+  await expect(nodes(page, "domainEvent")).toHaveCount(1);
+  await expect(nodes(page, "domainEvent")).toContainText("Order Placed");
+});
+
+test("compare shows a unified diff — added, removed, summary, read-only, unchanged board [us-00023-AC-1.1/2.1/4.1/5.1/6.1/7.1, spec-00008-XAC-3.1]", async ({
+  page,
+}) => {
+  const exportNow = async () => {
+    const [d] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Export" }).click(),
+    ]);
+    return JSON.parse(readFileSync(await d.path(), "utf8"));
+  };
+
+  await page.goto("/");
+  await addContext(page);
+  await addLabeledEvent(page, "Order Placed");
+
+  await page.getByRole("button", { name: "Versions", exact: true }).click();
+  page.once("dialog", (d) => d.accept("as-is"));
+  await page.getByRole("button", { name: "Capture snapshot" }).click();
+  await expect(page.getByTestId("snapshot-row")).toHaveCount(1);
+  // Compare needs two snapshots (us-00023-AC-7.1): disabled + side pickers hidden.
+  await expect(page.getByTestId("compare-open")).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Compare left = as-is" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Versions", exact: true }).click();
+
+  await page.locator(".react-flow__pane").click({ position: { x: 10, y: 10 } });
+  await addLabeledEvent(page, "Order Shipped");
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+  const before = await exportNow();
+
+  await page.getByRole("button", { name: "Versions", exact: true }).click();
+  page.once("dialog", (d) => d.accept("to-be"));
+  await page.getByRole("button", { name: "Capture snapshot" }).click();
+  await expect(page.getByTestId("snapshot-row")).toHaveCount(2);
+
+  // base = as-is → target = to-be: one Domain Event added (us-00023-AC-1.1)
+  await page.getByRole("button", { name: "Compare left = as-is" }).click();
+  await page.getByRole("button", { name: "Compare right = to-be" }).click();
+  await page.getByTestId("compare-open").click();
+  await expect(page.getByTestId("compare-view")).toBeVisible();
+  await expect(page.getByTestId("diff-summary")).toContainText("+1 added");
+  await expect(page.getByTestId("diff-summary")).toContainText("−0 removed");
+  // the diff board is the target, so it shows both events
+  const diffEvents = page.getByTestId("diff-board").locator(".react-flow__node-domainEvent");
+  await expect(diffEvents).toHaveCount(2);
+
+  // read-only: a delivered double-click opens no editor (us-00023-AC-5.1)
+  await diffEvents.first().dblclick({ force: true });
+  await expect(page.getByTestId("diff-board").getByRole("textbox")).toHaveCount(0);
+
+  // swap the pair (base = to-be → target = as-is): now one event is removed
+  // (us-00023-AC-2.1 / AC-4.1 recompute)
+  await page.getByLabel("left snapshot").selectOption({ label: "to-be" });
+  await page.getByLabel("right snapshot").selectOption({ label: "as-is" });
+  await expect(page.getByTestId("diff-summary")).toContainText("−1 removed");
+  await expect(page.getByTestId("diff-removed")).toContainText("Order Shipped");
+
+  // close → unchanged live board (us-00023-AC-6.1, spec-00008-XAC-3.1)
+  await page.getByRole("button", { name: "Close compare" }).click();
+  await expect(page.getByTestId("compare-view")).toHaveCount(0);
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+  expect(normalize(await exportNow())).toEqual(normalize(before));
+});
+
+test("compare boards render with a non-zero height [issue-00014]", async ({ page }) => {
+  await page.goto("/");
+  await addContext(page);
+  await addLabeledEvent(page, "Order Placed");
+
+  const capture = async (name: string) => {
+    await page.getByRole("button", { name: "Versions", exact: true }).click();
+    page.once("dialog", (d) => d.accept(name));
+    await page.getByRole("button", { name: "Capture snapshot" }).click();
+    await page.getByRole("button", { name: "Versions", exact: true }).click();
+  };
+  await capture("as-is");
+  await page.locator(".react-flow__pane").click({ position: { x: 10, y: 10 } });
+  await addLabeledEvent(page, "Order Shipped");
+  await capture("to-be");
+
+  await page.getByRole("button", { name: "Versions", exact: true }).click();
+  await page.getByRole("button", { name: "Compare left = as-is" }).click();
+  await page.getByRole("button", { name: "Compare right = to-be" }).click();
+  await page.getByTestId("compare-open").click();
+  await expect(page.getByTestId("compare-view")).toBeVisible();
+
+  // The board slot must actually occupy vertical space — otherwise React Flow
+  // renders into a 0-height container and the modeller sees a blank Compare view.
+  const box = await page.getByTestId("diff-board").locator(".react-flow").boundingBox();
+  expect(box?.height ?? 0).toBeGreaterThan(200);
+});
+
+test("compare diff lays out all bands so level-hidden types don't overlap [issue-00015]", async ({
+  page,
+}) => {
+  await page.goto("/"); // Design
+  await addUngroupedEvent(page); // a Domain Event, selected
+  await slice(page, "+ Command (produces)"); // Command is hidden (collapsed) at Big Picture
+  await expect(nodes(page, "command")).toHaveCount(1);
+
+  // Capture at Big Picture, where the Command band is hidden on the live board.
+  await page.getByRole("button", { name: "Big Picture" }).click();
+  const capture = async (name: string) => {
+    await page.getByRole("button", { name: "Versions", exact: true }).click();
+    page.once("dialog", (d) => d.accept(name));
+    await page.getByRole("button", { name: "Capture snapshot" }).click();
+    await page.getByRole("button", { name: "Versions", exact: true }).click();
+  };
+  await capture("v1");
+  await capture("v2");
+
+  await page.getByRole("button", { name: "Versions", exact: true }).click();
+  await page.getByRole("button", { name: "Compare left = v1" }).click();
+  await page.getByRole("button", { name: "Compare right = v2" }).click();
+  await page.getByTestId("compare-open").click();
+  await expect(page.getByTestId("compare-view")).toBeVisible();
+
+  // The diff renders every element, so it must lay out in full bands: the Command
+  // sits in its own band above the Domain Event, not collapsed on top of it.
+  const cmd = await page.getByTestId("diff-board").locator(".react-flow__node-command").boundingBox();
+  const evt = await page
+    .getByTestId("diff-board")
+    .locator(".react-flow__node-domainEvent")
+    .boundingBox();
+  expect(cmd && evt).toBeTruthy();
+  expect(cmd!.y + cmd!.height).toBeLessThanOrEqual(evt!.y + 2); // Command fully above the event
+});
+
+test("compare diff shows what changed: struck old label, direction chip, hover detail [us-00023-AC-8.1/8.2/9.1]", async ({
+  page,
+}) => {
+  await page.goto("/"); // Design
+  await addContext(page);
+  await addLabeledEvent(page, "测试3"); // event A
+  await page.locator(".react-flow__pane").click({ position: { x: 10, y: 10 } });
+  await addLabeledEvent(page, "E2"); // event B (A before B on the timeline)
+
+  const capture = async (name: string) => {
+    await page.getByRole("button", { name: "Versions", exact: true }).click();
+    page.once("dialog", (d) => d.accept(name));
+    await page.getByRole("button", { name: "Capture snapshot" }).click();
+    await page.getByRole("button", { name: "Versions", exact: true }).click();
+  };
+  await capture("v1");
+
+  // Change A: rename it and move it later on the timeline.
+  await nodes(page, "domainEvent").filter({ hasText: "测试3" }).click();
+  await page.getByLabel("Label", { exact: true }).fill("测试3改");
+  await page.getByRole("button", { name: "Move later" }).click();
+  await capture("v2");
+
+  await page.getByRole("button", { name: "Versions", exact: true }).click();
+  await page.getByRole("button", { name: "Compare left = v1" }).click();
+  await page.getByRole("button", { name: "Compare right = v2" }).click();
+  await page.getByTestId("compare-open").click();
+  await expect(page.getByTestId("compare-view")).toBeVisible();
+
+  const changed = page
+    .getByTestId("diff-board")
+    .locator(".react-flow__node-domainEvent")
+    .filter({ hasText: "测试3改" });
+  // AC-8.1: previous label struck-through on the element
+  await expect(changed.getByTestId("diff-renamed-from")).toHaveText("测试3");
+  // AC-8.2: order shown as a direction chip, not a slot number
+  await expect(changed.getByTestId("diff-chips")).toContainText("later");
+  await expect(changed.getByTestId("diff-chips")).not.toContainText(/\d/);
+  // AC-9.1: full field-level detail on hover (native title)
+  const detail = await changed.locator("[title]").first().getAttribute("title");
+  expect(detail).toContain("label: 测试3 → 测试3改");
+});
+
 test("New clears the model and does not restore it on reload", async ({ page }) => {
   await page.goto("/");
   await addContext(page);
