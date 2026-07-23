@@ -1,14 +1,16 @@
 "use client";
 
 import { useViewport } from "@xyflow/react";
-import { Plus, X } from "lucide-react";
+import { Check, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { createPortal } from "react-dom";
 import {
   BAND_ORDER,
   type Band,
   ELEMENT_BAND,
   ELEMENT_DEFINITIONS,
 } from "@/lib/eventstorming/elements";
-import { contextTint, SUBDOMAIN_STYLE, type Subdomain } from "@/lib/eventstorming/context-color";
+import { contextTint, SUBDOMAIN_STYLE } from "@/lib/eventstorming/context-color";
 import { LEVEL_TYPES } from "@/lib/eventstorming/levels";
 import { computeBandTops } from "@/lib/layout/layout";
 import { useESStore } from "@/lib/store/store";
@@ -50,13 +52,26 @@ export function BoardChrome() {
   const setContextClassification = useESStore((s) => s.setContextClassification);
   const removeContext = useESStore((s) => s.removeContext);
   const setSelected = useESStore((s) => s.setSelected);
+  const focusedContext = useESStore((s) => s.focusedContext);
+  const setFocusedContext = useESStore((s) => s.setFocusedContext);
+
+  // Progressive disclosure: the open `⋯` menu (id + the trigger's screen anchor,
+  // so the menu can portal out of the header's horizontal scroll container and
+  // not get clipped), and which chip is being renamed inline. One of each.
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const visibleBands = new Set(LEVEL_TYPES[level].map((t) => ELEMENT_BAND[t]));
 
   const bandTops = computeBandTops(nodes, edges, contexts, level);
   const nameOf = new Map(contexts.map((c) => [c.id, c.name]));
 
-  const addEvent = (ctxId?: string) => setSelected(addNode("domainEvent", ctxId));
+  const addEvent = (ctxId?: string) => {
+    setSelected(addNode("domainEvent", ctxId));
+    setMenu(null);
+  };
+
+  const menuCtx = menu ? (contexts.find((c) => c.id === menu.id) ?? null) : null;
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -79,74 +94,181 @@ export function BoardChrome() {
         );
       })}
 
-      {/* context legend — chips (colour + name + add-event + remove). On the board
-          a context is identified by the sticky tint (decision-00005), not a
-          spanning column bar; Ungrouped events get no chip (added via the palette). */}
+      {/* Context legend — one compact, fixed-height row that scales to many
+          contexts (spec-00010). A chip shows colour + name + subdomain badge; its
+          body toggles Bounded Context Focus (dim the rest). Rename / classify /
+          add-event / delete live behind the `⋯` menu (progressive disclosure). On
+          the board a context is a sticky tint, not a spanning box (decision-00005);
+          Ungrouped events get no chip. */}
       {contexts.length > 0 && (
-        <div className="pointer-events-auto absolute left-1/2 top-2 flex max-w-[80%] -translate-x-1/2 flex-wrap items-center justify-center gap-1.5">
-          {contexts
-            .slice()
-            .sort((a, b) => a.order - b.order)
-            .map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center gap-1 rounded-md border border-zinc-200 bg-white/90 px-1.5 py-1 shadow-sm backdrop-blur-sm"
-              >
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-[3px]"
-                  style={{ background: contextTint(c.id) }}
-                />
-                <input
-                  className="w-24 min-w-0 bg-transparent text-xs font-semibold text-zinc-700 outline-none focus:bg-white/60"
-                  value={nameOf.get(c.id) ?? c.name}
-                  onChange={(e) => renameContext(c.id, e.target.value)}
-                  aria-label="Context name"
-                />
-                {/* Subdomain classification (spec-00004 FR4): a badge-coloured
-                    selector; empty = unclassified. */}
-                <select
-                  className="rounded border px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide outline-none"
-                  aria-label="Classification"
-                  data-classification={c.classification ?? ""}
-                  value={c.classification ?? ""}
-                  onChange={(e) =>
-                    setContextClassification(c.id, (e.target.value || undefined) as Subdomain | undefined)
-                  }
-                  style={
-                    c.classification
-                      ? {
-                          borderColor: SUBDOMAIN_STYLE[c.classification].color,
-                          color: SUBDOMAIN_STYLE[c.classification].color,
-                        }
-                      : { borderColor: "#d4d4d8", color: "#a1a1aa" }
-                  }
-                >
-                  <option value="">—</option>
-                  <option value="core">Core</option>
-                  <option value="supporting">Supporting</option>
-                  <option value="generic">Generic</option>
-                </select>
+        <>
+          <div
+            data-testid="context-legend"
+            className="pointer-events-auto absolute left-1/2 top-2 z-50 flex max-w-[72%] -translate-x-1/2 items-center gap-1.5 overflow-x-auto rounded-lg p-1"
+          >
+            {contexts
+              .slice()
+              .sort((a, b) => a.order - b.order)
+              .map((c) => {
+                const tint = contextTint(c.id);
+                const focused = focusedContext === c.id;
+                const badge = c.classification ? SUBDOMAIN_STYLE[c.classification] : null;
+                return (
+                  <div key={c.id} className="relative shrink-0">
+                    <div
+                      className="flex items-center gap-1 rounded-md border border-zinc-200 bg-white/90 px-1.5 py-1 shadow-sm backdrop-blur-sm"
+                      style={
+                        focused ? { borderColor: tint, boxShadow: `0 0 0 2px ${tint}66` } : undefined
+                      }
+                    >
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-[3px]"
+                        style={{ background: tint }}
+                      />
+                      {editingId === c.id ? (
+                        <input
+                          autoFocus
+                          className="w-24 min-w-0 bg-white/60 text-xs font-semibold text-zinc-700 outline-none"
+                          defaultValue={nameOf.get(c.id) ?? c.name}
+                          aria-label="Context name"
+                          onBlur={(e) => {
+                            renameContext(c.id, e.target.value.trim() || c.name);
+                            setEditingId(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur();
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          className="max-w-[128px] truncate text-xs font-semibold text-zinc-700 outline-none hover:text-zinc-900"
+                          onClick={() => setFocusedContext(c.id)}
+                          onDoubleClick={() => setEditingId(c.id)}
+                          title="Click to focus this context · double-click to rename"
+                        >
+                          {nameOf.get(c.id) ?? c.name}
+                        </button>
+                      )}
+                      {badge && (
+                        <span
+                          className="shrink-0 rounded border px-1 text-[9px] font-semibold uppercase tracking-wide"
+                          style={{ color: badge.color, borderColor: badge.color }}
+                        >
+                          {badge.label}
+                        </span>
+                      )}
+                      {/* Primary action stays one-click and visible: adding a
+                          Domain Event is the only per-context creation entry. */}
+                      <button
+                        type="button"
+                        className="flex shrink-0 items-center rounded p-0.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
+                        onClick={() => addEvent(c.id)}
+                        aria-label="Add Event"
+                        title="Add a Domain Event to this context"
+                      >
+                        <Plus size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="flex shrink-0 items-center rounded p-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+                        onClick={(e) => {
+                          if (menu?.id === c.id) {
+                            setMenu(null);
+                            return;
+                          }
+                          const r = e.currentTarget.getBoundingClientRect();
+                          setMenu({ id: c.id, x: r.left, y: r.bottom });
+                        }}
+                        aria-label="Context options"
+                        aria-haspopup="menu"
+                        aria-expanded={menu?.id === c.id}
+                      >
+                        <MoreHorizontal size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+          {menuCtx &&
+            menu &&
+            createPortal(
+              <>
+                {/* click-away layer */}
                 <button
                   type="button"
-                  className="flex items-center gap-1 rounded border border-zinc-300 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 hover:bg-zinc-100"
-                  onClick={() => addEvent(c.id)}
-                  title="Add a Domain Event to this context"
+                  aria-hidden
+                  tabIndex={-1}
+                  className="fixed inset-0 z-[60] cursor-default"
+                  onClick={() => setMenu(null)}
+                />
+                {/* menu — fixed, anchored under the trigger, portalled to escape
+                    the header's scroll container (issue: overflow-x clips it) */}
+                <div
+                  role="menu"
+                  className="fixed z-[61] w-44 rounded-md border border-zinc-200 bg-white p-1 text-xs shadow-lg"
+                  style={{
+                    left: Math.min(menu.x, window.innerWidth - 184),
+                    top: menu.y + 4,
+                  }}
                 >
-                  <Plus size={11} /> Event
-                </button>
-                <button
-                  type="button"
-                  className="flex items-center rounded p-0.5 text-zinc-400 hover:bg-red-50 hover:text-red-600"
-                  onClick={() => removeContext(c.id)}
-                  title="Remove context"
-                  aria-label="Remove context"
-                >
-                  <X size={13} />
-                </button>
-              </div>
-            ))}
-        </div>
+                  <button
+                    type="button"
+                    className={MENU_ITEM}
+                    onClick={() => {
+                      setEditingId(menuCtx.id);
+                      setMenu(null);
+                    }}
+                  >
+                    <Pencil size={13} /> Rename
+                  </button>
+                  <div className="my-1 border-t border-zinc-100" />
+                  <div className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+                    Subdomain
+                  </div>
+                  {(["core", "supporting", "generic"] as const).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      className={MENU_ITEM}
+                      onClick={() => {
+                        setContextClassification(
+                          menuCtx.id,
+                          menuCtx.classification === k ? undefined : k,
+                        );
+                        setMenu(null);
+                      }}
+                    >
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: SUBDOMAIN_STYLE[k].color }}
+                      />
+                      {SUBDOMAIN_STYLE[k].label}
+                      {menuCtx.classification === k && <Check size={13} className="ml-auto" />}
+                    </button>
+                  ))}
+                  <div className="my-1 border-t border-zinc-100" />
+                  <button
+                    type="button"
+                    className={`${MENU_ITEM} text-red-600 hover:bg-red-50`}
+                    onClick={() => {
+                      removeContext(menuCtx.id);
+                      setMenu(null);
+                    }}
+                  >
+                    <Trash2 size={13} /> Delete context
+                  </button>
+                </div>
+              </>,
+              document.body,
+            )}
+        </>
       )}
     </div>
   );
 }
+
+const MENU_ITEM =
+  "flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-zinc-700 hover:bg-zinc-100";

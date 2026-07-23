@@ -10,7 +10,8 @@ const addContext = async (page: Page) => {
   await openFileMenu(page);
   await page.getByRole("button", { name: "Add context" }).click();
 };
-const addEvent = (page: Page) => page.getByRole("button", { name: "Event", exact: true }).first().click();
+const addEvent = (page: Page) =>
+  page.getByRole("button", { name: "Add Event", exact: true }).first().click();
 // add a Domain Event (via the context header) and label it, so tests can track it
 const addLabeledEvent = async (page: Page, label: string) => {
   await addEvent(page);
@@ -113,7 +114,7 @@ test("adds events across two contexts on one global timeline [us-00006-AC-1.1, u
   await page.goto("/");
   await addContext(page);
   await addContext(page);
-  const evBtns = page.getByRole("button", { name: "Event", exact: true });
+  const evBtns = page.getByRole("button", { name: "Add Event", exact: true });
   await evBtns.nth(0).click(); // global order 0
   await evBtns.nth(1).click(); // global order 1 (across contexts, one timeline)
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
@@ -677,11 +678,16 @@ test("classifies a Bounded Context and shows the badge; export carries it [us-00
 }) => {
   await page.goto("/");
   await addContext(page);
-  const classify = page.getByLabel("Classification");
-  await expect(classify).toHaveValue(""); // unclassified by default
+  const badge = page.getByText("Core", { exact: true });
+  await expect(badge).toHaveCount(0); // unclassified by default
 
-  await classify.selectOption("core");
-  await expect(classify).toHaveValue("core"); // badge reflects core
+  // classify via the context ⋯ menu, then the badge shows (us-00019-AC-1.1)
+  await page.getByRole("button", { name: "Context options" }).click();
+  // the menu must actually be on screen (not clipped by the header's scroll
+  // container) — a plain toBeVisible passes even when clipped, so assert viewport
+  await expect(page.getByRole("button", { name: "Core", exact: true })).toBeInViewport();
+  await page.getByRole("button", { name: "Core", exact: true }).click();
+  await expect(badge).toBeVisible();
 
   // export carries the classification (us-00019-AC-3.1)
   await openFileMenu(page);
@@ -693,9 +699,10 @@ test("classifies a Bounded Context and shows the badge; export carries it [us-00
   expect(exported.version).toBe("4.0");
   expect(exported.contexts[0].classification).toBe("core");
 
-  // clearing returns to unclassified (us-00019-AC-2.1)
-  await classify.selectOption("");
-  await expect(classify).toHaveValue("");
+  // re-selecting the same subdomain clears it (us-00019-AC-2.1)
+  await page.getByRole("button", { name: "Context options" }).click();
+  await page.getByRole("button", { name: "Core", exact: true }).click();
+  await expect(badge).toHaveCount(0);
 });
 
 test("Context Map renders contexts + a typed relationship; edits and deletes it; leaves the board intact [us-00020-AC-1.1/3.1/4.1/7.1]", async ({
@@ -965,4 +972,64 @@ test("New clears the model and does not restore it on reload", async ({ page }) 
   await page.waitForTimeout(600);
   await page.reload();
   await expect(nodes(page, "domainEvent")).toHaveCount(0);
+});
+
+// spec-00010: Bounded Context Focus + compact header
+const DIM = "0.15"; // NODE_DIM_OPACITY
+
+test("focuses a context: its slice stays vivid while other contexts dim, and clears [us-00024-AC-1.1/2.1/3.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addContext(page); // Context 1
+  await addContext(page); // Context 2
+  const addBtns = page.getByRole("button", { name: "Add Event", exact: true });
+  await addBtns.nth(0).click(); // event in Context 1 (selected on add)
+  await page.getByLabel("Label", { exact: true }).fill("Alpha");
+  await addBtns.nth(1).click(); // event in Context 2
+  await page.getByLabel("Label", { exact: true }).fill("Bravo");
+  // deselect the just-added event so selection-dimming doesn't confound the
+  // baseline — focus assertions below then isolate Bounded Context Focus.
+  await page.locator(".react-flow__pane").click({ position: { x: 20, y: 20 } });
+
+  const alpha = nodes(page, "domainEvent").filter({ hasText: "Alpha" });
+  const bravo = nodes(page, "domainEvent").filter({ hasText: "Bravo" });
+  const focus = (n: number) =>
+    page.getByRole("button", { name: `Context ${n}`, exact: true }).click();
+
+  // focus Context 1 → Alpha vivid, Bravo dimmed (AC-1.1)
+  await focus(1);
+  await expect(alpha).toHaveCSS("opacity", "1");
+  await expect(bravo).toHaveCSS("opacity", DIM);
+
+  // focus Context 2 → single-select swaps the emphasis (AC-2.1)
+  await focus(2);
+  await expect(alpha).toHaveCSS("opacity", DIM);
+  await expect(bravo).toHaveCSS("opacity", "1");
+
+  // re-clicking the focused context clears (toggle) (AC-3.1)
+  await focus(2);
+  await expect(alpha).toHaveCSS("opacity", "1");
+  await expect(bravo).toHaveCSS("opacity", "1");
+
+  // Esc also clears focus (AC-3.1)
+  await focus(1);
+  await expect(bravo).toHaveCSS("opacity", DIM);
+  await page.keyboard.press("Escape");
+  await expect(bravo).toHaveCSS("opacity", "1");
+});
+
+test("the context header stays one fixed-height row as contexts scale [us-00024-AC-5.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addContext(page);
+  const legend = page.getByTestId("context-legend");
+  const oneRow = (await legend.boundingBox())!.height;
+
+  for (let i = 0; i < 11; i++) await addContext(page); // 12 contexts total
+  await expect(page.getByRole("button", { name: /^Context \d+$/ })).toHaveCount(12);
+
+  const manyRows = (await legend.boundingBox())!.height;
+  expect(Math.abs(manyRows - oneRow)).toBeLessThan(4); // no vertical growth
 });
