@@ -3,7 +3,7 @@
 // outside this set so a large model is read one chain at a time (design-00003
 // §2/§3 Tier A). Pure — no store or React Flow dependency.
 
-import type { ESEdge } from "./types";
+import type { ESEdge, ESNode } from "./types";
 
 export interface FocusSet {
   /** true when a node is focused; false means "show everything at full opacity". */
@@ -61,6 +61,34 @@ export function computeNeighborhood(
     if (nodeIds.has(e.source) && nodeIds.has(e.target)) edgeIds.add(e.id);
   }
   return { nodeIds, edgeIds };
+}
+
+/** Bounded Context Focus (spec-00010): the same dim-others emphasis at context
+ *  granularity. `nodeIds` = the context's member nodes plus their edge neighbours
+ *  that are not in a *different* context (the slice's own/Ungrouped supporting
+ *  elements). `edgeIds` = every edge incident to a member, so a relation to
+ *  another context (a seam) is highlighted while that other context stays dimmed.
+ *  An empty context is still active — everything else dims. */
+export function computeContextFocus(
+  contextId: string | null | undefined,
+  nodes: ESNode[],
+  edges: ESEdge[],
+): FocusSet {
+  if (!contextId) return EMPTY;
+  const ctxOf = new Map(nodes.map((n) => [n.id, n.data.context]));
+  const members = new Set(nodes.filter((n) => n.data.context === contextId).map((n) => n.id));
+  const nodeIds = new Set(members);
+  const edgeIds = new Set<string>();
+  for (const e of edges) {
+    const sMember = members.has(e.source);
+    const tMember = members.has(e.target);
+    if (!sMember && !tMember) continue;
+    edgeIds.add(e.id);
+    const neighbour = sMember ? e.target : e.source;
+    const nctx = ctxOf.get(neighbour);
+    if (nctx === undefined || nctx === contextId) nodeIds.add(neighbour);
+  }
+  return { active: true, nodeIds, edgeIds };
 }
 
 /** The focused node plus its direct neighbours, and the edges incident to it. */

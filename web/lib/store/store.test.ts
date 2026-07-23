@@ -644,6 +644,67 @@ describe("discovery mode [spec-00002]", () => {
   });
 });
 
+describe("bounded context focus [spec-00010]", () => {
+  it("focuses a context and toggles it off when re-selected [us-00024-FR-1/FR-2]", () => {
+    const a = get().addContext("A");
+    const b = get().addContext("B");
+    get().setFocusedContext(a);
+    expect(get().focusedContext).toBe(a);
+    // single-select: focusing another replaces
+    get().setFocusedContext(b);
+    expect(get().focusedContext).toBe(b);
+    // re-selecting the focused one clears (toggle)
+    get().setFocusedContext(b);
+    expect(get().focusedContext).toBe(null);
+  });
+
+  it("clears focus when passed null [us-00024-FR-3]", () => {
+    const a = get().addContext("A");
+    get().setFocusedContext(a);
+    get().setFocusedContext(null);
+    expect(get().focusedContext).toBe(null);
+  });
+
+  it("clears focus when the focused context is removed", () => {
+    const a = get().addContext("A");
+    get().setFocusedContext(a);
+    get().removeContext(a);
+    expect(get().focusedContext).toBe(null);
+  });
+
+  it("keeps focus when a different context is removed", () => {
+    const a = get().addContext("A");
+    const b = get().addContext("B");
+    get().setFocusedContext(a);
+    get().removeContext(b);
+    expect(get().focusedContext).toBe(a);
+  });
+
+  it("resets focus on setModel and clear", () => {
+    const a = get().addContext("A");
+    get().setFocusedContext(a);
+    get().setModel({ nodes: [], edges: [], contexts: [] });
+    expect(get().focusedContext).toBe(null);
+    const b = get().addContext("B");
+    get().setFocusedContext(b);
+    get().clear();
+    expect(get().focusedContext).toBe(null);
+  });
+
+  it("focus is view-only — never written to the exported DSL [spec-00010-XAC-1.1]", () => {
+    const a = get().addContext("A");
+    get().addNode("domainEvent", a);
+    get().setFocusedContext(a);
+    const json = exportJSON(get().nodes, get().edges, get().contexts, {
+      name: "t",
+      createdAt: "t",
+      level: "design",
+    });
+    expect(json).not.toContain("focusedContext");
+    expect(json).not.toContain("focused");
+  });
+});
+
 describe("search + filter view state [spec-00006]", () => {
   it("sets the search query without touching the model [us-00018-FR-1]", () => {
     get().addNode("domainEvent");

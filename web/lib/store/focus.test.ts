@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { computeFocus, computeNeighborhood, focusSource } from "./focus";
-import type { ESEdge } from "./types";
+import { computeContextFocus, computeFocus, computeNeighborhood, focusSource } from "./focus";
+import type { ESEdge, ESNode } from "./types";
 
 const edge = (id: string, source: string, target: string): ESEdge => ({
   id,
   source,
   target,
   data: { relation: "emits" },
+});
+
+const node = (id: string, context?: string): ESNode => ({
+  id,
+  type: "domainEvent",
+  position: { x: 0, y: 0 },
+  data: { label: id, context },
 });
 
 // a -> b -> c, plus an unrelated d -> e
@@ -41,6 +48,49 @@ describe("computeFocus (RA2)", () => {
     const f = computeFocus("lonely", edges);
     expect(f.active).toBe(true);
     expect([...f.nodeIds]).toEqual(["lonely"]);
+    expect(f.edgeIds.size).toBe(0);
+  });
+});
+
+describe("computeContextFocus (spec-00010)", () => {
+  it("is inactive/empty when no context is given", () => {
+    for (const id of [null, undefined, ""]) {
+      const f = computeContextFocus(id, [node("a", "A")], []);
+      expect(f.active).toBe(false);
+      expect(f.nodeIds.size).toBe(0);
+      expect(f.edgeIds.size).toBe(0);
+    }
+  });
+
+  it("includes the context's members even with no edges", () => {
+    const nodes = [node("a1", "A"), node("a2", "A"), node("b1", "B")];
+    const f = computeContextFocus("A", nodes, []);
+    expect(f.active).toBe(true);
+    expect([...f.nodeIds].sort()).toEqual(["a1", "a2"]);
+    expect(f.edgeIds.size).toBe(0);
+  });
+
+  it("pulls in an Ungrouped supporting element and its edge", () => {
+    // cmd (Ungrouped) -> a1 (context A)
+    const nodes = [node("a1", "A"), node("cmd")];
+    const f = computeContextFocus("A", nodes, [edge("e1", "cmd", "a1")]);
+    expect([...f.nodeIds].sort()).toEqual(["a1", "cmd"]);
+    expect([...f.edgeIds]).toEqual(["e1"]);
+  });
+
+  it("keeps a cross-context seam edge on but leaves the other context's node dimmed", () => {
+    // a1 (A) -> b1 (B): seam edge is in the set, b1 is not
+    const nodes = [node("a1", "A"), node("b1", "B")];
+    const f = computeContextFocus("A", nodes, [edge("seam", "a1", "b1")]);
+    expect([...f.nodeIds]).toEqual(["a1"]);
+    expect([...f.edgeIds]).toEqual(["seam"]);
+    expect(f.nodeIds.has("b1")).toBe(false);
+  });
+
+  it("is active with empty sets for a context that has no members", () => {
+    const f = computeContextFocus("Z", [node("a1", "A")], []);
+    expect(f.active).toBe(true);
+    expect(f.nodeIds.size).toBe(0);
     expect(f.edgeIds.size).toBe(0);
   });
 });

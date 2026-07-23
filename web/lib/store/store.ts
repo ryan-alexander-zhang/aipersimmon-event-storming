@@ -82,6 +82,9 @@ export interface ESState {
   selectedId: string | null;
   /** Transient hover target; drives the focus highlight, never persisted. */
   hoveredId: string | null;
+  /** Bounded Context Focus (spec-00010): the focused context's slice stays vivid
+   *  and the rest dims. View-only, never persisted. */
+  focusedContext: string | null;
   /** Transient hovered edge; drives edge-hover isolation, never persisted. */
   hoveredEdgeId: string | null;
   /** Isolate/focus mode; view-only, never persisted. */
@@ -205,6 +208,9 @@ export interface ESState {
   setSelected: (id: string | null) => void;
   setHovered: (id: string | null) => void;
   setHoveredEdge: (id: string | null) => void;
+  /** Focus a Bounded Context (single-select); passing the current id or null
+   *  clears focus. */
+  setFocusedContext: (id: string | null) => void;
   setModel: (model: {
     nodes: ESNode[];
     edges: ESEdge[];
@@ -230,6 +236,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   level: "design",
   selectedId: null,
   hoveredId: null,
+  focusedContext: null,
   hoveredEdgeId: null,
   isolate: { active: false, direction: "down", depth: 2 },
   healthOpen: false,
@@ -375,6 +382,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       contexts,
       contextRelationships,
       selectedId: null,
+      focusedContext: get().focusedContext === id ? null : get().focusedContext,
     });
   },
 
@@ -513,6 +521,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   setSelected: (id) => set({ selectedId: id }),
   setHovered: (id) => set({ hoveredId: id }),
   setHoveredEdge: (id) => set({ hoveredEdgeId: id }),
+  setFocusedContext: (id) => set({ focusedContext: id === get().focusedContext ? null : id }),
   setModel: ({ nodes, edges, contexts, contextRelationships, level }) =>
     set({
       nodes: laidOut(nodes, edges, contexts, level ?? get().level),
@@ -522,6 +531,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       level: level ?? get().level,
       selectedId: null,
       hoveredId: null,
+      focusedContext: null,
       hoveredEdgeId: null,
       isolate: { ...get().isolate, active: false },
       walk: { active: false, index: 0 },
@@ -541,6 +551,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       contextRelationships: [],
       selectedId: null,
       hoveredId: null,
+      focusedContext: null,
       hoveredEdgeId: null,
       isolate: { ...get().isolate, active: false },
       walk: { active: false, index: 0 },
