@@ -183,6 +183,9 @@ function Canvas() {
   const setHovered = useESStore((s) => s.setHovered);
   const setHoveredEdge = useESStore((s) => s.setHoveredEdge);
   const hoveredEdgeId = useESStore((s) => s.hoveredEdgeId);
+  const setSelectedEdge = useESStore((s) => s.setSelectedEdge);
+  const selectedEdgeId = useESStore((s) => s.selectedEdgeId);
+  const removeEdge = useESStore((s) => s.removeEdge);
   const selectedId = useESStore((s) => s.selectedId);
   const hoveredId = useESStore((s) => s.hoveredId);
   const focusedContext = useESStore((s) => s.focusedContext);
@@ -289,10 +292,13 @@ function Canvas() {
 
   // Edge-hover tracing works on any edge in the neutral state, but inside a
   // committed scope (focused Bounded Context / selected element) only on edges
-  // within that scope — hovering an out-of-scope line does nothing.
+  // within that scope — hovering an out-of-scope line does nothing. A clicked
+  // (selected) edge gets the same emphasis but sticks when the pointer leaves;
+  // a live hover on another edge still previews on top (us-00025-FR-3).
   const committed = !!(focusedContext || selectedId);
+  const candidateEdgeId = hoveredEdgeId ?? selectedEdgeId;
   const activeHoveredEdgeId =
-    hoveredEdgeId && (!committed || focus.edgeIds.has(hoveredEdgeId)) ? hoveredEdgeId : null;
+    candidateEdgeId && (!committed || focus.edgeIds.has(candidateEdgeId)) ? candidateEdgeId : null;
 
   // Attach handle anchors per edge from current node positions, so the vertical
   // slice chain draws top↔bottom and timeline links left↔right.
@@ -438,6 +444,22 @@ function Canvas() {
     return () => clearTimeout(t);
   }, [isoKey, fitView]);
 
+  // Delete / Backspace removes the selected relation edge (us-00025-FR-4). Scoped
+  // to edges only — nodes are removed from the Property Panel, so a stray keypress
+  // never deletes a node. Ignored while typing in a field.
+  useEffect(() => {
+    if (!selectedEdgeId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      e.preventDefault();
+      removeEdge(selectedEdgeId);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedEdgeId, removeEdge]);
+
   const onConnect = useCallback((c: Connection) => void connect(c), [connect]);
 
   // Manual links stay possible for cross-context/ambiguous relations; the rule
@@ -484,13 +506,21 @@ function Canvas() {
             onNodeDragStart={onNodeDragStart}
             onNodeDrag={onNodeDrag}
             onNodeDragStop={onNodeDragStop}
-            onNodeClick={(_, n) => setSelected(n.id)}
+            onNodeClick={(_, n) => {
+              setSelected(n.id);
+              setSelectedEdge(null);
+            }}
             onNodeMouseEnter={(_, n) => setHovered(n.id)}
             onNodeMouseLeave={() => setHovered(null)}
+            onEdgeClick={(_, e) => {
+              setSelectedEdge(e.id);
+              setSelected(null);
+            }}
             onEdgeMouseEnter={(_, e) => setHoveredEdge(e.id)}
             onEdgeMouseLeave={() => setHoveredEdge(null)}
             onPaneClick={() => {
               setSelected(null);
+              setSelectedEdge(null);
               setHovered(null);
               setFocusedContext(null);
             }}

@@ -408,6 +408,27 @@ test("hovering a relation edge reveals a delete control that removes it, keeping
   await expect(node("c1")).toHaveCount(1);
 });
 
+test("clicking a relation edge highlights it; Delete removes it, keeping endpoints [us-00025-AC-3.1/4.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await page.getByRole("button", { name: "Design" }).click(); // show every edge
+  const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
+  const node = (id: string) => page.locator(`.react-flow__node[data-id="${id}"]`);
+  const before = await edges(page).count();
+  // Click off-centre (near the top of the edge) so the hit lands on the path, not
+  // on the hover-revealed delete control that sits at the edge's mid-label.
+  const bb = (await edge("r1").boundingBox())!;
+  await page.mouse.click(bb.x + bb.width / 2, bb.y + bb.height * 0.15);
+  await expect(edge("r1")).toHaveClass(/animated/); // selected → emphasised/flows (AC-3.1)
+  await page.keyboard.press("Delete"); // AC-4.1
+  await expect(edge("r1")).toHaveCount(0);
+  await expect(edges(page)).toHaveCount(before - 1);
+  await expect(node("a1")).toHaveCount(1);
+  await expect(node("c1")).toHaveCount(1);
+});
+
 test("a manual link is drawn in the arrow direction: drag source→target creates the edge [issue-00017]", async ({
   page,
 }) => {

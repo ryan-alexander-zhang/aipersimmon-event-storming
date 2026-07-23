@@ -87,6 +87,9 @@ export interface ESState {
   focusedContext: string | null;
   /** Transient hovered edge; drives edge-hover isolation, never persisted. */
   hoveredEdgeId: string | null;
+  /** Clicked (selected) edge; a sticky highlight and the Delete-key target
+   *  (us-00025-FR-3/FR-4). View-only, never persisted. */
+  selectedEdgeId: string | null;
   /** Isolate/focus mode; view-only, never persisted. */
   isolate: IsolateState;
   /** Model-health panel visibility (spec-00007); view-only, never persisted. */
@@ -210,6 +213,8 @@ export interface ESState {
   setSelected: (id: string | null) => void;
   setHovered: (id: string | null) => void;
   setHoveredEdge: (id: string | null) => void;
+  /** Select (highlight) an edge, or clear with null (us-00025-FR-3). */
+  setSelectedEdge: (id: string | null) => void;
   /** Focus a Bounded Context (single-select); passing the current id or null
    *  clears focus. */
   setFocusedContext: (id: string | null) => void;
@@ -240,6 +245,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   hoveredId: null,
   focusedContext: null,
   hoveredEdgeId: null,
+  selectedEdgeId: null,
   isolate: { active: false, direction: "down", depth: 2 },
   healthOpen: false,
   walk: { active: false, index: 0 },
@@ -451,7 +457,11 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     return true;
   },
 
-  removeEdge: (id) => set({ edges: get().edges.filter((e) => e.id !== id) }),
+  removeEdge: (id) =>
+    set({
+      edges: get().edges.filter((e) => e.id !== id),
+      selectedEdgeId: get().selectedEdgeId === id ? null : get().selectedEdgeId,
+    }),
 
   setEventOrder: (eventId, order) => {
     const ev = get().nodes.find((n) => n.id === eventId);
@@ -525,6 +535,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   setSelected: (id) => set({ selectedId: id }),
   setHovered: (id) => set({ hoveredId: id }),
   setHoveredEdge: (id) => set({ hoveredEdgeId: id }),
+  setSelectedEdge: (id) => set({ selectedEdgeId: id }),
   setFocusedContext: (id) => set({ focusedContext: id === get().focusedContext ? null : id }),
   setModel: ({ nodes, edges, contexts, contextRelationships, level }) =>
     set({
@@ -537,6 +548,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       hoveredId: null,
       focusedContext: null,
       hoveredEdgeId: null,
+      selectedEdgeId: null,
       isolate: { ...get().isolate, active: false },
       walk: { active: false, index: 0 },
       discovery: { active: false, items: [] },
@@ -557,6 +569,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       hoveredId: null,
       focusedContext: null,
       hoveredEdgeId: null,
+      selectedEdgeId: null,
       isolate: { ...get().isolate, active: false },
       walk: { active: false, index: 0 },
       discovery: { active: false, items: [] },

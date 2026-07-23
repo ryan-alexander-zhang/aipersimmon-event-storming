@@ -419,6 +419,19 @@ describe("store v2 (RT3)", () => {
     expect(node(a)).toBeDefined();
     expect(node(c)).toBeDefined();
   });
+
+  it("selects an edge and drops the selection when that edge is removed [us-00025-AC-3.1/4.1]", () => {
+    const ctx = get().addContext("c");
+    const a = get().addNode("actor", ctx);
+    const c = get().addNode("command", ctx);
+    get().connect({ source: a, target: c, sourceHandle: null, targetHandle: null });
+    const edgeId = get().edges[0].id;
+    get().setSelectedEdge(edgeId);
+    expect(get().selectedEdgeId).toBe(edgeId);
+    get().removeEdge(edgeId);
+    expect(get().edges).toHaveLength(0);
+    expect(get().selectedEdgeId).toBeNull();
+  });
 });
 
 describe("timeline editing [us-00010]", () => {

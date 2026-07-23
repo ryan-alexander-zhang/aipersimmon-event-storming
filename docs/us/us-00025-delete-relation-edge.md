@@ -26,6 +26,12 @@ so that I can correct a wrong relation without losing the elements it connected.
   in place.
 - **us-00025-FR-2** (Event) When the Modeler hovers a relation edge, the system shall
   reveal an inline delete control on that edge, so removal is discoverable in place.
+- **us-00025-FR-3** (Event) When the Modeler clicks a relation edge, the system shall
+  select it and highlight it, keeping the highlight until another element is
+  selected or the pane is clicked.
+- **us-00025-FR-4** (Event) When the Modeler presses Delete or Backspace while a
+  relation edge is selected (and not editing text), the system shall remove the
+  selected edge and leave its endpoint elements in place.
 
 ## Acceptance (GWT)
 
@@ -38,6 +44,15 @@ so that I can correct a wrong relation without losing the elements it connected.
   Given a relation edge on the board
   When the Modeler hovers over it
   Then an inline delete control appears on the edge
+- **us-00025-AC-3.1** (us-00025-FR-3)
+  Given a relation edge on the board
+  When the Modeler clicks it
+  Then the edge is highlighted and stays highlighted
+- **us-00025-AC-4.1** (us-00025-FR-4)
+  Given a relation edge is selected
+  When the Modeler presses Delete
+  Then no edge remains between the two elements
+  And both elements are still on the board
 
 ## Links
 
