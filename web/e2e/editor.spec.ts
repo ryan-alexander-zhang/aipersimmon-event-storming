@@ -4,7 +4,12 @@ import { expect, type Page, test } from "@playwright/test";
 
 const fixture = (name: string) => path.join(__dirname, "fixtures", name);
 
-const addContext = (page: Page) => page.getByRole("button", { name: "Add context" }).click();
+// File-scoped actions (New / Add context / Import / Export) now live in the File menu.
+const openFileMenu = (page: Page) => page.getByRole("button", { name: "File" }).click();
+const addContext = async (page: Page) => {
+  await openFileMenu(page);
+  await page.getByRole("button", { name: "Add context" }).click();
+};
 const addEvent = (page: Page) => page.getByRole("button", { name: "Event", exact: true }).first().click();
 // add a Domain Event (via the context header) and label it, so tests can track it
 const addLabeledEvent = async (page: Page, label: string) => {
@@ -251,6 +256,7 @@ test("import then export round-trips the model incl. level [us-00004-AC-3.1, us-
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
 
+  await openFileMenu(page);
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "Export" }).click(),
@@ -571,6 +577,7 @@ test("the discovery wall survives a reload and stays out of the exported DSL [us
 
   // the wall is never in the model DSL: exporting an otherwise-empty model yields
   // no nodes (us-00016-AC-5.1)
+  await openFileMenu(page);
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "Export" }).click(),
@@ -635,6 +642,7 @@ test("search and filter never change the exported model [us-00018-AC-5.1, spec-0
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
 
   const exportNow = async () => {
+    await openFileMenu(page);
     const [download] = await Promise.all([
       page.waitForEvent("download"),
       page.getByRole("button", { name: "Export" }).click(),
@@ -664,6 +672,7 @@ test("classifies a Bounded Context and shows the badge; export carries it [us-00
   await expect(classify).toHaveValue("core"); // badge reflects core
 
   // export carries the classification (us-00019-AC-3.1)
+  await openFileMenu(page);
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "Export" }).click(),
@@ -686,6 +695,7 @@ test("Context Map renders contexts + a typed relationship; edits and deletes it;
 
   // export the board before opening the map (for the unchanged check)
   const exportNow = async () => {
+    await openFileMenu(page);
     const [d] = await Promise.all([
       page.waitForEvent("download"),
       page.getByRole("button", { name: "Export" }).click(),
@@ -737,6 +747,7 @@ test("captures a named snapshot, keeps it out of the export, and restores it [us
   await page.getByRole("button", { name: "Versions", exact: true }).click(); // close the panel
 
   // the snapshot never appears in the model's export (spec-00008-XAC-1.1)
+  await openFileMenu(page);
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "Export" }).click(),
@@ -760,6 +771,7 @@ test("compare shows a unified diff — added, removed, summary, read-only, uncha
   page,
 }) => {
   const exportNow = async () => {
+    await openFileMenu(page);
     const [d] = await Promise.all([
       page.waitForEvent("download"),
       page.getByRole("button", { name: "Export" }).click(),
@@ -934,6 +946,7 @@ test("New clears the model and does not restore it on reload", async ({ page }) 
   await page.waitForTimeout(600); // let autosave persist the current model
 
   page.once("dialog", (d) => d.accept());
+  await openFileMenu(page);
   await page.getByRole("button", { name: "New" }).click();
   await expect(nodes(page, "domainEvent")).toHaveCount(0);
 

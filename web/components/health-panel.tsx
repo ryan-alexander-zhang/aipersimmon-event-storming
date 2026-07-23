@@ -32,7 +32,7 @@ export function HealthPanel() {
 
   return (
     <div
-      className="absolute left-3 top-3 z-30 flex max-h-[calc(100%-1.5rem)] w-72 flex-col rounded-lg border border-zinc-200 bg-white shadow-lg"
+      className="flex h-full w-72 shrink-0 flex-col border-l border-zinc-200 bg-white"
       data-testid="health-panel"
     >
       <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2">

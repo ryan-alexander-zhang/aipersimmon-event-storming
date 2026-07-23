@@ -23,6 +23,7 @@ import { DiscoveryCanvas } from "@/components/discovery-canvas";
 import { VersionsPanel } from "@/components/versions-panel";
 import { RelationEdge } from "@/components/edges/relation-edge";
 import { HealthPanel } from "@/components/health-panel";
+import { PanelRail } from "@/components/panel-rail";
 import { Walkthrough } from "@/components/walkthrough";
 import { ElementNode, routeHandles } from "@/components/nodes/element-node";
 import { PropertyPanel } from "@/components/property-panel";
@@ -485,11 +486,14 @@ function Canvas() {
           )}
           {boardView && <BoardChrome />}
           {boardView && drop && <TimelineDropIndicator drop={drop} />}
-          {boardView && healthOpen && <HealthPanel />}
-          {boardView && versionsOpen && <VersionsPanel />}
           {boardView && walkActive && <Walkthrough />}
         </div>
+        {/* Right region: the active docked panel (Health/Versions are mutually
+            exclusive), the always-docked Inspector, then the panel rail. */}
+        {boardView && healthOpen && <HealthPanel />}
+        {boardView && versionsOpen && <VersionsPanel />}
         {boardView && <PropertyPanel />}
+        {boardView && <PanelRail />}
       </div>
     </div>
   );

@@ -253,7 +253,8 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   toggleIsolate: () => set({ isolate: { ...get().isolate, active: !get().isolate.active } }),
   setIsolateDirection: (direction) => set({ isolate: { ...get().isolate, direction } }),
   setIsolateDepth: (depth) => set({ isolate: { ...get().isolate, depth: Math.max(1, depth) } }),
-  toggleHealth: () => set({ healthOpen: !get().healthOpen }),
+  // Health and Versions dock into the same column, so opening one closes the other.
+  toggleHealth: () => set({ healthOpen: !get().healthOpen, versionsOpen: false }),
 
   startWalkthrough: () => {
     const order = timelineOrder(get().nodes);
@@ -500,7 +501,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     const snap = get().snapshots.find((s) => s.id === id);
     if (snap) get().setModel(fromModel(snap.model));
   },
-  toggleVersions: () => set({ versionsOpen: !get().versionsOpen }),
+  toggleVersions: () => set({ versionsOpen: !get().versionsOpen, healthOpen: false }),
   setCompareSide: (side, id) =>
     set({ compare: { ...get().compare, [side === "left" ? "leftId" : "rightId"]: id } }),
   openCompare: () => {
