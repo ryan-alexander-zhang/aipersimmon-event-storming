@@ -28,10 +28,58 @@ export function Toolbar() {
   const btn =
     "flex items-center gap-1.5 rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100";
 
+  // The three canvases (Board / Context Map / Discovery) are mutually exclusive
+  // (editor.tsx: boardView = !contextMap && !discovery). One segmented switcher
+  // selects between them; each segment still toggles back to Board when re-clicked.
+  const view = discoveryActive ? "discovery" : contextMapOpen ? "contextMap" : "board";
+  const goBoard = () => {
+    if (contextMapOpen) toggleContextMap();
+    if (discoveryActive) exitDiscovery();
+  };
+  const goContextMap = () => {
+    if (discoveryActive) exitDiscovery();
+    toggleContextMap();
+  };
+  const goDiscover = () => {
+    if (contextMapOpen) toggleContextMap();
+    if (discoveryActive) exitDiscovery();
+    else enterDiscovery();
+  };
+  const seg = (on: boolean) =>
+    `flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium ${
+      on ? "bg-zinc-800 text-white" : "text-zinc-600 hover:bg-zinc-100"
+    }`;
+
   return (
     <header className="flex items-center gap-2 border-b border-zinc-200 bg-white px-3 py-2">
       <span className="text-sm font-semibold text-zinc-800">Event Storming</span>
-      <div className="ml-3 flex items-center rounded-md border border-zinc-300 p-0.5" role="group" aria-label="Level">
+      <div className="ml-3 flex items-center rounded-md border border-zinc-300 p-0.5" role="group" aria-label="View">
+        <button type="button" className={seg(view === "board")} aria-pressed={view === "board"} onClick={goBoard}>
+          Board
+        </button>
+        <button
+          type="button"
+          className={seg(view === "contextMap")}
+          aria-pressed={view === "contextMap"}
+          onClick={goContextMap}
+        >
+          <Network size={14} /> Context Map
+        </button>
+        {/* Discovery Mode: Big-Picture only (decision-00004). Switching Level off
+            Big Picture exits the mode and drops this segment. */}
+        {level === "big-picture" && (
+          <button
+            type="button"
+            className={seg(view === "discovery")}
+            aria-pressed={view === "discovery"}
+            onClick={goDiscover}
+            data-testid="discovery-controls"
+          >
+            <Sparkles size={14} /> Discover
+          </button>
+        )}
+      </div>
+      <div className="flex items-center rounded-md border border-zinc-300 p-0.5" role="group" aria-label="Level">
         {LEVELS.map((lv) => (
           <button
             key={lv}
@@ -46,45 +94,23 @@ export function Toolbar() {
           </button>
         ))}
       </div>
-      <button
-        type="button"
-        className={`${btn} ml-1`}
-        aria-pressed={contextMapOpen}
-        onClick={toggleContextMap}
-      >
-        <Network size={14} /> Context Map
-      </button>
-      {/* Discovery Mode: Big-Picture only (decision-00004). The Level control is
-          how you leave — switching off Big Picture exits the mode. */}
-      {level === "big-picture" && (
-        <div className="ml-1 flex items-center gap-2" data-testid="discovery-controls">
+      {discoveryActive && (
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            className={`${btn} ${discoveryActive ? "bg-amber-100 border-amber-300" : ""}`}
-            aria-pressed={discoveryActive}
-            onClick={() => (discoveryActive ? exitDiscovery() : enterDiscovery())}
+            className={btn}
+            aria-label="Add discovery event"
+            onClick={onAddDiscoveryEvent}
           >
-            <Sparkles size={14} /> Discover
+            <Plus size={14} /> Event
           </button>
-          {discoveryActive && (
-            <>
-              <button
-                type="button"
-                className={btn}
-                aria-label="Add discovery event"
-                onClick={onAddDiscoveryEvent}
-              >
-                <Plus size={14} /> Event
-              </button>
-              <button
-                type="button"
-                className={`${btn} bg-zinc-800 text-white hover:bg-zinc-700`}
-                onClick={converge}
-              >
-                <Combine size={14} /> Converge
-              </button>
-            </>
-          )}
+          <button
+            type="button"
+            className={`${btn} bg-zinc-800 text-white hover:bg-zinc-700`}
+            onClick={converge}
+          >
+            <Combine size={14} /> Converge
+          </button>
         </div>
       )}
       <div className="ml-auto flex items-center gap-2">
