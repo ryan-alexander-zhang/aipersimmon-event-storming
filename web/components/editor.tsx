@@ -35,7 +35,7 @@ import { isValidConnection as canConnect } from "@/lib/eventstorming/relations";
 import { computeEdgeOffsets } from "@/lib/layout/edge-spread";
 import { COL_W, NODE_W } from "@/lib/layout/layout";
 import { isShownByFilter, matchesQuery } from "@/lib/store/filter";
-import { computeFocus, computeNeighborhood, focusSource } from "@/lib/store/focus";
+import { computeContextFocus, computeFocus, computeNeighborhood, focusSource } from "@/lib/store/focus";
 import {
   loadDiscovery,
   loadModel,
@@ -185,6 +185,8 @@ function Canvas() {
   const hoveredEdgeId = useESStore((s) => s.hoveredEdgeId);
   const selectedId = useESStore((s) => s.selectedId);
   const hoveredId = useESStore((s) => s.hoveredId);
+  const focusedContext = useESStore((s) => s.focusedContext);
+  const setFocusedContext = useESStore((s) => s.setFocusedContext);
   const level = useESStore((s) => s.level);
   const isolate = useESStore((s) => s.isolate);
   const healthOpen = useESStore((s) => s.healthOpen);
@@ -246,6 +248,12 @@ function Canvas() {
         cancelRef.current = true;
         return;
       }
+      // Escape (not mid-drag) clears Bounded Context Focus (spec-00010).
+      if (e.key === "Escape") {
+        const s = useESStore.getState();
+        if (s.focusedContext) s.setFocusedContext(null);
+        return;
+      }
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       const tag = document.activeElement?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -268,11 +276,17 @@ function Canvas() {
 
   const edgeTypes = useMemo(() => ({ relation: RelationEdge }), []);
 
-  // The node under attention (hover wins over selection) and its neighbourhood.
-  const focus = useMemo(
-    () => computeFocus(focusSource(hoveredId, selectedId), edges),
-    [hoveredId, selectedId, edges],
-  );
+  // The focus set that drives dimming. A focused Bounded Context (spec-00010)
+  // dims everything outside its slice; hovering a node still previews that node's
+  // chain. Otherwise it's the node under attention (hover wins over selection).
+  const focus = useMemo(() => {
+    if (focusedContext) {
+      return hoveredId
+        ? computeFocus(hoveredId, edges)
+        : computeContextFocus(focusedContext, nodes, edges);
+    }
+    return computeFocus(focusSource(hoveredId, selectedId), edges);
+  }, [focusedContext, hoveredId, selectedId, nodes, edges]);
 
   // Attach handle anchors per edge from current node positions, so the vertical
   // slice chain draws top↔bottom and timeline links left↔right.
@@ -471,6 +485,7 @@ function Canvas() {
             onPaneClick={() => {
               setSelected(null);
               setHovered(null);
+              setFocusedContext(null);
             }}
             fitView
             fitViewOptions={{ padding: 0.25 }}
