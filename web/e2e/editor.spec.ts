@@ -388,6 +388,26 @@ test("hovering an edge isolates it and dims the rest [design-00003]", async ({ p
   expect(await nodeOpacity("e1")).toBe("1");
 });
 
+test("hovering a relation edge reveals a delete control that removes it, keeping its endpoints [us-00025-AC-1.1/2.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await page.getByRole("button", { name: "Design" }).click(); // show every edge
+  const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
+  const node = (id: string) => page.locator(`.react-flow__node[data-id="${id}"]`);
+  const before = await edges(page).count();
+  // No delete control until the edge is hovered (us-00025-AC-2.1).
+  await expect(page.getByRole("button", { name: "Delete relation" })).toHaveCount(0);
+  await edge("r1").hover({ force: true }); // the "issues" edge a1→c1
+  await page.getByRole("button", { name: "Delete relation" }).click(); // us-00025-AC-1.1
+  await expect(edge("r1")).toHaveCount(0);
+  await expect(edges(page)).toHaveCount(before - 1);
+  // both endpoints stay on the board
+  await expect(node("a1")).toHaveCount(1);
+  await expect(node("c1")).toHaveCount(1);
+});
+
 test("model health lists a smell, focuses its element, and never blocks editing [us-00011-AC-1.1/3.1/5.1]", async ({
   page,
 }) => {

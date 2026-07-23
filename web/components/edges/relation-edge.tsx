@@ -7,8 +7,10 @@ import {
   getSmoothStepPath,
   Position,
 } from "@xyflow/react";
+import { X } from "lucide-react";
 import { RELATION_STYLE } from "@/lib/eventstorming/edge-style";
 import { offsetOrthogonalPath } from "@/lib/layout/edge-path";
+import { useESStore } from "@/lib/store/store";
 import type { ESEdge } from "@/lib/store/types";
 
 const DIM_OPACITY = 0.12;
@@ -31,6 +33,8 @@ export function RelationEdge({
   data,
   markerEnd,
 }: EdgeProps<ESEdge>) {
+  const removeEdge = useESStore((s) => s.removeEdge);
+  const setHoveredEdge = useESStore((s) => s.setHoveredEdge);
   // Edges sharing a corridor get a small center offset so they bump apart. A
   // straight/aligned smoothstep ignores a center offset, so offset edges use a
   // manually jogged orthogonal path instead (issue-00003).
@@ -87,10 +91,25 @@ export function RelationEdge({
       {showLabel && relation && (
         <EdgeLabelRenderer>
           <div
-            className="nodrag nopan pointer-events-none absolute rounded bg-white/85 px-1 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm"
+            className={`nodrag nopan absolute flex items-center gap-1 rounded bg-white/85 px-1 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm ${emphasised ? "pointer-events-auto" : "pointer-events-none"}`}
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+            // While the pointer sits on the label (a separate overlay layer), keep
+            // this edge emphasised so the hover-revealed delete stays reachable —
+            // otherwise onEdgeMouseLeave would unmount it before the click lands.
+            onMouseEnter={emphasised ? () => setHoveredEdge(id) : undefined}
+            onMouseLeave={emphasised ? () => setHoveredEdge(null) : undefined}
           >
             {relation}
+            {emphasised && (
+              <button
+                type="button"
+                aria-label="Delete relation"
+                className="text-zinc-400 hover:text-red-600"
+                onClick={() => removeEdge(id)}
+              >
+                <X size={11} />
+              </button>
+            )}
           </div>
         </EdgeLabelRenderer>
       )}

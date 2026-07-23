@@ -407,6 +407,18 @@ describe("store v2 (RT3)", () => {
     get().onNodesChange([{ type: "remove", id: a }]);
     expect(node(a)).toBeUndefined();
   });
+
+  it("removes a relation edge but keeps its endpoints [us-00025-AC-1.1]", () => {
+    const ctx = get().addContext("c");
+    const a = get().addNode("actor", ctx);
+    const c = get().addNode("command", ctx);
+    get().connect({ source: a, target: c, sourceHandle: null, targetHandle: null });
+    const edgeId = get().edges[0].id;
+    get().removeEdge(edgeId);
+    expect(get().edges).toHaveLength(0);
+    expect(node(a)).toBeDefined();
+    expect(node(c)).toBeDefined();
+  });
 });
 
 describe("timeline editing [us-00010]", () => {

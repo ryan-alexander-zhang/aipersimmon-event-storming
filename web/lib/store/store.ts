@@ -176,6 +176,8 @@ export interface ESState {
   addOpportunity: (targetId: string, text: string) => string;
   /** Create a semantic edge if the connection is valid; returns success. */
   connect: (connection: Connection) => boolean;
+  /** Remove a relation edge, leaving its endpoint elements in place (us-00025-FR-1). */
+  removeEdge: (id: string) => void;
   /** Set a Domain Event's global timeline order, then normalize the timeline to a
    *  contiguous slot sequence (preserving concurrency). Fractional orders are
    *  allowed — the UI uses them to insert between slots. */
@@ -448,6 +450,8 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     set({ nodes: laidOut(nodes, edges, get().contexts, get().level), edges });
     return true;
   },
+
+  removeEdge: (id) => set({ edges: get().edges.filter((e) => e.id !== id) }),
 
   setEventOrder: (eventId, order) => {
     const ev = get().nodes.find((n) => n.id === eventId);
