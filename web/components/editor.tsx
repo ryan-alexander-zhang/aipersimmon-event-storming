@@ -35,7 +35,7 @@ import { isValidConnection as canConnect } from "@/lib/eventstorming/relations";
 import { computeEdgeOffsets } from "@/lib/layout/edge-spread";
 import { COL_W, NODE_W } from "@/lib/layout/layout";
 import { isShownByFilter, matchesQuery } from "@/lib/store/filter";
-import { computeContextFocus, computeFocus, computeNeighborhood, focusSource } from "@/lib/store/focus";
+import { computeContextFocus, computeFocus, computeNeighborhood } from "@/lib/store/focus";
 import {
   loadDiscovery,
   loadModel,
@@ -276,17 +276,16 @@ function Canvas() {
 
   const edgeTypes = useMemo(() => ({ relation: RelationEdge }), []);
 
-  // The focus set that drives dimming. A focused Bounded Context (spec-00010)
-  // dims everything outside its slice; hovering a node still previews that node's
-  // chain. Otherwise it's the node under attention (hover wins over selection).
+  // The focus set that drives dimming (design-00003 Tier A). A committed scope —
+  // a focused Bounded Context (spec-00010) or a selected element — is sticky:
+  // node hover no longer overrides it. Node hover only previews in the neutral
+  // state (nothing committed). Edge hover still traces on top of any of these
+  // (handled below via hoveredEndpoints / decoratedEdges).
   const focus = useMemo(() => {
-    if (focusedContext) {
-      return hoveredId
-        ? computeFocus(hoveredId, edges)
-        : computeContextFocus(focusedContext, nodes, edges);
-    }
-    return computeFocus(focusSource(hoveredId, selectedId), edges);
-  }, [focusedContext, hoveredId, selectedId, nodes, edges]);
+    if (focusedContext) return computeContextFocus(focusedContext, nodes, edges);
+    if (selectedId) return computeFocus(selectedId, edges);
+    return computeFocus(hoveredId, edges);
+  }, [focusedContext, selectedId, hoveredId, nodes, edges]);
 
   // Attach handle anchors per edge from current node positions, so the vertical
   // slice chain draws top↔bottom and timeline links left↔right.

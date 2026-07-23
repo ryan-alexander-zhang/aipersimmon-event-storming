@@ -54,21 +54,30 @@ change); Tier B changes edge geometry; Tier C is structural.
 
 ### Tier A — focus & visual hierarchy (no layout change)
 
-- **Focus & dim.** On node hover/selection, highlight the node, its incident
-  edges, and their opposite endpoints; drop everything else to a low opacity
-  (~15%). This is the primary readability lever — it collapses the hairball to
-  the one chain under attention. Derivable from the existing `edges` (match
-  `source`/`target` against the selected id); the store already tracks
-  `selectedId`. Focused edges are further emphasised — **thickened** and given a
-  **directional flow** (marching-ants animation along the causal direction),
-  honouring `prefers-reduced-motion` (a static thick line when motion is reduced).
+- **Focus & dim.** Highlight the node under attention, its incident edges, and
+  their opposite endpoints; drop everything else to a low opacity (~15%). This is
+  the primary readability lever — it collapses the hairball to the one chain under
+  attention. Derivable from the existing `edges` (match `source`/`target` against
+  the focused id); the store tracks `selectedId`. Focused edges are further
+  emphasised — **thickened** and given a **directional flow** (marching-ants
+  animation along the causal direction), honouring `prefers-reduced-motion` (a
+  static thick line when motion is reduced).
+  - **Node hover previews only in the neutral state.** When nothing is committed,
+    hovering a node previews its chain. Once a scope is committed — a selected
+    element **or** a focused Bounded Context (`focusedContext`, spec-00010) — that
+    scope is sticky: node hover no longer overrides it, so reading labels or moving
+    the pointer does not disturb the chosen highlight. Return to preview by
+    clearing the scope (empty-canvas click / Esc). Precedence:
+    edge-hover (below) → committed scope → neutral node hover.
 - **Edge-hover isolation.** When many edges are highlighted at once (a node with
   several incident edges), an individual connection is still hard to trace.
   Hovering a single edge emphasises just it — thicker, a soft glow, brought to
   front, its label shown — dims every other edge, **and dims every node except
   the edge's two endpoints**, so the connection reads as just "source → target".
   The node-focus baseline (flow + all incident labels) is unchanged; hover only
-  isolates on demand.
+  isolates on demand. Edge-hover tracing works in **any** state, including inside a
+  committed scope — following one specific connection within a selected/focused
+  range is intended (it takes precedence over the committed highlight).
 - **On-demand edge labels.** Hide relation labels by default; show a label only
   when its edge is in the focused set (or on edge hover). Removes label
   collisions directly. The relation is still carried on every edge (`edge.data.relation`).
