@@ -2,7 +2,7 @@
 id: plan-00018-bounded-context-focus
 type: plan
 role: main
-status: open
+status: resolved
 parent: spec-00010-bounded-context-focus
 ---
 
@@ -64,6 +64,5 @@ edge `focusState`). Terms follow [CONTEXT.md](../../CONTEXT.md).
 **Verified 2026-07-23** — independent subagent verdict **PASS** on all GWTs, no
 gaps. Evidence in
 [record-00018](../record/record-00018-bounded-context-focus-acceptance.md). 256
-unit + 48 e2e green; tsc + lint clean. **Remaining gate:** `bun run build` was not
-run this session (a `next dev` server held `.next`); plan stays `open` until the
-production build passes.
+unit + 48 e2e green; tsc + lint + `bun run build` clean. All DoD gates met —
+**resolved**.

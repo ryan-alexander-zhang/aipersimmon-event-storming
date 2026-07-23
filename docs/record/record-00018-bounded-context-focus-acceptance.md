@@ -21,10 +21,7 @@ Verified 2026-07-23. An independent subagent cross-checked every GWT; verdict
 
 - Unit: **256 passed** (`bun run test`).
 - E2E: **48 passed** (`bunx playwright test`, chromium).
-- `bunx tsc --noEmit` clean; `bun run lint` clean.
-- `bun run build`: **not yet run** — a dev server (`next dev`, :3000) was holding
-  `.next` during this session; production build to be run once it is free. This is
-  the one open DoD gate; the plan stays `open` until it passes.
+- `bunx tsc --noEmit` clean; `bun run lint` clean; `bun run build` clean.
 
 ## GWT coverage
 
