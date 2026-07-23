@@ -408,6 +408,28 @@ test("hovering a relation edge reveals a delete control that removes it, keeping
   await expect(node("c1")).toHaveCount(1);
 });
 
+test("a manual link is drawn in the arrow direction: drag source→target creates the edge [issue-00017]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("unlinked-command-event.json"));
+  const cmd = page.locator(".react-flow__node-command"); // source of `produces`
+  const ev = page.locator(".react-flow__node-domainEvent"); // its target
+  await expect(cmd).toHaveCount(1);
+  await expect(ev).toHaveCount(1);
+  await expect(edges(page)).toHaveCount(0);
+  const cb = (await cmd.boundingBox())!;
+  const eb = (await ev.boundingBox())!;
+  // Drag from the Command's bottom (arrow tail) down to the Domain Event's top
+  // (arrow head) — the natural, semantics-matching direction.
+  await page.mouse.move(cb.x + cb.width / 2, cb.y + cb.height);
+  await page.mouse.down();
+  await page.mouse.move(eb.x + eb.width / 2, (cb.y + cb.height + eb.y) / 2, { steps: 8 });
+  await page.mouse.move(eb.x + eb.width / 2, eb.y, { steps: 8 });
+  await page.mouse.up();
+  await expect(edges(page)).toHaveCount(1);
+});
+
 test("model health lists a smell, focuses its element, and never blocks editing [us-00011-AC-1.1/3.1/5.1]", async ({
   page,
 }) => {

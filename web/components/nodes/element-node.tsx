@@ -111,9 +111,18 @@ export function ElementNode({ id, type, data, selected }: NodeProps<ESNode>) {
       }}
     >
       {/* Anchor points on all four sides; edges pick the pair that matches the
-          slice direction (vertical chain top↔bottom, timeline left↔right). */}
+          slice direction (vertical chain top↔bottom, timeline left↔right). The
+          source and target handle on each side overlap, so the source is lifted
+          above the target: a drag from a node begins an outgoing (source)
+          connection, making a manual link follow the arrow direction (issue-00017). */}
       {HANDLES.map(({ id, type, position }) => (
-        <Handle key={id} id={id} type={type} position={position} style={HANDLE_STYLE} />
+        <Handle
+          key={id}
+          id={id}
+          type={type}
+          position={position}
+          style={type === "source" ? { ...HANDLE_STYLE, zIndex: 1 } : HANDLE_STYLE}
+        />
       ))}
       <div className="flex items-center gap-1.5">
         <Icon size={14} className="shrink-0 opacity-70" />

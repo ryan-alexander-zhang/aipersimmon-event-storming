@@ -1,0 +1,10 @@
+{
+  "version": "3.0",
+  "meta": { "name": "UnlinkedCommandEvent", "level": "process", "createdAt": "2026-07-20T00:00:00Z" },
+  "contexts": [{ "id": "ord", "name": "Ordering", "order": 0 }],
+  "nodes": [
+    { "id": "c1", "type": "command", "label": "Place Order", "context": "ord", "properties": {} },
+    { "id": "e1", "type": "domainEvent", "label": "Order Placed", "context": "ord", "order": 0, "properties": {} }
+  ],
+  "edges": []
+}
