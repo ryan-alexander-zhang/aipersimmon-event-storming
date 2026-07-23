@@ -103,6 +103,14 @@ collected in a single soft group on the board and can be assigned to a context
 later — context membership is optional.
 _Avoid_: orphan, unassigned, none.
 
+**Bounded Context Focus**:
+A transient view that emphasises one Bounded Context: selecting it keeps that
+context's slice (its members and their connected supporting elements) vivid while
+the rest of the board dims, with any relation to another context (a seam) kept
+highlighted. It dims, never hides — distinct from a filter (which hides elements)
+and the Walkthrough (which steps through events).
+_Avoid_: isolate, spotlight, filter.
+
 **Timeline**:
 The single global left→right ordering of all Domain Events that forms the board's
 spine, shared across every Bounded Context; every other element is placed relative
