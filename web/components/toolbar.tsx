@@ -99,14 +99,14 @@ export function Toolbar() {
           <button
             type="button"
             className={btn}
-            aria-label="Add discovery event"
+            aria-label="Add wall event"
             onClick={onAddDiscoveryEvent}
           >
             <Plus size={14} /> Event
           </button>
           <button
             type="button"
-            className={`${btn} bg-zinc-800 text-white hover:bg-zinc-700`}
+            className="flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-800 px-2.5 py-1 text-xs font-medium text-white hover:bg-zinc-700"
             onClick={converge}
           >
             <Combine size={14} /> Converge

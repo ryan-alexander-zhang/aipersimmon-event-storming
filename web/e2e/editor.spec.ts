@@ -532,8 +532,8 @@ test("discovery mode is Big-Picture only; converge builds structured events [us-
 
   // drop two unordered events via the toolbar (RF pane double-click also works,
   // but is not needed to exercise the flow); they are wall stickies, not model nodes
-  await page.getByRole("button", { name: "Add discovery event" }).click();
-  await page.getByRole("button", { name: "Add discovery event" }).click();
+  await page.getByRole("button", { name: "Add wall event" }).click();
+  await page.getByRole("button", { name: "Add wall event" }).click();
   await expect(page.getByTestId("discovery-node")).toHaveCount(2);
   await expect(nodes(page, "domainEvent")).toHaveCount(0); // model untouched while diverging
 
@@ -544,13 +544,25 @@ test("discovery mode is Big-Picture only; converge builds structured events [us-
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
 });
 
+test("the Converge button is legible: white text on the dark fill [issue-00016]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Big Picture" }).click();
+  await page.getByRole("button", { name: "Discover" }).click();
+  const converge = page.getByRole("button", { name: "Converge" });
+  await expect(converge).toBeVisible();
+  const color = await converge.evaluate((el) => getComputedStyle(el).color);
+  expect(color).toBe("rgb(255, 255, 255)");
+});
+
 test("renames a wall event inline without spawning extra events [us-00016-AC-2.1/4.1]", async ({
   page,
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Big Picture" }).click();
   await page.getByRole("button", { name: "Discover" }).click();
-  await page.getByRole("button", { name: "Add discovery event" }).click();
+  await page.getByRole("button", { name: "Add wall event" }).click();
   await expect(page.getByTestId("discovery-node")).toHaveCount(1);
 
   // double-clicking the node enters rename mode; the count stays 1 (rename is on
@@ -572,7 +584,7 @@ test("the discovery wall survives a reload and stays out of the exported DSL [us
   await page.goto("/");
   await page.getByRole("button", { name: "Big Picture" }).click();
   await page.getByRole("button", { name: "Discover" }).click();
-  await page.getByRole("button", { name: "Add discovery event" }).click();
+  await page.getByRole("button", { name: "Add wall event" }).click();
   await expect(page.getByTestId("discovery-node")).toHaveCount(1);
 
   // the wall is never in the model DSL: exporting an otherwise-empty model yields
