@@ -28,7 +28,7 @@ export interface ContextRelationStyle {
 export const CONTEXT_RELATION_STYLE: Record<ContextRelationType, ContextRelationStyle> = {
   partnership: { label: "Partnership", color: "#0891b2", symmetric: true },
   sharedKernel: { label: "Shared Kernel", color: "#7c3aed", symmetric: true },
-  customerSupplier: { label: "Customer/Supplier", color: "#2563eb", symmetric: false },
+  customerSupplier: { label: "Supplier ▶ Customer", color: "#2563eb", symmetric: false },
   conformist: { label: "Conformist", color: "#b45309", symmetric: false },
   acl: { label: "Anticorruption Layer", color: "#dc2626", symmetric: false },
   openHostService: { label: "Open Host Service", color: "#15803d", symmetric: false },
