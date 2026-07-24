@@ -111,4 +111,5 @@ are shown — kept minimal.
 ## Links
 
 - Idea: idea-00002-structured-rule-expression · Analysis: analysis-00002 §3
-- Plan: <plan-id, pending>
+- Plan: plan-00019-structured-rule-expression (resolved) · Record:
+  record-00019-structured-rule-expression-acceptance

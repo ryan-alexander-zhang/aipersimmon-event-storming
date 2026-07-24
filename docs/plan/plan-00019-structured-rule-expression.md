@@ -2,7 +2,7 @@
 id: plan-00019-structured-rule-expression
 type: plan
 role: main
-status: open
+status: resolved
 parent: spec-00011-structured-rule-expression
 ---
 
@@ -64,3 +64,8 @@ element type. `DSL_VERSION` stays `"4.0"`; `migrate.ts` is untouched.
   and the `spec-00011-XAC` scenario have a passing test and no requirement is
   unfinished; a `docs/record/` acceptance checklist links the GWT/XAC ids
   (CLAUDE.md §7). Any gap blocks `resolved`.
+
+**Verified 2026-07-24** — independent subagent verdict PASS (every us-00026 /
+us-00027 GWT and spec-00011-XAC covered, no gaps on the first pass); acceptance
+evidence in
+[record-00019-structured-rule-expression-acceptance](../record/record-00019-structured-rule-expression-acceptance.md).
