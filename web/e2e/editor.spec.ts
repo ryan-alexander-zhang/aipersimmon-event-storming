@@ -524,6 +524,57 @@ test("hotspot workflow: resolving mutes it and drops it from model health [us-00
   );
 });
 
+test("policy and constraint carry structured rule fields, persisted across export/import [us-00026-AC-1.1/2.1/3.1/4.1, us-00027-AC-1.1/2.1]", async ({
+  page,
+}) => {
+  await page.goto("/"); // Design level → Policy and Constraint both in the palette
+
+  // Policy: condition + execution + a parameter (each control gated to Policy)
+  await palette(page, "Policy"); // created and selected
+  await page.getByLabel("Condition").fill("retry count < 3");
+  await page.getByLabel("Execution").selectOption("manual");
+  await page.getByRole("button", { name: "+ Add parameter" }).click();
+  await page.getByLabel("Parameter 1 name").fill("retry");
+  await page.getByLabel("Parameter 1 value").fill("3");
+  await expect(nodes(page, "policy")).toContainText("manual"); // execution shown on the node
+
+  // Constraint: rule, distinct from description
+  await page.locator(".react-flow__pane").click({ position: { x: 10, y: 10 } }); // deselect → palette
+  await palette(page, "Constraint"); // created and selected
+  await page.getByLabel("Description").fill("credit limit check");
+  await page.getByLabel("Rule").fill("order.total <= account.creditLimit");
+
+  const exportModel = async () => {
+    await openFileMenu(page);
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Export" }).click(),
+    ]);
+    const file = await download.path();
+    return { file, json: JSON.parse(readFileSync(file, "utf8")) };
+  };
+
+  // export → both nodes' rule fields are persisted
+  const first = await exportModel();
+  const policy = first.json.nodes.find((n: { type: string }) => n.type === "policy");
+  const constraint = first.json.nodes.find((n: { type: string }) => n.type === "constraint");
+  expect(policy.properties).toMatchObject({
+    condition: "retry count < 3",
+    execution: "manual",
+    parameters: [{ name: "retry", value: "3" }],
+  });
+  expect(constraint.properties).toMatchObject({
+    description: "credit limit check",
+    rule: "order.total <= account.creditLimit",
+  });
+
+  // re-import that export → the fields survive the round-trip (us-00026-AC-4.1, us-00027-AC-2.1)
+  await page.setInputFiles("input[type=file]", first.file);
+  await expect(nodes(page, "policy")).toContainText("manual");
+  const second = await exportModel();
+  expect(normalize(second.json)).toEqual(normalize(first.json));
+});
+
 test("opportunity: attach to an element, distinct from a hotspot, visible at Big Picture [us-00013-AC-1.1/3.1]", async ({
   page,
 }) => {

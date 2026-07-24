@@ -164,6 +164,13 @@ export function ElementNode({ id, type, data, selected }: NodeProps<ESNode>) {
           )}
         </div>
       )}
+      {type === "policy" && data.execution && (
+        <div className="mt-1 flex flex-wrap gap-1">
+          <span className="rounded bg-white/50 px-1 text-[9px] font-semibold uppercase tracking-wide">
+            {data.execution}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

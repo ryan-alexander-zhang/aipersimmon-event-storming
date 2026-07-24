@@ -152,6 +152,11 @@ export function PropertyPanel() {
 
   const actions = (SLICE[node.type] ?? []).filter((a) => isVisibleAt(level, a.type));
 
+  // Policy parameters (spec-00011): a flat name/value list, replaced whole on edit.
+  const params = node.data.parameters ?? [];
+  const setParams = (next: { name: string; value: string }[]) =>
+    updateNodeData(node.id, { parameters: next.length ? next : undefined });
+
   return (
     <aside className={wrap} key={selectedId}>
       <div className="mb-3 flex items-center gap-2">
@@ -232,6 +237,91 @@ export function PropertyPanel() {
             onChange={(e) => updateNodeData(node.id, { description: e.target.value })}
           />
         </label>
+      )}
+
+      {node.type === "constraint" && (
+        <label className="mt-3 block text-xs font-medium text-zinc-600">
+          Rule
+          <textarea
+            className={`${field} h-16 resize-none`}
+            placeholder="The invariant that must hold"
+            value={node.data.rule ?? ""}
+            onChange={(e) => updateNodeData(node.id, { rule: e.target.value || undefined })}
+          />
+        </label>
+      )}
+
+      {node.type === "policy" && (
+        <div className="mt-3 flex flex-col gap-2">
+          <label className="block text-xs font-medium text-zinc-600">
+            Condition
+            <input
+              className={field}
+              placeholder="The guard (if …)"
+              value={node.data.condition ?? ""}
+              onChange={(e) => updateNodeData(node.id, { condition: e.target.value || undefined })}
+            />
+          </label>
+          <label className="block text-xs font-medium text-zinc-600">
+            Execution
+            <select
+              className={field}
+              value={node.data.execution ?? ""}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  execution: (e.target.value || undefined) as "automatic" | "manual" | undefined,
+                })
+              }
+            >
+              <option value="">—</option>
+              <option value="automatic">Automatic</option>
+              <option value="manual">Manual</option>
+            </select>
+          </label>
+          <div className="text-xs font-medium text-zinc-600">
+            Parameters
+            <div className="mt-1 flex flex-col gap-1">
+              {params.map((p, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional, edited in place
+                <div key={i} className="flex items-center gap-1">
+                  <input
+                    className="w-full rounded-md border border-zinc-300 px-2 py-1 text-sm"
+                    aria-label={`Parameter ${i + 1} name`}
+                    placeholder="name"
+                    value={p.name}
+                    onChange={(e) =>
+                      setParams(params.map((q, j) => (j === i ? { ...q, name: e.target.value } : q)))
+                    }
+                  />
+                  <input
+                    className="w-full rounded-md border border-zinc-300 px-2 py-1 text-sm"
+                    aria-label={`Parameter ${i + 1} value`}
+                    placeholder="value"
+                    value={p.value}
+                    onChange={(e) =>
+                      setParams(params.map((q, j) => (j === i ? { ...q, value: e.target.value } : q)))
+                    }
+                  />
+                  <button
+                    type="button"
+                    aria-label={`Remove parameter ${i + 1}`}
+                    className="shrink-0 rounded border border-zinc-300 px-1.5 py-1 text-zinc-500 hover:bg-zinc-100"
+                    onClick={() => setParams(params.filter((_, j) => j !== i))}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="mt-0.5 self-start rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+                onClick={() => setParams([...params, { name: "", value: "" }])}
+              >
+                + Add parameter
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {contexts.length > 0 && (
