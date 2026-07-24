@@ -65,4 +65,39 @@ describe("DSL model schema (v2)", () => {
     model.nodes[0].id = "";
     expect(modelSchema.safeParse(model).success).toBe(false);
   });
+
+  it("accepts a Policy's condition/execution/parameters and a Constraint's rule [us-00026-FR-1/2/3, us-00027-FR-1]", () => {
+    const model = validModel() as { nodes: Array<Record<string, unknown>> };
+    model.nodes.push({
+      id: "p1",
+      type: "policy",
+      label: "Re-match on decline",
+      context: "ord",
+      properties: {
+        condition: "retry count < 3",
+        execution: "automatic",
+        parameters: [{ name: "retry", value: "3" }],
+      },
+    });
+    model.nodes.push({
+      id: "k1",
+      type: "constraint",
+      label: "Credit limit",
+      context: "ord",
+      properties: { rule: "order.total <= account.creditLimit" },
+    });
+    expect(modelSchema.safeParse(model).success).toBe(true);
+  });
+
+  it("rejects an invalid execution value", () => {
+    const model = validModel() as { nodes: Array<Record<string, unknown>> };
+    model.nodes[0].properties = { execution: "eventual" };
+    expect(modelSchema.safeParse(model).success).toBe(false);
+  });
+
+  it("rejects a parameter entry missing name or value", () => {
+    const model = validModel() as { nodes: Array<Record<string, unknown>> };
+    model.nodes[0].properties = { parameters: [{ name: "retry" }] };
+    expect(modelSchema.safeParse(model).success).toBe(false);
+  });
 });

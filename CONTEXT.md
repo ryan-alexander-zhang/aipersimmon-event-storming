@@ -33,11 +33,15 @@ _Avoid_: entity, model.
 A restriction, rule, or precondition that must hold to perform a Command — the
 design **input**. It constrains a Command; it never emits events. Distinct from
 the Aggregate (input vs designed output). Introduced at the Design level.
+Carries an optional **rule**: the invariant/assertion itself, distinct from the
+prose description (spec-00011).
 _Avoid_: aggregate, validation, guard.
 
 **Policy**:
 A reaction rule of the form "when X happens, do Y" that connects a Domain Event
-to a Command. The lilac sticky.
+to a Command. The lilac sticky. Carries optional **condition** (the guard "if"),
+**execution** (automatic or manual), and **parameters** (named thresholds)
+(spec-00011).
 _Avoid_: rule, reactor, saga.
 
 **Read Model**:

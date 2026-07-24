@@ -14,6 +14,12 @@ export type ESNodeData = {
   state?: "open" | "resolved";
   kind?: "conflict" | "question" | "risk";
   priority?: "low" | "medium" | "high";
+  // Structured rule expression (spec-00011); Policy's condition/execution/
+  // parameters, Constraint's rule. All optional.
+  condition?: string;
+  execution?: "automatic" | "manual";
+  parameters?: { name: string; value: string }[];
+  rule?: string;
   // bounded context membership; timeline index (Domain Events carry order).
   context?: string;
   order?: number;

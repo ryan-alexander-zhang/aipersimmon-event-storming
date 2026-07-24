@@ -57,6 +57,69 @@ describe("serialize v2 (T2/RT1)", () => {
     });
   });
 
+  it("round-trips a Policy's rule fields and a Constraint's rule [us-00026-AC-4.1, us-00027-AC-2.1]", () => {
+    const nodes: ESNode[] = [
+      {
+        id: "p1",
+        type: "policy",
+        position: { x: 0, y: 0 },
+        data: {
+          label: "Re-match on decline",
+          condition: "retry count < 3",
+          execution: "manual",
+          parameters: [{ name: "retry", value: "3" }, { name: "radius", value: "2km" }],
+        },
+      },
+      {
+        id: "k1",
+        type: "constraint",
+        position: { x: 0, y: 0 },
+        data: { label: "Credit limit", description: "credit check", rule: "total <= limit" },
+      },
+    ];
+    const back = fromModel(toModel(nodes, [], [], META));
+    expect(back.nodes[0].data).toMatchObject({
+      condition: "retry count < 3",
+      execution: "manual",
+      parameters: [{ name: "retry", value: "3" }, { name: "radius", value: "2km" }],
+    });
+    expect(back.nodes[1].data).toMatchObject({ description: "credit check", rule: "total <= limit" });
+    const out = JSON.parse(exportJSON(nodes, [], [], META));
+    expect(out.nodes[0].properties.execution).toBe("manual");
+  });
+
+  it("omits absent rule fields on export [us-00026-AC-4.1]", () => {
+    const nodes: ESNode[] = [
+      { id: "p1", type: "policy", position: { x: 0, y: 0 }, data: { label: "P" } },
+    ];
+    const out = JSON.parse(exportJSON(nodes, [], [], META));
+    expect(out.nodes[0].properties.condition).toBeUndefined();
+    expect(out.nodes[0].properties.execution).toBeUndefined();
+    expect(out.nodes[0].properties.parameters).toBeUndefined();
+    expect(out.nodes[0].properties.rule).toBeUndefined();
+  });
+
+  it("imports a pre-spec v4.0 file without the rule fields unchanged [spec-00011-XAC-1.1]", () => {
+    const model = {
+      version: "4.0",
+      meta: { name: "old", level: "design", createdAt: "2026-01-01T00:00:00Z" },
+      contexts: [],
+      nodes: [
+        { id: "p1", type: "policy", label: "P", properties: {} },
+        { id: "k1", type: "constraint", label: "K", properties: {} },
+      ],
+      edges: [],
+    };
+    const result = importJSON(JSON.stringify(model));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const back = fromModel(result.model);
+      expect(back.nodes[0].data.condition).toBeUndefined();
+      expect(back.nodes[0].data.execution).toBeUndefined();
+      expect(back.nodes[1].data.rule).toBeUndefined();
+    }
+  });
+
   it("imports a pre-spec v2.0 file without the new fields [spec-00003-XAC-1.1]", () => {
     const model = {
       version: "2.0",

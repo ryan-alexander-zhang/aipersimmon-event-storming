@@ -45,6 +45,10 @@ export function toModel(
         ...(n.data.state !== undefined ? { state: n.data.state } : {}),
         ...(n.data.kind !== undefined ? { kind: n.data.kind } : {}),
         ...(n.data.priority !== undefined ? { priority: n.data.priority } : {}),
+        ...(n.data.condition !== undefined ? { condition: n.data.condition } : {}),
+        ...(n.data.execution !== undefined ? { execution: n.data.execution } : {}),
+        ...(n.data.parameters !== undefined ? { parameters: n.data.parameters } : {}),
+        ...(n.data.rule !== undefined ? { rule: n.data.rule } : {}),
       },
     })),
     edges: edges.map((e) => ({
@@ -84,6 +88,10 @@ export function fromModel(model: Model): {
         ...(n.properties.state !== undefined ? { state: n.properties.state } : {}),
         ...(n.properties.kind !== undefined ? { kind: n.properties.kind } : {}),
         ...(n.properties.priority !== undefined ? { priority: n.properties.priority } : {}),
+        ...(n.properties.condition !== undefined ? { condition: n.properties.condition } : {}),
+        ...(n.properties.execution !== undefined ? { execution: n.properties.execution } : {}),
+        ...(n.properties.parameters !== undefined ? { parameters: n.properties.parameters } : {}),
+        ...(n.properties.rule !== undefined ? { rule: n.properties.rule } : {}),
       },
     })),
     edges: model.edges.map((e) => ({

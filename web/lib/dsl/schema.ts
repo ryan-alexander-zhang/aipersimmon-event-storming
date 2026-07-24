@@ -17,6 +17,12 @@ export const propertiesSchema = z.object({
   state: z.enum(["open", "resolved"]).optional(),
   kind: z.enum(["conflict", "question", "risk"]).optional(),
   priority: z.enum(["low", "medium", "high"]).optional(),
+  // Structured rule expression (spec-00011); all optional and additive.
+  // condition/execution/parameters are a Policy's; rule is a Constraint's.
+  condition: z.string().optional(),
+  execution: z.enum(["automatic", "manual"]).optional(),
+  parameters: z.array(z.object({ name: z.string(), value: z.string() })).optional(),
+  rule: z.string().optional(),
 });
 
 // A bounded context: a named region/attribute over the global timeline (decision-00005).

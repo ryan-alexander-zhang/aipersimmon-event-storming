@@ -103,6 +103,30 @@ describe("store v2 (RT3)", () => {
     );
   });
 
+  it("writes a Policy's condition and execution via updateNodeData [us-00026-AC-1.1/2.1]", () => {
+    const p = get().addNode("policy");
+    get().updateNodeData(p, { condition: "retry count < 3", execution: "manual" });
+    expect(node(p)?.data).toMatchObject({ condition: "retry count < 3", execution: "manual" });
+    get().updateNodeData(p, { execution: "automatic" });
+    expect(node(p)?.data.execution).toBe("automatic");
+  });
+
+  it("replaces a Policy's parameter list on edit [us-00026-AC-3.1]", () => {
+    const p = get().addNode("policy");
+    get().updateNodeData(p, {
+      parameters: [{ name: "retry", value: "3" }, { name: "radius", value: "2km" }],
+    });
+    expect(node(p)?.data.parameters).toHaveLength(2);
+    get().updateNodeData(p, { parameters: [{ name: "radius", value: "2km" }] });
+    expect(node(p)?.data.parameters).toEqual([{ name: "radius", value: "2km" }]);
+  });
+
+  it("writes a Constraint's rule via updateNodeData [us-00027-AC-1.1]", () => {
+    const k = get().addNode("constraint");
+    get().updateNodeData(k, { description: "credit check", rule: "total <= limit" });
+    expect(node(k)?.data).toMatchObject({ description: "credit check", rule: "total <= limit" });
+  });
+
   it("attaches an opportunity via a highlights edge, inheriting context [us-00013-AC-1.1]", () => {
     const ctx = get().addContext("c");
     const e = get().addNode("domainEvent", ctx);
