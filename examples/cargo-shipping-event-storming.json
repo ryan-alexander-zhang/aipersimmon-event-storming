@@ -35,7 +35,7 @@
     {"id": "rout-c-compute", "type": "command", "label": "Compute Candidate Routes", "context": "rout", "properties": {}},
     {"id": "rout-e-computed", "type": "domainEvent", "label": "Route Candidates Computed", "context": "rout", "order": 1, "properties": {}},
     {"id": "rout-rm-candidates", "type": "readModel", "label": "Candidate Routes View", "context": "rout", "properties": {}},
-    {"id": "rout-p-onbooked", "type": "policy", "label": "Request Routing Policy", "context": "rout", "properties": {"description": "When a cargo is booked, compute candidate routes for its route specification."}},
+    {"id": "rout-p-onbooked", "type": "policy", "label": "Request Routing Policy", "context": "rout", "properties": {"description": "When a cargo is booked, compute candidate routes for its route specification.", "execution": "automatic", "parameters": [{"name": "maxCandidates", "value": "3"}]}},
     {"id": "rout-h-reschedule", "type": "hotspot", "label": "How do we handle a voyage schedule change after a cargo is routed?", "context": "rout", "properties": {"kind": "question", "priority": "medium"}},
 
     {"id": "hand-agent", "type": "actor", "label": "Handling Agent", "context": "hand", "properties": {}},
@@ -49,7 +49,7 @@
     {"id": "hand-c-claim", "type": "command", "label": "Register Claim", "context": "hand", "properties": {}},
     {"id": "hand-e-claimed", "type": "domainEvent", "label": "Cargo Claimed", "context": "hand", "order": 6, "properties": {"pivotal": true, "description": "The receiver claims the cargo at its destination; delivery is fulfilled."}},
     {"id": "hand-rm-queue", "type": "readModel", "label": "Port Handling View", "context": "hand", "properties": {}},
-    {"id": "hand-p-updatedelivery", "type": "policy", "label": "Update Delivery Policy", "context": "hand", "properties": {"description": "When cargo is handled, recalculate the cargo's delivery progress against its itinerary."}},
+    {"id": "hand-p-updatedelivery", "type": "policy", "label": "Update Delivery Policy", "context": "hand", "properties": {"description": "When cargo is handled, recalculate the cargo's delivery progress against its itinerary.", "execution": "automatic"}},
     {"id": "hand-h-misdirect", "type": "hotspot", "label": "What happens when cargo is misdirected mid-voyage?", "context": "hand", "properties": {"kind": "question", "priority": "high"}},
 
     {"id": "trak-owner", "type": "actor", "label": "Cargo Owner", "context": "trak", "properties": {}},

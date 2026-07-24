@@ -22,7 +22,7 @@
     {"id": "iam-c-assignrole", "type": "command", "label": "Assign Role", "context": "iam", "properties": {}},
     {"id": "iam-e-roleassigned", "type": "domainEvent", "label": "Role Assigned", "context": "iam", "order": 1, "properties": {}},
     {"id": "iam-rm-directory", "type": "readModel", "label": "User Directory View", "context": "iam", "properties": {}},
-    {"id": "iam-p-defaultadmin", "type": "policy", "label": "Default Administrator Policy", "context": "iam", "properties": {"description": "When a tenant is provisioned, register its first administrator user."}},
+    {"id": "iam-p-defaultadmin", "type": "policy", "label": "Default Administrator Policy", "context": "iam", "properties": {"description": "When a tenant is provisioned, register its first administrator user.", "execution": "automatic"}},
 
     {"id": "apm-po", "type": "actor", "label": "Product Owner", "context": "apm", "properties": {}},
     {"id": "apm-sm", "type": "actor", "label": "Scrum Master", "context": "apm", "properties": {}},
@@ -48,7 +48,7 @@
     {"id": "apm-e-teamformed", "type": "domainEvent", "label": "Team Formed", "context": "apm", "order": 2, "properties": {}},
     {"id": "apm-rm-backlog", "type": "readModel", "label": "Product Backlog View", "context": "apm", "properties": {}},
     {"id": "apm-rm-sprintboard", "type": "readModel", "label": "Sprint Board View", "context": "apm", "properties": {}},
-    {"id": "apm-p-productdiscussion", "type": "policy", "label": "Product Discussion Policy", "context": "apm", "properties": {"description": "When a product is planned, open a team discussion for it via the Collaboration ACL."}},
+    {"id": "apm-p-productdiscussion", "type": "policy", "label": "Product Discussion Policy", "context": "apm", "properties": {"description": "When a product is planned, open a team discussion for it via the Collaboration ACL.", "execution": "automatic"}},
     {"id": "apm-h-multisprint", "type": "hotspot", "label": "Can a backlog item belong to more than one sprint at once?", "context": "apm", "properties": {"kind": "question", "priority": "high"}},
     {"id": "apm-h-reestimate", "type": "hotspot", "label": "Who may re-estimate a story after it is committed?", "context": "apm", "properties": {"kind": "question", "priority": "medium"}},
 
