@@ -408,6 +408,33 @@ test("hovering a relation edge reveals a delete control that removes it, keeping
   await expect(node("c1")).toHaveCount(1);
 });
 
+test("deleting the hovered edge leaves no stale isolation behind [issue-00018]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await page.getByRole("button", { name: "Design" }).click(); // show every edge
+  const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
+  const pathOpacity = (id: string) =>
+    edge(id)
+      .locator(".react-flow__edge-path")
+      .evaluate((el) => getComputedStyle(el).opacity);
+  await expect(edge("r3")).toHaveCount(1);
+  expect(await pathOpacity("r3")).toBe("1");
+
+  // Delete r1 from its hover-revealed control. The label unmounts without a
+  // mouseleave, so the hovered id must be cleared by the removal itself.
+  await edge("r1").hover({ force: true });
+  await page.getByRole("button", { name: "Delete relation" }).click();
+  await expect(edge("r1")).toHaveCount(0);
+  await page.mouse.move(5, 5); // pointer off every edge
+
+  // No edge is hovered any more, so nothing isolates: r3 is fully opaque and no
+  // edge is emphasised. Before the fix every edge stayed dimmed at 0.12.
+  await expect(edge("r3").locator(".react-flow__edge-path")).toHaveCSS("opacity", "1");
+  await expect(page.locator(".react-flow__edge.animated")).toHaveCount(0);
+});
+
 test("clicking a relation edge highlights it; Delete removes it, keeping endpoints [us-00025-AC-3.1/4.1]", async ({
   page,
 }) => {

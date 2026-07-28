@@ -463,6 +463,10 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     set({
       edges: get().edges.filter((e) => e.id !== id),
       selectedEdgeId: get().selectedEdgeId === id ? null : get().selectedEdgeId,
+      // Deleting from the hover-revealed control unmounts the label without a
+      // mouseleave, so drop the hover here too — a hovered id that outlives its
+      // edge dims every remaining edge with none emphasised (issue-00018).
+      hoveredEdgeId: get().hoveredEdgeId === id ? null : get().hoveredEdgeId,
     }),
 
   setEventOrder: (eventId, order) => {

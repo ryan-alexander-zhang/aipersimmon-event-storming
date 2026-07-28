@@ -456,6 +456,20 @@ describe("store v2 (RT3)", () => {
     expect(get().edges).toHaveLength(0);
     expect(get().selectedEdgeId).toBeNull();
   });
+
+  // A hovered id that outlives its edge dims every remaining edge with none
+  // emphasised: the delete control sits on the hovered edge's label, which
+  // unmounts without a mouseleave to clear the hover.
+  it("drops the hover when the hovered edge is removed [issue-00018]", () => {
+    const ctx = get().addContext("c");
+    const a = get().addNode("actor", ctx);
+    const c = get().addNode("command", ctx);
+    get().connect({ source: a, target: c, sourceHandle: null, targetHandle: null });
+    const edgeId = get().edges[0].id;
+    get().setHoveredEdge(edgeId);
+    get().removeEdge(edgeId);
+    expect(get().hoveredEdgeId).toBeNull();
+  });
 });
 
 describe("timeline editing [us-00010]", () => {

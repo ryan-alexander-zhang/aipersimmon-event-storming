@@ -105,7 +105,14 @@ export function RelationEdge({
                 type="button"
                 aria-label="Delete relation"
                 className="text-zinc-400 hover:text-red-600"
-                onClick={() => removeEdge(id)}
+                // The label renders through EdgeLabelRenderer's portal, which sits
+                // inside this edge in the React tree — so an un-stopped click
+                // bubbles into React Flow's edge click and selects the edge we
+                // just removed, leaving a stale selection (issue-00018).
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeEdge(id);
+                }}
               >
                 <X size={11} />
               </button>
