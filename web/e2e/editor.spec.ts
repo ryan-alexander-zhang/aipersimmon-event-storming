@@ -1213,3 +1213,142 @@ test("a committed scope is sticky vs node hover; only in-scope lines trace [desi
   await expect(edge("r4")).toHaveClass(/animated/);
   expect(await nodeOpacity("rm1")).toBe("1"); // endpoint bright
 });
+
+// ---------------------------------------------------------------------------
+// Canvas re-render guards (issue-00019). View-only interactions must not cost
+// work proportional to the whole board. Thresholds count DOM elements touched,
+// not milliseconds, so the guards stay deterministic on any machine.
+// ---------------------------------------------------------------------------
+
+/** A board of `times` copies of model.json (8 nodes / 6 edges each), as an upload
+ *  buffer — big enough that a whole-board re-render is unmistakable. */
+// Frame clock: the wasted re-render work during a zoom produces *identical* DOM,
+// so mutation counts cannot see it — the observable cost is frame length.
+const FRAME_CLOCK = `
+window.__f = { on: false, last: 0, frames: [] };
+const tick = () => {
+  const t = performance.now();
+  if (window.__f.on) window.__f.frames.push(t - window.__f.last);
+  window.__f.last = t;
+  requestAnimationFrame(tick);
+};
+requestAnimationFrame(tick);
+window.__frameStart = () => { window.__f.frames = []; window.__f.last = performance.now(); window.__f.on = true; };
+window.__frameStop = () => {
+  window.__f.on = false;
+  const f = window.__f.frames;
+  return { count: f.length, max: Math.round(Math.max(0, ...f)) };
+};
+`;
+
+const largeBoard = (times: number) => {
+  const base = JSON.parse(readFileSync(fixture("model.json"), "utf8"));
+  const out = { ...base, contexts: [], contextRelationships: [], nodes: [], edges: [] } as {
+    contexts: { id: string; name: string; order: number }[];
+    contextRelationships: unknown[];
+    nodes: { id: string; context?: string; order?: number }[];
+    edges: { id: string; source: string; target: string }[];
+  };
+  for (let k = 0; k < times; k++) {
+    const sfx = `-${k}`;
+    for (const c of base.contexts)
+      out.contexts.push({ ...c, id: c.id + sfx, name: `${c.name} ${k}`, order: c.order + 10 * k });
+    for (const n of base.nodes)
+      out.nodes.push({
+        ...n,
+        id: n.id + sfx,
+        ...(n.context ? { context: n.context + sfx } : {}),
+        ...(n.order !== undefined ? { order: n.order + 100 * k } : {}),
+      });
+    for (const e of base.edges)
+      out.edges.push({ ...e, id: e.id + sfx, source: e.source + sfx, target: e.target + sfx });
+  }
+  return { name: "large.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(out)) };
+};
+
+// Count how many *node* and *edge* elements a single interaction mutates.
+const COUNTER = `
+window.__c = { node: 0, edge: 0 };
+const layer = (n) => {
+  let el = n instanceof Element ? n : n.parentElement;
+  while (el) {
+    const c = el.className, s = typeof c === "string" ? c : "";
+    if (s.includes("react-flow__node")) return "node";
+    if (s.includes("react-flow__edge")) return "edge";
+    el = el.parentElement;
+  }
+  return null;
+};
+window.__obs = new MutationObserver((recs) => {
+  for (const r of recs) { const k = layer(r.target); if (k) window.__c[k]++; }
+});
+window.__obs.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+window.__reset = () => { window.__c = { node: 0, edge: 0 }; };
+`;
+
+async function openLargeBoard(page: Page, times = 20) {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", largeBoard(times));
+  await page.getByRole("button", { name: "Design" }).click();
+  // Zoom in past the semantic-zoom thresholds so every band renders.
+  const zoomIn = page.locator(".react-flow__controls-zoomin");
+  for (let i = 0; i < 6; i++) {
+    await zoomIn.click();
+    await page.waitForTimeout(120);
+  }
+  const rendered = await page.locator(".react-flow__node").count();
+  expect(rendered).toBeGreaterThan(100); // the guard is meaningless on a small board
+  await page.evaluate(COUNTER);
+  return rendered;
+}
+
+const touched = (page: Page) => page.evaluate("({...window.__c})") as Promise<{ node: number; edge: number }>;
+
+/** Centre of the first node that is fully inside the viewport — a mouse.move to a
+ *  node scrolled out of view would silently hover nothing. */
+async function onscreenNode(page: Page, rendered: number) {
+  const all = page.locator(".react-flow__node");
+  for (let i = 0; i < Math.min(rendered, 250); i++) {
+    const bb = await all.nth(i).boundingBox();
+    if (bb && bb.x > 80 && bb.y > 140 && bb.x + bb.width < 1200 && bb.y + bb.height < 820 && bb.width > 20)
+      return { x: bb.x + bb.width / 2, y: bb.y + bb.height / 2 };
+  }
+  throw new Error("no node inside the viewport");
+}
+
+test("hovering one element does not re-render every node on the board [issue-00019]", async ({
+  page,
+}) => {
+  const rendered = await openLargeBoard(page);
+  const target = await onscreenNode(page, rendered);
+
+  await page.evaluate("window.__reset()");
+  await page.mouse.move(target.x, target.y, { steps: 2 });
+  await page.waitForTimeout(400);
+
+  const { node } = await touched(page);
+  // Dimming the board on hover is intended (design-00003 Tier A) — doing it by
+  // rebuilding every node's props is not. Before the fix this equalled `rendered`.
+  expect(node).toBeLessThan(rendered / 4);
+});
+
+test("a zoom gesture inside one semantic band does not stall a frame [issue-00019]", async ({
+  page,
+}) => {
+  const rendered = await openLargeBoard(page);
+  await page.evaluate(FRAME_CLOCK);
+
+  await page.mouse.move(700, 480);
+  await page.evaluate("window.__frameStart()");
+  for (let i = 0; i < 6; i++) {
+    await page.mouse.wheel(0, -60); // small ticks: stay inside the current band
+    await page.waitForTimeout(60);
+  }
+  const frames = (await page.evaluate("window.__frameStop()")) as { count: number; max: number };
+  // Same band → the same elements are visible, so nothing about them needs to change.
+  expect(await page.locator(".react-flow__node").count()).toBe(rendered);
+  expect(frames.count).toBeGreaterThan(10); // the clock actually sampled the gesture
+  // A frame that re-renders the whole board takes >100ms here; one that re-renders
+  // nothing takes ~8ms. 60ms leaves 2x headroom on both sides.
+  expect(frames.max).toBeLessThan(60);
+});

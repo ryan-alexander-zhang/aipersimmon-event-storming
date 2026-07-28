@@ -8,21 +8,22 @@ import {
   Position,
 } from "@xyflow/react";
 import { X } from "lucide-react";
+import { memo } from "react";
 import { RELATION_STYLE } from "@/lib/eventstorming/edge-style";
 import { offsetOrthogonalPath } from "@/lib/layout/edge-path";
 import { useESStore } from "@/lib/store/store";
 import type { ESEdge } from "@/lib/store/types";
 
-const DIM_OPACITY = 0.12;
 const FOCUS_WIDTH_BOOST = 1.5;
 const HOVER_WIDTH_BOOST = 3;
 const CORNER_RADIUS = 8;
 
 /** Semantic edge: an orthogonal (right-angle, rounded-corner) connector coloured
- *  and weighted by relation type, dimmed when a focus set is active and this edge
- *  is outside it, and labelled only when it is in the focused set — so the
- *  un-focused board stays label-free (design-00003 Tier A/B). */
-export function RelationEdge({
+ *  and weighted by relation type, thickened when it is in the focused/hovered set,
+ *  and labelled only then — so the un-focused board stays label-free
+ *  (design-00003 Tier A/B). Dimming the edges *outside* that set is the board's job,
+ *  not this component's (issue-00019). */
+function RelationEdgeInner({
   id,
   sourceX,
   sourceY,
@@ -60,11 +61,11 @@ export function RelationEdge({
   const baseWidth = style?.width ?? 1.5;
 
   // Edge-hover isolation wins over focus: the hovered edge is emphasised (thicker
-  // + glow + label), all others dim. With no edge hovered, fall back to the focus
-  // highlight (design-00003 Tier A/B/C).
+  // + glow + label). Dimming the *others* is not decided here — the board dims the
+  // whole layer with one rule and lifts the emphasised ids back out (issue-00019),
+  // so an edge that is merely dim never re-renders.
   const hover = data?.hover;
   const emphasised = hover === "on";
-  const dimmed = hover === "dim" || (hover === undefined && focusState === "off");
   const focused = hover === undefined && focusState === "on";
   const showLabel = emphasised || focused;
   const strokeWidth = emphasised
@@ -84,7 +85,6 @@ export function RelationEdge({
           // Flowing dashes come from the `animated` flag (stroke-dashoffset);
           // a hovered edge also gets a soft glow so it reads above the rest.
           strokeWidth,
-          opacity: dimmed ? DIM_OPACITY : 1,
           ...(emphasised ? { filter: `drop-shadow(0 0 4px ${color})` } : {}),
         }}
       />
@@ -123,3 +123,7 @@ export function RelationEdge({
     </>
   );
 }
+
+/** Memoised for the same reason as ElementNode: an edge whose decoration did not
+ *  change keeps its object identity and skips re-rendering its path (issue-00019). */
+export const RelationEdge = memo(RelationEdgeInner);

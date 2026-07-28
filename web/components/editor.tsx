@@ -55,6 +55,19 @@ const defaultEdgeOptions = {
 };
 
 const NODE_DIM_OPACITY = 0.15;
+const EDGE_DIM_OPACITY = 0.12;
+const EMPTY_STYLE: CSSProperties = {};
+
+// Tier A/C dimming is delivered as one injected rule scoped to the board wrapper,
+// so it never touches per-element props (issue-00019). Element ids come from the
+// imported DSL, so they must be escaped before going into a selector.
+const DIM_SCOPE = ".es-dim";
+const EDGE_DIM_SCOPE = ".es-dim-edges";
+const cssId = (id: string) =>
+  typeof CSS !== "undefined" && CSS.escape ? CSS.escape(id) : id.replace(/["\\]/g, "\\$&");
+const nodeSelector = (id: string) => `.react-flow__node[data-id="${cssId(id)}"]`;
+const edgePathSelector = (id: string) =>
+  `.react-flow__edge[data-id="${cssId(id)}"] .react-flow__edge-path`;
 
 // Search-hit ring (spec-00006): a blue halo around matched nodes, distinct from
 // the selection outline and from focus dimming.
@@ -158,7 +171,22 @@ function useAutosave() {
       useESStore.setState({ snapshots: snaps });
     }
     let timer: ReturnType<typeof setTimeout>;
+    // Only the persisted slices matter. The store also carries view-only state
+    // (hover, selection, zoom band), and reacting to that re-serialized the whole
+    // model on every pointer rest (issue-00019).
+    let saved: unknown[] = [];
     const unsubscribe = useESStore.subscribe((s) => {
+      const slice = [
+        s.nodes,
+        s.edges,
+        s.contexts,
+        s.level,
+        s.contextRelationships,
+        s.discovery.items,
+        s.snapshots,
+      ];
+      if (slice.every((v, i) => v === saved[i])) return;
+      saved = slice;
       clearTimeout(timer);
       timer = setTimeout(() => {
         saveModel(s.nodes, s.edges, s.contexts, s.level, s.contextRelationships);
@@ -312,8 +340,15 @@ function Canvas() {
   }, [nodes, edges]);
 
   // Visible element types = the Level filter, further narrowed by semantic zoom
-  // (zoomed out → backbone; both never show more than the Level).
-  const visibleTypes = useMemo(() => new Set(typesForZoom(zoom, level)), [zoom, level]);
+  // (zoomed out → backbone; both never show more than the Level). Keyed by the
+  // type list's *contents*: zoom changes every frame of a gesture but the band only
+  // changes at a threshold, and a fresh Set identity here would invalidate the whole
+  // node/edge decoration chain on every frame (issue-00019).
+  const visibleTypeKey = typesForZoom(zoom, level).join("|");
+  const visibleTypes = useMemo(
+    () => new Set(visibleTypeKey.split("|") as ElementType[]),
+    [visibleTypeKey],
+  );
 
   // Isolate ("focus mode"): when on with a selected anchor, keep only that node's
   // N-hop neighbourhood; otherwise null (show everything the types allow).
@@ -364,18 +399,29 @@ function Canvas() {
     return e ? new Set([e.source, e.target]) : null;
   }, [activeHoveredEdgeId, edges]);
 
+  // The bright set drives Tier-A dimming, but it must not reach the nodes as props:
+  // writing `opacity` per node rebuilds every node object, so React Flow re-renders
+  // the whole board (each node = 8 handles) for one pointer move. One stylesheet
+  // dims the layer and lifts the bright ids back out instead, which keeps hover at
+  // O(1) React work whatever the board size (issue-00019).
+  const brightNodeIds = hoveredEndpoints ?? (dimActive ? focus.nodeIds : null);
+  const dimCss = useMemo(() => {
+    if (!brightNodeIds) return "";
+    const lift = [...brightNodeIds].map((id) => `${DIM_SCOPE} ${nodeSelector(id)}`).join(",");
+    return `${DIM_SCOPE} .react-flow__node{opacity:${NODE_DIM_OPACITY}}${lift ? `${lift}{opacity:1}` : ""}`;
+  }, [brightNodeIds]);
+
   const decoratedNodes = useMemo(() => {
-    const bright = hoveredEndpoints ?? (dimActive ? focus.nodeIds : null);
     // Domain Events are draggable to adjust the timeline (us-00010); every other
     // type stays locked. Dragging edits `order`, not position (design-00004 §1).
     return visibleNodes.map((n) => {
-      const style: CSSProperties = { ...n.style };
-      if (bright) style.opacity = bright.has(n.id) ? 1 : NODE_DIM_OPACITY;
       // Search hit: a blue ring, kept separate from focus dimming (spec-00006).
-      if (matchIds?.has(n.id)) style.boxShadow = SEARCH_RING;
+      const style: CSSProperties = matchIds?.has(n.id)
+        ? { ...n.style, boxShadow: SEARCH_RING }
+        : n.style ?? EMPTY_STYLE;
       return { ...n, draggable: n.type === "domainEvent", style };
     });
-  }, [visibleNodes, hoveredEndpoints, dimActive, focus, matchIds]);
+  }, [visibleNodes, matchIds]);
   const visibleEdges = useMemo(() => {
     const ids = new Set(visibleNodes.map((n) => n.id));
     return routedEdges.filter((e) => ids.has(e.source) && ids.has(e.target));
@@ -396,44 +442,60 @@ function Canvas() {
   );
   const offsets = useMemo(() => computeEdgeOffsets(visibleEdges, nodePos), [visibleEdges, nodePos]);
 
-  // Colour/weight each edge by relation, colour its arrow to match, spread
-  // parallel edges, and tag its focus state so the custom edge dims off-focus
-  // edges and labels focused ones.
-  const decoratedEdges = useMemo<ESEdge[]>(
+  // Edges dim the same way as the nodes: the emphasised set is small, so only those
+  // edges carry view state and get a new object; the rest keep their identity (and
+  // their already-rendered path) while the stylesheet dims them (issue-00019).
+  const brightEdgeIds = useMemo(() => {
+    if (activeHoveredEdgeId) return new Set([activeHoveredEdgeId]);
+    return focus.active && dimActive ? focus.edgeIds : null;
+  }, [activeHoveredEdgeId, focus, dimActive]);
+
+  const dimEdgeCss = useMemo(() => {
+    if (!brightEdgeIds) return "";
+    const lift = [...brightEdgeIds].map((id) => `${EDGE_DIM_SCOPE} ${edgePathSelector(id)}`).join(",");
+    return `${EDGE_DIM_SCOPE} .react-flow__edge .react-flow__edge-path{opacity:${EDGE_DIM_OPACITY}}${lift ? `${lift}{opacity:1}` : ""}`;
+  }, [brightEdgeIds]);
+
+  // Colour each edge by relation, colour its arrow to match, and spread parallel
+  // edges. This layer depends only on the model + layout, so it survives hover.
+  const baseEdges = useMemo<ESEdge[]>(
     () =>
       visibleEdges.map((e) => {
         const relation = e.data?.relation;
-        const focusState = !focus.active
-          ? "none"
-          : focus.edgeIds.has(e.id)
-            ? "on"
-            : dimActive
-              ? "off"
-              : "none";
-        // Edge-hover isolation overrides focus: the hovered edge is emphasised,
-        // every other edge dims — so a single connection can be traced. Gated to
-        // in-scope edges while committed (activeHoveredEdgeId).
-        const hover = activeHoveredEdgeId
-          ? e.id === activeHoveredEdgeId
-            ? "on"
-            : "dim"
-          : undefined;
-        const emphasised = hover === "on";
         const color = relation ? RELATION_STYLE[relation].color : undefined;
         return {
           ...e,
           type: "relation",
-          // Focused (or hovered) edges flow; reduced-motion falls back to a
-          // static line via a CSS override in globals.css.
-          animated: hover ? emphasised : focusState === "on",
-          zIndex: emphasised ? 1000 : undefined,
-          data: e.data ? { ...e.data, focusState, hover, pathOffset: offsets.get(e.id) } : e.data,
-          markerEnd: color
-            ? { type: MarkerType.ArrowClosed, color }
-            : e.markerEnd,
+          data: e.data ? { ...e.data, pathOffset: offsets.get(e.id) } : e.data,
+          markerEnd: color ? { type: MarkerType.ArrowClosed, color } : e.markerEnd,
         };
       }),
-    [visibleEdges, focus, offsets, dimActive, activeHoveredEdgeId],
+    [visibleEdges, offsets],
+  );
+
+  // Only the emphasised edges get a new object; every other edge is handed back the
+  // identity it already had, so memo(RelationEdge) skips it and its path is never
+  // recomputed. Edge-hover isolation overrides focus, and is gated to in-scope edges
+  // while committed (activeHoveredEdgeId).
+  const decoratedEdges = useMemo<ESEdge[]>(
+    () =>
+      baseEdges.map((e) => {
+        const hovered = activeHoveredEdgeId === e.id;
+        const focused =
+          !activeHoveredEdgeId && focus.active && focus.edgeIds.has(e.id);
+        if (!hovered && !focused) return e;
+        return {
+          ...e,
+          // Focused (or hovered) edges flow; reduced-motion falls back to a static
+          // line via a CSS override in globals.css.
+          animated: true,
+          zIndex: hovered ? 1000 : undefined,
+          data: e.data
+            ? { ...e.data, focusState: focused ? "on" : "none", hover: hovered ? "on" : undefined }
+            : e.data,
+        };
+      }),
+    [baseEdges, focus, activeHoveredEdgeId],
   );
 
   // Refit the view when isolate frames a subset (or clears back to the board).
@@ -482,7 +544,11 @@ function Canvas() {
     <div className="flex min-h-0 flex-1 flex-col">
       <Toolbar />
       <div className="flex min-h-0 flex-1">
-        <div className="relative flex-1">
+        <div
+          className={`relative flex-1${brightNodeIds ? " es-dim" : ""}${brightEdgeIds ? " es-dim-edges" : ""}`}
+        >
+          {/* Tier A/C dimming, as one rule rather than per-element props. */}
+          {(dimCss || dimEdgeCss) && <style>{dimCss + dimEdgeCss}</style>}
           {compareActive ? (
             <CompareDiffView />
           ) : contextMapOpen ? (

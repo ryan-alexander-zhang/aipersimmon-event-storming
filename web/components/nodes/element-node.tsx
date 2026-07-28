@@ -15,7 +15,7 @@ import {
   Workflow,
   Zap,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { contextTint } from "@/lib/eventstorming/context-color";
 import { ELEMENT_DEFINITIONS, type ElementType } from "@/lib/eventstorming/elements";
 import { useESStore } from "@/lib/store/store";
@@ -71,7 +71,7 @@ export function routeHandles(
     : { sourceHandle: "s-left", targetHandle: "t-right" };
 }
 
-export function ElementNode({ id, type, data, selected }: NodeProps<ESNode>) {
+function ElementNodeInner({ id, type, data, selected }: NodeProps<ESNode>) {
   const def = ELEMENT_DEFINITIONS[type];
   const Icon = ICONS[type];
   const resolved = type === "hotspot" && data.state === "resolved";
@@ -174,3 +174,8 @@ export function ElementNode({ id, type, data, selected }: NodeProps<ESNode>) {
     </div>
   );
 }
+
+/** React Flow re-renders a node whenever its record changes; memo keeps that from
+ *  cascading into the body (and its 8 handles) when only the wrapper's style moved
+ *  — the difference between one node re-rendering and all of them (issue-00019). */
+export const ElementNode = memo(ElementNodeInner);
