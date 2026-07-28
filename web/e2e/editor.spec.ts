@@ -1166,6 +1166,58 @@ test("focuses a context: its slice stays vivid while other contexts dim, and cle
   await expect(bravo).toHaveCSS("opacity", "1");
 });
 
+test("the Context Map reads like the board: clicking a context focuses it, dims the unrelated ones, and clears [design-00003, spec-00010]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("context-map-focus.json"));
+  await expect(nodes(page, "domainEvent")).toHaveCount(1);
+  await page.getByRole("button", { name: "Context Map" }).click();
+  await expect(page.getByTestId("context-node")).toHaveCount(3);
+
+  // opacity lives on the React Flow node wrapper, not the context card
+  const ctx = (name: string) => page.locator(".react-flow__node").filter({ hasText: name });
+  const ordering = ctx("Ordering");
+  const shipping = ctx("Shipping"); // no relationship — never in Ordering's neighbourhood
+  const payment = ctx("Payment");
+  const flowing = page.locator(".react-flow__edge.animated");
+  const pane = page.locator(".react-flow__pane");
+
+  // neutral: nothing dims, nothing flows
+  await expect(shipping).toHaveCSS("opacity", "1");
+  await expect(flowing).toHaveCount(0);
+
+  // click Ordering → it and its one-relationship-away neighbour stay vivid, the
+  // unrelated context dims, and the relationship flows
+  await ordering.click();
+  await expect(ordering).toHaveCSS("opacity", "1");
+  await expect(payment).toHaveCSS("opacity", "1");
+  await expect(shipping).toHaveCSS("opacity", DIM);
+  await expect(flowing).toHaveCount(1);
+
+  // the committed focus is sticky: hovering another context does not steal it
+  await shipping.hover();
+  await expect(shipping).toHaveCSS("opacity", DIM);
+
+  // re-clicking the focused context clears (toggle); with the pointer moved off
+  // the node, nothing is emphasised any more (clearing returns to hover preview)
+  await ordering.click();
+  await pane.hover({ position: { x: 20, y: 20 } });
+  await expect(shipping).toHaveCSS("opacity", "1");
+  await expect(flowing).toHaveCount(0);
+
+  // with nothing committed, a hover previews that context's neighbourhood
+  await shipping.hover();
+  await expect(shipping).toHaveCSS("opacity", "1");
+  await expect(ordering).toHaveCSS("opacity", DIM);
+
+  // empty-canvas click clears a committed focus
+  await ordering.click();
+  await expect(shipping).toHaveCSS("opacity", DIM);
+  await pane.click({ position: { x: 20, y: 20 } });
+  await expect(shipping).toHaveCSS("opacity", "1");
+});
+
 test("the context header stays one fixed-height row as contexts scale [us-00024-AC-5.1]", async ({
   page,
 }) => {

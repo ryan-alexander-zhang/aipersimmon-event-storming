@@ -89,6 +89,16 @@ arrow's meaning.
     The type picker stays visible unhovered: on this surface the label is the only
     place a relationship's type is readable. No zIndex lift on hover — the label
     is the hover target and re-parenting the edge would remount it.
+  - Node reading is aligned with the board the same way: clicking a context commits
+    **Bounded Context Focus** (spec-00010, the shared `focusedContext` — so the
+    focus carries over to the board and back), keeping that context, the contexts
+    one relationship away and those relationships vivid while the rest dims;
+    re-clicking it, an empty-canvas click or Esc clears. Hovering a context only
+    *previews* the same set while nothing is committed. Precedence follows
+    design-00003: edge hover → committed focus → node hover, with edge hover gated
+    to relationships inside a committed focus. The neighbourhood comes from the
+    board's `computeFocus` (relationships are the graph); a focused relationship
+    flows and thickens but keeps its delete hover-only.
 - `editor.tsx`: extend the view swap — `contextMapOpen ? <ContextMapCanvas/> :
   discoveryActive ? <DiscoveryCanvas/> : <ReactFlow .../>`; gate `BoardChrome`,
   panels, etc. on the board view only.

@@ -12,13 +12,14 @@ import {
   ReactFlowProvider,
   useNodesState,
 } from "@xyflow/react";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ContextRelationEdge } from "@/components/edges/context-relation-edge";
 import { ContextNode, type ContextFlowNode } from "@/components/nodes/context-node";
 import { contextTint } from "@/lib/eventstorming/context-color";
 import { CONTEXT_RELATION_STYLE } from "@/lib/eventstorming/context-relations";
 import { contextEdgeHandles, contextMapPositions } from "@/lib/layout/context-map";
 import { computeEdgeOffsets } from "@/lib/layout/edge-spread";
+import { computeFocus } from "@/lib/store/focus";
 import { useESStore } from "@/lib/store/store";
 
 const nodeTypes: NodeTypes = { context: ContextNode };
@@ -37,6 +38,11 @@ function ContextMapSurface() {
   const addContextRelationship = useESStore((s) => s.addContextRelationship);
   const hoveredEdgeId = useESStore((s) => s.hoveredEdgeId);
   const setHoveredEdge = useESStore((s) => s.setHoveredEdge);
+  const focusedContext = useESStore((s) => s.focusedContext);
+  const setFocusedContext = useESStore((s) => s.setFocusedContext);
+  // Node hover only previews (nothing committed), so it is this surface's own view
+  // state; the board's `hoveredId` names a board node and must not take a context id.
+  const [hoveredContext, setHoveredContext] = useState<string | null>(null);
 
   const seeded = useMemo<ContextFlowNode[]>(() => {
     const pos = contextMapPositions(contexts);
@@ -54,6 +60,23 @@ function ContextMapSurface() {
     () => relationships.find((r) => r.id === hoveredEdgeId),
     [relationships, hoveredEdgeId],
   );
+
+  // Bounded Context Focus on this surface (spec-00010), read the board's way
+  // (design-00003 Tier A): clicking a context commits it — that context, the
+  // contexts one relationship away and those relationships stay vivid, the rest
+  // dims. A node hover only previews while nothing is committed, so reading a
+  // relationship's label never disturbs the chosen focus.
+  const contextFocus = useMemo(
+    () => computeFocus(focusedContext ?? hoveredContext, relationships),
+    [focusedContext, hoveredContext, relationships],
+  );
+
+  // Edge hover traces on top of any of that, but inside a committed focus only on
+  // relationships within it — hovering an out-of-scope line does nothing.
+  const activeHovered =
+    hoveredRelationship && (!focusedContext || contextFocus.edgeIds.has(hoveredRelationship.id))
+      ? hoveredRelationship
+      : null;
 
   const [nodes, setNodes, onNodesChange] = useNodesState<ContextFlowNode>([]);
   // Re-seed when the set of contexts (or their names/classification) changes;
@@ -89,36 +112,50 @@ function ContextMapSurface() {
         // emphasised and flows, every other one dims (design-00003 Tier C). No
         // zIndex lift on hover — here the always-visible label is the hover
         // target, and re-parenting the edge remounts its label, which flickers
-        // hover on/off.
-        const hover = hoveredRelationship
-          ? r.id === hoveredRelationship.id
+        // hover on/off. Without a hover, a focused context flows its own
+        // relationships and dims the rest.
+        const inFocus = contextFocus.edgeIds.has(r.id);
+        const hover = activeHovered
+          ? r.id === activeHovered.id
             ? "on"
             : "dim"
-          : undefined;
+          : contextFocus.active && !inFocus
+            ? "dim"
+            : undefined;
+        const focused = !activeHovered && contextFocus.active && inFocus;
         return {
           id: r.id,
           source: r.source,
           target: r.target,
           ...(handles ?? {}),
           type: "contextRelation",
-          animated: hover === "on",
-          data: { type: r.type, hover, pathOffset: offsets.get(r.id) },
+          animated: hover === "on" || focused,
+          data: {
+            type: r.type,
+            hover,
+            focusState: focused ? "on" : undefined,
+            pathOffset: offsets.get(r.id),
+          },
           markerEnd: { type: MarkerType.ArrowClosed, color: CONTEXT_RELATION_STYLE[r.type].color },
         };
       }),
-    [relationships, posById, offsets, hoveredRelationship],
+    [relationships, posById, offsets, activeHovered, contextFocus],
   );
 
-  // Hovering a relationship dims every context except its two endpoints, so one
-  // relationship reads as just "source → target".
+  // The vivid set: an isolated relationship's two endpoints, so one relationship
+  // reads as just "source → target"; otherwise the focused context's neighbourhood.
+  const brightNodeIds = useMemo(() => {
+    if (activeHovered) return new Set([activeHovered.source, activeHovered.target]);
+    return contextFocus.active ? contextFocus.nodeIds : null;
+  }, [activeHovered, contextFocus]);
+
   const decoratedNodes = useMemo(() => {
-    if (!hoveredRelationship) return nodes;
-    const bright = new Set([hoveredRelationship.source, hoveredRelationship.target]);
+    if (!brightNodeIds) return nodes;
     return nodes.map((n) => ({
       ...n,
-      style: { ...n.style, opacity: bright.has(n.id) ? 1 : NODE_DIM_OPACITY },
+      style: { ...n.style, opacity: brightNodeIds.has(n.id) ? 1 : NODE_DIM_OPACITY },
     }));
-  }, [nodes, hoveredRelationship]);
+  }, [nodes, brightNodeIds]);
 
   const onConnect = useCallback(
     (c: Connection) => {
@@ -137,6 +174,10 @@ function ContextMapSurface() {
       onConnect={onConnect}
       onEdgeMouseEnter={(_, e) => setHoveredEdge(e.id)}
       onEdgeMouseLeave={() => setHoveredEdge(null)}
+      onNodeClick={(_, n) => setFocusedContext(n.id)}
+      onNodeMouseEnter={(_, n) => setHoveredContext(n.id)}
+      onNodeMouseLeave={() => setHoveredContext(null)}
+      onPaneClick={() => setFocusedContext(null)}
       deleteKeyCode={null}
       minZoom={0.2}
       fitView

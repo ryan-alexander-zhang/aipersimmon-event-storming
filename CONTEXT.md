@@ -112,7 +112,9 @@ A transient view that emphasises one Bounded Context: selecting it keeps that
 context's slice (its members and their connected supporting elements) vivid while
 the rest of the board dims, with any relation to another context (a seam) kept
 highlighted. It dims, never hides — distinct from a filter (which hides elements)
-and the Walkthrough (which steps through events).
+and the Walkthrough (which steps through events). One focus, rendered per surface:
+on the Context Map the same focused context keeps itself, the contexts one
+relationship away and those relationships vivid while the other contexts dim.
 _Avoid_: isolate, spotlight, filter.
 
 **Timeline**:

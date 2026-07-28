@@ -18,6 +18,7 @@ import { useESStore } from "@/lib/store/store";
 
 const BASE_WIDTH = 2;
 const HOVER_WIDTH_BOOST = 3;
+const FOCUS_WIDTH_BOOST = 1.5;
 const DIM_OPACITY = 0.12;
 const DIM_LABEL_OPACITY = 0.3;
 const CORNER_RADIUS = 8;
@@ -66,6 +67,9 @@ export function ContextRelationEdge({
   const hover = data?.hover as "on" | "dim" | undefined;
   const emphasised = hover === "on";
   const dimmed = hover === "dim";
+  // In a focused context's neighbourhood without a hover: thickened and flowing,
+  // but no glow and no delete — deleting stays tied to the hovered relationship.
+  const focused = !hover && data?.focusState === "on";
 
   return (
     <>
@@ -75,7 +79,11 @@ export function ContextRelationEdge({
         markerEnd={markerEnd}
         style={{
           stroke: style.color,
-          strokeWidth: emphasised ? BASE_WIDTH + HOVER_WIDTH_BOOST : BASE_WIDTH,
+          strokeWidth: emphasised
+            ? BASE_WIDTH + HOVER_WIDTH_BOOST
+            : focused
+              ? BASE_WIDTH + FOCUS_WIDTH_BOOST
+              : BASE_WIDTH,
           opacity: dimmed ? DIM_OPACITY : 1,
           ...(emphasised ? { filter: `drop-shadow(0 0 4px ${style.color})` } : {}),
         }}

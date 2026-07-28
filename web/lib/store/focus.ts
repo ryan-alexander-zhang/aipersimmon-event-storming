@@ -14,6 +14,14 @@ export interface FocusSet {
 
 const EMPTY: FocusSet = { active: false, nodeIds: new Set(), edgeIds: new Set() };
 
+/** All a neighbourhood needs of an edge. Board relations and Context Map
+ *  relationships both qualify, so `computeFocus` serves either graph. */
+export interface FocusEdge {
+  id: string;
+  source: string;
+  target: string;
+}
+
 /** The node that drives the focus set: a hovered node takes precedence over the
  *  selected one, so pointing at a node previews its chain without changing the
  *  selection. */
@@ -92,7 +100,7 @@ export function computeContextFocus(
 }
 
 /** The focused node plus its direct neighbours, and the edges incident to it. */
-export function computeFocus(focusId: string | null | undefined, edges: ESEdge[]): FocusSet {
+export function computeFocus(focusId: string | null | undefined, edges: FocusEdge[]): FocusSet {
   if (!focusId) return EMPTY;
   const nodeIds = new Set<string>([focusId]);
   const edgeIds = new Set<string>();
