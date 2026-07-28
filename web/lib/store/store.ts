@@ -373,7 +373,9 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     }),
   removeContextRelationship: (id) =>
     set({ contextRelationships: get().contextRelationships.filter((r) => r.id !== id) }),
-  toggleContextMap: () => set({ contextMapOpen: !get().contextMapOpen }),
+  // `hoveredEdgeId` is shared by both surfaces' edge-hover isolation, so clear it
+  // on the swap — a hovered relationship id must not leak into the board's.
+  toggleContextMap: () => set({ contextMapOpen: !get().contextMapOpen, hoveredEdgeId: null }),
 
   removeContext: (id) => {
     const nodes = get().nodes.filter((n) => n.data.context !== id);

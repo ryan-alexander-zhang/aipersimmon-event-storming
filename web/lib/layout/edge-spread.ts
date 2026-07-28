@@ -8,7 +8,13 @@
 // (design-00003 §3 Tier B; generalises the earlier shared-handle version —
 // issue-00003.)
 
-import type { ESEdge } from "@/lib/store/types";
+// Only the endpoints are read, so both the board's semantic edges and the
+// Context Map's relationship edges can be spread by this one function.
+interface EdgeRef {
+  id: string;
+  source: string;
+  target: string;
+}
 
 interface Pt {
   x: number;
@@ -35,7 +41,10 @@ const overlaps = (a: { lo: number; hi: number }, b: { lo: number; hi: number }) 
 /** edgeId → centre offset (px), only for edges pushed off their corridor's
  *  centreline. Deterministic; shorter edges keep the centre so the causal chain
  *  stays straight and only long/crossing edges bow aside. */
-export function computeEdgeOffsets(edges: ESEdge[], pos: Map<string, Pt>): Map<string, number> {
+export function computeEdgeOffsets(
+  edges: readonly EdgeRef[],
+  pos: Map<string, Pt>,
+): Map<string, number> {
   const out = new Map<string, number>();
   const corridors = new Map<string, Array<{ id: string; lo: number; hi: number; mid: number }>>();
   for (const e of edges) {

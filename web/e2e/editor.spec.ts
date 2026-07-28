@@ -848,6 +848,12 @@ test("Context Map renders contexts + a typed relationship; edits and deletes it;
   await relLabel.getByLabel("Relationship type").selectOption("acl");
   await expect(relLabel.getByLabel("Relationship type")).toHaveValue("acl");
 
+  // hover isolation matches the board: the relationship flows and its delete
+  // appears only while hovered (design-00003 Tier C)
+  await expect(page.getByRole("button", { name: "Delete relationship" })).toHaveCount(0);
+  await relLabel.hover();
+  await expect(page.locator(".react-flow__edge").first()).toHaveClass(/animated/);
+
   // delete it (us-00020-AC-4.1)
   await relLabel.getByRole("button", { name: "Delete relationship" }).click();
   await expect(page.getByTestId("context-relation-label")).toHaveCount(0);

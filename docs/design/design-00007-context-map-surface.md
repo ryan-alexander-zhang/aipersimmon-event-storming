@@ -76,9 +76,19 @@ arrow's meaning.
     or grid by context order) — **not** the timeline layout engine; the map is its
     own graph. Free-drag of context nodes is view-only scratch (not persisted),
     consistent with decision-00002 (no persisted hand positions in the model).
+  - Layout lives in `lib/layout/context-map.ts` (`contextMapPositions`), pure and
+    unit-tested like the board's `computeLayout`.
   - `onConnect` → `addContextRelationship`; selecting an edge shows a type picker
     (small inline control) → `setContextRelationshipType`; delete key / button →
     `removeContextRelationship`.
+  - Edge readability is aligned with the board (design-00003): relationships
+    sharing a corridor are spread by the board's `computeEdgeOffsets`, and edge
+    hover isolates — the hovered relationship thickens, glows, flows and reveals
+    its delete, while other edges/labels and non-endpoint contexts dim. The
+    hovered id is the shared transient `hoveredEdgeId`, cleared on the view swap.
+    The type picker stays visible unhovered: on this surface the label is the only
+    place a relationship's type is readable. No zIndex lift on hover — the label
+    is the hover target and re-parenting the edge would remount it.
 - `editor.tsx`: extend the view swap — `contextMapOpen ? <ContextMapCanvas/> :
   discoveryActive ? <DiscoveryCanvas/> : <ReactFlow .../>`; gate `BoardChrome`,
   panels, etc. on the board view only.
