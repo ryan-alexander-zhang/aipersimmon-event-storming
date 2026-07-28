@@ -1288,8 +1288,11 @@ requestAnimationFrame(tick);
 window.__frameStart = () => { window.__f.frames = []; window.__f.last = performance.now(); window.__f.on = true; };
 window.__frameStop = () => {
   window.__f.on = false;
-  const f = window.__f.frames;
-  return { count: f.length, max: Math.round(Math.max(0, ...f)) };
+  // The *second* worst frame, not the worst: the regression this measures stalls every
+  // frame of the gesture, so the second worst proves it just as well — and unlike the
+  // worst it cannot be set by a single GC/scheduling stall (issue-00020).
+  const f = [...window.__f.frames].sort((a, b) => b - a);
+  return { count: f.length, second: Math.round(f[1] ?? 0) };
 };
 `;
 
@@ -1396,11 +1399,16 @@ test("a zoom gesture inside one semantic band does not stall a frame [issue-0001
     await page.mouse.wheel(0, -60); // small ticks: stay inside the current band
     await page.waitForTimeout(60);
   }
-  const frames = (await page.evaluate("window.__frameStop()")) as { count: number; max: number };
+  const frames = (await page.evaluate("window.__frameStop()")) as {
+    count: number;
+    second: number;
+  };
   // Same band → the same elements are visible, so nothing about them needs to change.
   expect(await page.locator(".react-flow__node").count()).toBe(rendered);
   expect(frames.count).toBeGreaterThan(10); // the clock actually sampled the gesture
-  // A frame that re-renders the whole board takes >100ms here; one that re-renders
-  // nothing takes ~8ms. 60ms leaves 2x headroom on both sides.
-  expect(frames.max).toBeLessThan(60);
+  // Re-rendering the whole board stalls *every* tick frame of the gesture (2nd worst
+  // 68-73ms here, all of the top five ≥65ms); a healthy in-band tick costs ~26ms and
+  // holds there even under load, where the worst frame alone can hit 68ms from one
+  // scheduling stall. So the guard reads the second worst, at 50ms (issue-00020).
+  expect(frames.second).toBeLessThan(50);
 });
