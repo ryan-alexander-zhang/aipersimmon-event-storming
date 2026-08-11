@@ -2,7 +2,7 @@
 
 import { useViewport } from "@xyflow/react";
 import { Check, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   BAND_ORDER,
@@ -71,11 +71,23 @@ export function BoardChrome({
   // Isolate collapses the bands its neighbourhood does not occupy, so the rail
   // labels only the bands that are actually there and takes their tops from the
   // same relayout the board is drawn from.
-  const visibleBands = isolated
-    ? new Set(isolated.nodes.map((n) => ELEMENT_BAND[n.type]))
-    : new Set(LEVEL_TYPES[level].map((t) => ELEMENT_BAND[t]));
+  //
+  // Both are memoised on the model: this component re-renders on every pan/zoom
+  // frame (it tracks the viewport), while band tops are a function of the model
+  // alone. Recomputing them per frame re-ran the whole placement pass — O(nodes ×
+  // edges) — for a result that had not changed (issue-00026).
+  const visibleBands = useMemo(
+    () =>
+      isolated
+        ? new Set(isolated.nodes.map((n) => ELEMENT_BAND[n.type]))
+        : new Set(LEVEL_TYPES[level].map((t) => ELEMENT_BAND[t])),
+    [isolated, level],
+  );
 
-  const bandTops = isolated?.bandTops ?? computeBandTops(nodes, edges, contexts, level);
+  const bandTops = useMemo(
+    () => isolated?.bandTops ?? computeBandTops(nodes, edges, contexts, level),
+    [isolated, nodes, edges, contexts, level],
+  );
   const nameOf = new Map(contexts.map((c) => [c.id, c.name]));
 
   const addEvent = (ctxId?: string) => {
