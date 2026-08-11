@@ -396,7 +396,10 @@ test("hovering a relation edge reveals a delete control that removes it, keeping
   await page.getByRole("button", { name: "Design" }).click(); // show every edge
   const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
   const node = (id: string) => page.locator(`.react-flow__node[data-id="${id}"]`);
-  const before = await edges(page).count();
+  // Wait for the full edge set before taking the baseline: a bare count() does not
+  // retry, so under load it can capture a half-rendered board (issue-00022).
+  const before = 6; // model.json at Design
+  await expect(edges(page)).toHaveCount(before);
   // No delete control until the edge is hovered (us-00025-AC-2.1).
   await expect(page.getByRole("button", { name: "Delete relation" })).toHaveCount(0);
   await edge("r1").hover({ force: true }); // the "issues" edge a1→c1
@@ -443,7 +446,10 @@ test("clicking a relation edge highlights it; Delete removes it, keeping endpoin
   await page.getByRole("button", { name: "Design" }).click(); // show every edge
   const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
   const node = (id: string) => page.locator(`.react-flow__node[data-id="${id}"]`);
-  const before = await edges(page).count();
+  // Wait for the full edge set before taking the baseline: a bare count() does not
+  // retry, so under load it can capture a half-rendered board (issue-00022).
+  const before = 6; // model.json at Design
+  await expect(edges(page)).toHaveCount(before);
   // Click off-centre (near the top of the edge) so the hit lands on the path, not
   // on the hover-revealed delete control that sits at the edge's mid-label.
   const bb = (await edge("r1").boundingBox())!;
