@@ -1,7 +1,7 @@
 "use client";
 
 import { useViewport } from "@xyflow/react";
-import { Check, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, Crosshair, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -61,6 +61,7 @@ export function BoardChrome({
   const setSelected = useESStore((s) => s.setSelected);
   const focusedContext = useESStore((s) => s.focusedContext);
   const setFocusedContext = useESStore((s) => s.setFocusedContext);
+  const isolateContext = useESStore((s) => s.isolateContext);
 
   // Progressive disclosure: the open `⋯` menu (id + the trigger's screen anchor,
   // so the menu can portal out of the header's horizontal scroll container and
@@ -247,6 +248,19 @@ export function BoardChrome({
                     }}
                   >
                     <Pencil size={13} /> Rename
+                  </button>
+                  {/* Isolate the whole context: unlike Bounded Context Focus (which
+                      the chip body toggles, and which only dims), this hides the rest
+                      and relayouts the slice as its own compact board. */}
+                  <button
+                    type="button"
+                    className={MENU_ITEM}
+                    onClick={() => {
+                      isolateContext(menuCtx.id);
+                      setMenu(null);
+                    }}
+                  >
+                    <Crosshair size={13} /> Isolate this context
                   </button>
                   <div className="my-1 border-t border-zinc-100" />
                   <div className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">

@@ -71,6 +71,28 @@ export function computeNeighborhood(
   return { nodeIds, edgeIds };
 }
 
+/** The Bounded Context's slice as an induced subgraph, for isolating a whole
+ *  context: its members plus every element directly related to one of them. That
+ *  pulls in the context's own and Ungrouped supporting elements *and* the element
+ *  on the far side of a seam, so a cross-context relation still reads as a
+ *  relation instead of vanishing with its endpoint. */
+export function computeContextNeighborhood(
+  contextId: string | null | undefined,
+  nodes: ESNode[],
+  edges: ESEdge[],
+): Set<string> {
+  const ids = new Set<string>();
+  if (!contextId) return ids;
+  const members = nodes.filter((n) => n.data.context === contextId).map((n) => n.id);
+  for (const id of members) ids.add(id);
+  const memberSet = new Set(members);
+  for (const e of edges) {
+    if (memberSet.has(e.source)) ids.add(e.target);
+    if (memberSet.has(e.target)) ids.add(e.source);
+  }
+  return ids;
+}
+
 /** Bounded Context Focus (spec-00010): the same dim-others emphasis at context
  *  granularity. `nodeIds` = the context's member nodes plus their edge neighbours
  *  that are not in a *different* context (the slice's own/Ungrouped supporting

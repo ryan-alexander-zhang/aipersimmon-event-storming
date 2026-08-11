@@ -118,15 +118,17 @@ relationship away and those relationships vivid while the other contexts dim.
 _Avoid_: isolate, spotlight, filter.
 
 **Isolate**:
-A transient view that keeps only one element's neighbourhood — the elements
-reachable from it within a chosen number of hops, upstream, downstream, or both —
-and **hides** everything else, laying the survivors out as their own compact
-board so the space the hidden elements vacated is reclaimed. Its **anchor** — the
-element selected when Isolate is switched on — is pinned: selecting another
-element inside the view reads that element without re-framing the view. Distinct
-from **Bounded Context Focus** (which dims rather than hides, is anchored on a
-context, and never moves anything) and from a filter (which hides by attribute,
-not by reachability).
+A transient view that keeps only its **anchor**'s slice and **hides** everything
+else, laying the survivors out as their own compact board so the space the hidden
+elements vacated is reclaimed. The anchor is either an **element** — its slice is
+everything reachable within a chosen number of hops, upstream, downstream, or both
+— or a whole **Bounded Context**, whose slice is its members plus every element
+directly related to one of them, so a relation to another context (a seam) keeps
+the element on its far side and still reads as a relation. The anchor is pinned:
+selecting another element inside the view reads that element without re-framing
+the view. Distinct from **Bounded Context Focus** (which dims rather than hides and
+never moves anything, even when both are anchored on the same context) and from a
+filter (which hides by attribute, not by reachability).
 _Avoid_: focus mode, drill-down, neighbourhood filter.
 
 **Timeline**:

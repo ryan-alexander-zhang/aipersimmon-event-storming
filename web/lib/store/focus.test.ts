@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { computeContextFocus, computeFocus, computeNeighborhood, focusSource } from "./focus";
+import {
+  computeContextFocus,
+  computeContextNeighborhood,
+  computeFocus,
+  computeNeighborhood,
+  focusSource,
+} from "./focus";
 import type { ESEdge, ESNode } from "./types";
 
 const edge = (id: string, source: string, target: string): ESEdge => ({
@@ -142,5 +148,44 @@ describe("focusSource (RA3)", () => {
   it("is null when neither is set", () => {
     expect(focusSource(null, null)).toBe(null);
     expect(focusSource(undefined, undefined)).toBe(null);
+  });
+});
+
+describe("computeContextNeighborhood (context isolate)", () => {
+  // A: a1 -> a2, a1 -> u (Ungrouped support), a2 -> b1 (a seam into B); B: b1 -> b2
+  const nodes = [
+    node("a1", "A"),
+    node("a2", "A"),
+    node("u"),
+    node("b1", "B"),
+    node("b2", "B"),
+  ];
+  const es = [
+    edge("a1a2", "a1", "a2"),
+    edge("a1u", "a1", "u"),
+    edge("a2b1", "a2", "b1"),
+    edge("b1b2", "b1", "b2"),
+  ];
+
+  it("is empty when no context is given", () => {
+    for (const id of [null, undefined, ""]) {
+      expect(computeContextNeighborhood(id, nodes, es).size).toBe(0);
+    }
+  });
+
+  it("keeps the members, their Ungrouped support, and the far side of a seam", () => {
+    const ids = computeContextNeighborhood("A", nodes, es);
+    expect([...ids].sort()).toEqual(["a1", "a2", "b1", "u"]);
+    // b1 comes in as the seam's other endpoint; b2, a second hop into B, does not
+    expect(ids.has("b2")).toBe(false);
+  });
+
+  it("keeps a member with no edges at all", () => {
+    const ids = computeContextNeighborhood("B", [node("b9", "B")], []);
+    expect([...ids]).toEqual(["b9"]);
+  });
+
+  it("is empty for a context no node belongs to", () => {
+    expect(computeContextNeighborhood("nope", nodes, es).size).toBe(0);
   });
 });

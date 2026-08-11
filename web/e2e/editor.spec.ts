@@ -1408,6 +1408,42 @@ const isolateAroundOrderPlaced = async (page: Page) => {
   await page.waitForTimeout(450); // let the isolate refit (300ms) settle before hit-testing
 };
 
+test("isolates a whole Bounded Context from its menu, keeping the far side of a seam [design-00003]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await page.getByRole("button", { name: "Design" }).click();
+  const all = page.locator(".react-flow__node");
+  await expect(all).toHaveCount(8); // ord: a1 c1 ag1 e1 rm1 · pay: ex1 c2 e2
+
+  // a seam: Ordering's Actor issues Payment's Command (manual cross-context link)
+  const ab = (await page.locator('.react-flow__node[data-id="a1"]').boundingBox())!;
+  const cb = (await page.locator('.react-flow__node[data-id="c2"]').boundingBox())!;
+  await page.mouse.move(ab.x + ab.width / 2, ab.y + ab.height);
+  await page.mouse.down();
+  await page.mouse.move(cb.x + cb.width / 2, (ab.y + ab.height + cb.y) / 2, { steps: 8 });
+  await page.mouse.move(cb.x + cb.width / 2, cb.y, { steps: 8 });
+  await page.mouse.up();
+  await expect(edges(page)).toHaveCount(7);
+
+  await page.locator(".react-flow__pane").click({ position: { x: 20, y: 300 } });
+  await page.getByRole("button", { name: "Context options" }).first().click(); // Ordering
+  await page.getByRole("button", { name: "Isolate this context" }).click();
+  await page.waitForTimeout(500);
+
+  // Ordering's five members plus c2 — the element on the far side of the seam, so
+  // the cross-context relation still reads as a relation
+  await expect(all).toHaveCount(6);
+  await expect(page.locator('.react-flow__node[data-id="c2"]')).toHaveCount(1);
+  await expect(page.locator('.react-flow__node[data-id="e2"]')).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Exit Isolate" })).toBeVisible();
+
+  // Esc leaves it and the whole board comes back
+  await page.keyboard.press("Escape");
+  await expect(all).toHaveCount(8);
+});
+
 test("Isolate stays visible with nothing selected and exits with Esc [design-00003]", async ({
   page,
 }) => {

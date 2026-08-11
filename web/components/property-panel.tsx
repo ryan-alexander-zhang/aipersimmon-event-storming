@@ -436,7 +436,9 @@ export function PropertyPanel() {
             {isolate.active ? "On" : "Off"}
           </button>
         </div>
-        {isolate.active && (
+        {/* Direction and depth walk an element's relations, so they are meaningless
+            while the view is anchored on a whole Bounded Context. */}
+        {isolate.active && isolate.anchor?.kind !== "context" && (
           <div className="mt-2 space-y-2">
             <div
               className="flex items-center rounded-md border border-zinc-300 p-0.5"

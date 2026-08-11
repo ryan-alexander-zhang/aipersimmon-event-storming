@@ -345,7 +345,7 @@ describe("store v2 (RT3)", () => {
   });
 
   it("tracks isolate view state and clears active on clear/setModel (TC2)", () => {
-    expect(get().isolate).toEqual({ active: false, direction: "down", depth: 2, anchorId: null });
+    expect(get().isolate).toEqual({ active: false, direction: "down", depth: 2, anchor: null });
     get().toggleIsolate();
     expect(get().isolate.active).toBe(true);
     get().setIsolateDirection("up");
@@ -364,25 +364,41 @@ describe("store v2 (RT3)", () => {
     const b = get().addNode("domainEvent", ctx);
     get().setSelected(a);
     get().toggleIsolate();
-    expect(get().isolate.anchorId).toBe(a);
+    expect(get().isolate.anchor).toEqual({ kind: "element", id: a });
 
     // selecting another element (or clearing the selection) leaves the frame alone
     get().setSelected(b);
-    expect(get().isolate.anchorId).toBe(a);
+    expect(get().isolate.anchor).toEqual({ kind: "element", id: a });
     get().setSelected(null);
-    expect(get().isolate.anchorId).toBe(a);
+    expect(get().isolate.anchor).toEqual({ kind: "element", id: a });
     // direction/depth re-frame the same anchor
     get().setIsolateDepth(3);
-    expect(get().isolate.anchorId).toBe(a);
+    expect(get().isolate.anchor).toEqual({ kind: "element", id: a });
 
     // switching off releases the anchor; switching on again pins what is selected now
     get().toggleIsolate();
-    expect(get().isolate).toMatchObject({ active: false, anchorId: null });
+    expect(get().isolate).toMatchObject({ active: false, anchor: null });
     get().setSelected(b);
     get().toggleIsolate();
-    expect(get().isolate.anchorId).toBe(b);
+    expect(get().isolate.anchor).toEqual({ kind: "element", id: b });
     get().clear();
-    expect(get().isolate).toMatchObject({ active: false, anchorId: null });
+    expect(get().isolate).toMatchObject({ active: false, anchor: null });
+  });
+
+  it("anchors isolate on a whole Bounded Context, and releases it on toggle off", () => {
+    const ctx = get().addContext("Ordering");
+    const ev = get().addNode("domainEvent", ctx);
+    get().setSelected(ev);
+    get().isolateContext(ctx);
+    expect(get().isolate).toMatchObject({ active: true, anchor: { kind: "context", id: ctx } });
+    // the selection is left alone — it is not what the view is framed on
+    expect(get().selectedId).toBe(ev);
+    // isolating another context re-frames without going through off
+    const other = get().addContext("Payment");
+    get().isolateContext(other);
+    expect(get().isolate.anchor).toEqual({ kind: "context", id: other });
+    get().toggleIsolate();
+    expect(get().isolate).toMatchObject({ active: false, anchor: null });
   });
 
   it("toggles the model-health panel visibility [spec-00007]", () => {

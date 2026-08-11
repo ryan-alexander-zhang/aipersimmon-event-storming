@@ -119,6 +119,21 @@ change); Tier B changes edge geometry; Tier C is structural.
     a **discrete switch** — isolate on/off, depth, direction — never on semantic
     zoom or on search/filter (whose query changes per keystroke). Positions are
     still computed, never authored (§5 holds).
+  - **An anchor is an element or a Bounded Context.** A context's slice is its
+    members plus every element directly related to one of them: that pulls in its
+    own and Ungrouped supporting elements *and* the element on the far side of a
+    seam, so a cross-context relation still reads as a relation instead of
+    vanishing with its endpoint. Entry point is the context chip's `⋯` menu
+    ("Isolate this context"), **not** the chip body — clicking a chip stays the
+    two-state Bounded Context Focus toggle of us-00024-AC-3.1 (dim, then clear).
+    Bounded Context Focus keeps dimming; Isolate is what hides and reflows.
+  - **A framed fit never drops below the detail threshold.** A context can span most
+    of the timeline, and fitting such a slice whole zooms out past the semantic-zoom
+    threshold (`FULL_DETAIL_ZOOM`), which drops the very detail the view was opened
+    to read (measured: a 78-node context slice fitted at zoom 0.23, stickies 28px
+    wide). Camera moves that frame a chosen subset — entering Isolate, and the
+    recentre on leaving — clamp to that threshold and let the modeller pan. The
+    whole-board fit is exempt: that view exists to orient, not to read.
   - **The anchor is pinned, and leaving recenters on it.** The neighbourhood is
     framed around the element selected when Isolate is switched on — the *anchor* —
     and that anchor is **pinned** for the life of the view: clicking another

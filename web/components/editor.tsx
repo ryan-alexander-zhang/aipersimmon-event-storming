@@ -30,12 +30,17 @@ import { PropertyPanel } from "@/components/property-panel";
 import { Toolbar } from "@/components/toolbar";
 import { RELATION_STYLE } from "@/lib/eventstorming/edge-style";
 import { ELEMENT_DEFINITIONS, ELEMENT_TYPES, type ElementType } from "@/lib/eventstorming/elements";
-import { typesForZoom } from "@/lib/eventstorming/levels";
+import { FULL_DETAIL_ZOOM, typesForZoom } from "@/lib/eventstorming/levels";
 import { isValidConnection as canConnect } from "@/lib/eventstorming/relations";
 import { computeEdgeOffsets } from "@/lib/layout/edge-spread";
 import { COL_W, computeIsolateLayout, NODE_W } from "@/lib/layout/layout";
 import { isShownByFilter, matchesQuery } from "@/lib/store/filter";
-import { computeContextFocus, computeFocus, computeNeighborhood } from "@/lib/store/focus";
+import {
+  computeContextFocus,
+  computeContextNeighborhood,
+  computeFocus,
+  computeNeighborhood,
+} from "@/lib/store/focus";
 import {
   loadDiscovery,
   loadModel,
@@ -328,21 +333,26 @@ function Canvas() {
     return computeFocus(hoveredId, edges);
   }, [focusedContext, selectedId, hoveredId, nodes, edges]);
 
-  // Isolate ("focus mode"): keep only the anchor's N-hop neighbourhood; otherwise
-  // null (show everything the types allow). The anchor is pinned when Isolate is
-  // switched on, so selecting another element inside the view reads it without
-  // re-framing the view (issue-00024). A deleted anchor frames nothing.
-  const anchorId = isolate.active ? isolate.anchorId : null;
-  const isoNodeIds = useMemo(
-    () =>
-      anchorId && nodes.some((n) => n.id === anchorId)
-        ? computeNeighborhood(anchorId, edges, {
-            depth: isolate.depth,
-            direction: isolate.direction,
-          }).nodeIds
-        : null,
-    [anchorId, isolate.depth, isolate.direction, nodes, edges],
-  );
+  // Isolate ("focus mode"): keep only the anchor's slice — an element's N-hop
+  // neighbourhood, or a Bounded Context's members and what they are directly
+  // related to; otherwise null (show everything the types allow). The anchor is
+  // pinned when Isolate is switched on, so selecting another element inside the
+  // view reads it without re-framing the view (issue-00024). An anchor that is no
+  // longer on the board (deleted element, emptied context) frames nothing.
+  const anchor = isolate.active ? isolate.anchor : null;
+  const isoNodeIds = useMemo(() => {
+    if (!anchor) return null;
+    if (anchor.kind === "context") {
+      const ids = computeContextNeighborhood(anchor.id, nodes, edges);
+      return ids.size > 0 ? ids : null;
+    }
+    return nodes.some((n) => n.id === anchor.id)
+      ? computeNeighborhood(anchor.id, edges, {
+          depth: isolate.depth,
+          direction: isolate.direction,
+        }).nodeIds
+      : null;
+  }, [anchor, isolate.depth, isolate.direction, nodes, edges]);
 
   // Edge-hover tracing works on any edge in the neutral state, but inside a
   // committed scope (focused Bounded Context / selected element) only on edges
@@ -527,28 +537,50 @@ function Canvas() {
   // Refit the view when isolate frames a subset (or clears back to the board).
   // `maxZoom` keeps a small neighbourhood from being blown up oversized when its
   // compact box is scaled to the viewport (issue-00021).
-  const isoKey = isoNodeIds ? `${anchorId}|${isolate.direction}|${isolate.depth}` : "off";
+  const isoKey = isoNodeIds
+    ? `${anchor?.kind}:${anchor?.id}|${isolate.direction}|${isolate.depth}`
+    : "off";
 
   // Where the camera goes when Isolate is left. The modeller wants the element they
   // were just reading, which is the last one they selected inside the view — the
-  // anchor only while they have selected nothing else (issue-00025). Kept past the
-  // exit, and dropped when a new anchor starts a new view. A null `selectedId` never
-  // erases the selection here, so the clearing click cannot race it away.
-  const exitRef = useRef<{ anchor: string; selection: string | null } | null>(null);
+  // anchor's own slice only while they have selected nothing else (issue-00025).
+  // Kept past the exit, and dropped when a new anchor starts a new view. A null
+  // `selectedId` never erases the selection here, so the clearing click cannot race
+  // it away.
+  const exitRef = useRef<{ key: string; ids: string[]; selection: string | null } | null>(null);
   useEffect(() => {
-    if (!isoNodeIds || !anchorId) return;
-    if (exitRef.current?.anchor !== anchorId) exitRef.current = { anchor: anchorId, selection: null };
-    if (selectedId && selectedId !== anchorId) exitRef.current.selection = selectedId;
-  }, [isoNodeIds, anchorId, selectedId]);
+    if (!isoNodeIds || !anchor) return;
+    if (exitRef.current?.key !== isoKey) {
+      // An element anchor frames itself; a context anchor frames the slice it kept.
+      const ids = anchor.kind === "context" ? [...isoNodeIds] : [anchor.id];
+      exitRef.current = { key: isoKey, ids, selection: null };
+    }
+    if (selectedId && selectedId !== anchor.id) exitRef.current.selection = selectedId;
+  }, [isoNodeIds, anchor, isoKey, selectedId]);
 
   useEffect(() => {
     const t = setTimeout(() => {
-      // On leaving isolate, recenter on that element — or on the anchor if it is
-      // gone (deleted mid-view); if neither is on the board, fit it as before.
-      const s = exitRef.current;
-      const id =
-        isoKey === "off" && s ? [s.selection, s.anchor].find((x) => x && getNode(x)) : undefined;
-      fitView({ padding: 0.2, duration: 300, maxZoom: 1, ...(id ? { nodes: [{ id }] } : {}) });
+      // On leaving isolate, recenter on what was being read — else on the anchor's
+      // slice; if none of it is on the board any more, fit the board as before.
+      const s = isoKey === "off" ? exitRef.current : null;
+      const ids = s
+        ? s.selection && getNode(s.selection)
+          ? [s.selection]
+          : s.ids.filter((id) => getNode(id))
+        : [];
+      // Framing a chosen subset never zooms out past the detail threshold: a wide
+      // slice (a whole Bounded Context can span most of the timeline) is better read
+      // at readable size and panned than shrunk until its stickies lose their text.
+      // The whole-board fit is exempt — that view exists to orient, not to read.
+      const framed = isoKey !== "off" || ids.length > 0;
+      const target = ids.length > 0 ? { nodes: ids.map((id) => ({ id })) } : {};
+      fitView({
+        padding: 0.2,
+        duration: 300,
+        maxZoom: 1,
+        ...(framed ? { minZoom: FULL_DETAIL_ZOOM } : {}),
+        ...target,
+      });
     }, 0);
     return () => clearTimeout(t);
   }, [isoKey, fitView, getNode]);

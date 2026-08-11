@@ -28,15 +28,23 @@ import type { IsolateDirection } from "./focus";
 import { eventSlotIndex, gapOrder, normalizeOrders, slotOrders, timelineOrder } from "./timeline";
 import type { ESEdge, ESNode, ESNodeData } from "./types";
 
-/** Isolate ("focus mode") view state: hide everything outside the anchor's
- *  `depth`-hop neighbourhood in `direction`. The anchor is the element selected
- *  when Isolate is switched on and stays **pinned** — selecting another element
- *  inside the view reads it without re-framing the view. */
+/** What an isolate view is framed on: the element selected when Isolate was
+ *  switched on, or a whole Bounded Context. */
+export interface IsolateAnchor {
+  kind: "element" | "context";
+  id: string;
+}
+
+/** Isolate ("focus mode") view state: hide everything outside the anchor's slice —
+ *  an element's `depth`-hop neighbourhood in `direction`, or a context's members
+ *  and what they are directly related to. The anchor is **pinned** when Isolate is
+ *  switched on, so selecting another element inside the view reads it without
+ *  re-framing the view. `direction`/`depth` apply to an element anchor only. */
 export interface IsolateState {
   active: boolean;
   direction: IsolateDirection;
   depth: number;
-  anchorId: string | null;
+  anchor: IsolateAnchor | null;
 }
 
 /** A Domain Event on the transient discovery wall: a free x/y position and a
@@ -115,6 +123,7 @@ export interface ESState {
 
   setLevel: (level: Level) => void;
   toggleIsolate: () => void;
+  isolateContext: (contextId: string) => void;
   setIsolateDirection: (direction: IsolateDirection) => void;
   setIsolateDepth: (depth: number) => void;
   toggleHealth: () => void;
@@ -249,7 +258,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   focusedContext: null,
   hoveredEdgeId: null,
   selectedEdgeId: null,
-  isolate: { active: false, direction: "down", depth: 2, anchorId: null },
+  isolate: { active: false, direction: "down", depth: 2, anchor: null },
   healthOpen: false,
   walk: { active: false, index: 0 },
   discovery: { active: false, items: [] },
@@ -271,8 +280,15 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   toggleIsolate: () => {
     const on = !get().isolate.active;
     // Switching on pins the current selection as the anchor; switching off releases it.
-    set({ isolate: { ...get().isolate, active: on, anchorId: on ? get().selectedId : null } });
+    const selectedId = get().selectedId;
+    const anchor: IsolateAnchor | null =
+      on && selectedId ? { kind: "element", id: selectedId } : null;
+    set({ isolate: { ...get().isolate, active: on, anchor } });
   },
+  // Isolating a whole Bounded Context: the same view, anchored on the context
+  // instead of an element (its `⋯` menu is the entry point).
+  isolateContext: (contextId) =>
+    set({ isolate: { ...get().isolate, active: true, anchor: { kind: "context", id: contextId } } }),
   setIsolateDirection: (direction) => set({ isolate: { ...get().isolate, direction } }),
   setIsolateDepth: (depth) => set({ isolate: { ...get().isolate, depth: Math.max(1, depth) } }),
   // Health and Versions dock into the same column, so opening one closes the other.
@@ -562,7 +578,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       focusedContext: null,
       hoveredEdgeId: null,
       selectedEdgeId: null,
-      isolate: { ...get().isolate, active: false, anchorId: null },
+      isolate: { ...get().isolate, active: false, anchor: null },
       walk: { active: false, index: 0 },
       discovery: { active: false, items: [] },
       filter: { query: "", types: new Set(), contexts: new Set() },
@@ -583,7 +599,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       focusedContext: null,
       hoveredEdgeId: null,
       selectedEdgeId: null,
-      isolate: { ...get().isolate, active: false, anchorId: null },
+      isolate: { ...get().isolate, active: false, anchor: null },
       walk: { active: false, index: 0 },
       discovery: { active: false, items: [] },
       filter: { query: "", types: new Set(), contexts: new Set() },
