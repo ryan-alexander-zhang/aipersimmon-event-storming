@@ -1,6 +1,6 @@
 "use client";
 
-import { Combine, Network, Plus, Sparkles } from "lucide-react";
+import { Combine, Crosshair, Network, Plus, Sparkles, X } from "lucide-react";
 import { FileMenu } from "@/components/file-menu";
 import { FilterControls } from "@/components/filter-controls";
 import { LEVEL_LABEL, LEVELS } from "@/lib/eventstorming/levels";
@@ -17,6 +17,8 @@ export function Toolbar() {
   const contextMapOpen = useESStore((s) => s.contextMapOpen);
   const toggleContextMap = useESStore((s) => s.toggleContextMap);
   const compareActive = useESStore((s) => s.compare.active);
+  const isolate = useESStore((s) => s.isolate);
+  const toggleIsolate = useESStore((s) => s.toggleIsolate);
 
   // Drop a wall event in a light left→right cascade so freshly added events are
   // spatially ordered out of the box; the modeller then drags them where they want.
@@ -94,6 +96,21 @@ export function Toolbar() {
           </button>
         ))}
       </div>
+      {/* Isolate is sticky across the clearing click, and its On/Off control lives
+          in the selected element's panel — so with nothing selected the mode would
+          be on but invisible. This chip is the always-visible read-out and exit. */}
+      {isolate.active && !discoveryActive && !contextMapOpen && !compareActive && (
+        <button
+          type="button"
+          aria-label="Exit Isolate"
+          title="Isolate is on — Esc to exit"
+          className="flex items-center gap-1.5 rounded-md bg-zinc-800 px-2.5 py-1 text-xs font-medium text-white hover:bg-zinc-700"
+          onClick={toggleIsolate}
+        >
+          <Crosshair size={14} /> Isolate
+          <X size={13} className="text-zinc-400" />
+        </button>
+      )}
       {discoveryActive && (
         <div className="flex items-center gap-2">
           <button

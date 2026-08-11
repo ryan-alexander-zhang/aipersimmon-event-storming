@@ -69,6 +69,10 @@ change); Tier B changes edge geometry; Tier C is structural.
     the pointer does not disturb the chosen highlight. Return to preview by
     clearing the scope (empty-canvas click / Esc). Precedence:
     edge-hover (below) → committed scope → neutral node hover.
+  - **Which set "the scope" is.** For a selection or a focused Bounded Context it is
+    that element's/context's own incident edges. Under **Isolate** it is the whole
+    neighbourhood on screen, not the anchor's incident edges — everything rendered
+    there was chosen by the modeller, so all of it traces on hover (issue-00023).
 - **Edge-hover isolation.** When many edges are highlighted at once (a node with
   several incident edges), an individual connection is still hard to trace.
   Hovering a single edge emphasises just it — thicker, a soft glow, brought to
@@ -105,6 +109,29 @@ change); Tier B changes edge geometry; Tier C is structural.
   everything outside the selected node's N-hop neighborhood, with an
   upstream / downstream / both selector. Mirrors dbt's `model+` / `+model`
   lineage selectors. For deep inspection of 50+ node boards.
+  - **The neighborhood is relaid out as its own board** (issue-00021). Hiding
+    alone leaves the survivors on their full-board coordinates, so the columns
+    and bands the hidden elements vacated stay as empty space and an isolated
+    chain reads *worse* than the dimmed full view. So layout is a function of
+    `(model, Level, isolate neighborhood)`: the neighborhood's columns are
+    re-ranked over its own surviving Domain Events and a band with no surviving
+    node reserves no height. Like the per-Level reflow (issue-00009), this keys on
+    a **discrete switch** — isolate on/off, depth, direction — never on semantic
+    zoom or on search/filter (whose query changes per keystroke). Positions are
+    still computed, never authored (§5 holds).
+  - **The anchor is pinned, and leaving recenters on it.** The neighbourhood is
+    framed around the element selected when Isolate is switched on — the *anchor* —
+    and that anchor is **pinned** for the life of the view: clicking another
+    element inside it reads that element without re-framing, because the view
+    answers "what is connected to *this* element" (issue-00024). Re-anchoring is
+    explicit: select the new element, toggle Off then On. Exit is the clearing click
+    on empty canvas, Esc, the toolbar chip, or the panel's Off; on exit the camera
+    goes to **the element last read inside the view** — the last selection there, or
+    the anchor when nothing else was selected — rather than refitting the whole
+    board, so the modeller does not have to hunt for where they were (issue-00021,
+    issue-00025). While the mode is on with
+    nothing selected — the panel's control out of view — a toolbar chip carries the
+    state and exits it.
 - **Semantic zoom + collapse.** Tie level of detail to zoom and to the existing
   **Levels** (Big Picture / Process / Design, see design-00002 §8): zoomed out or
   at Big Picture, show only the Domain Event backbone and drop labels/read

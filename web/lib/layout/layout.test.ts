@@ -3,7 +3,14 @@ import type { Context } from "@/lib/dsl/schema";
 import { bandIndex } from "@/lib/eventstorming/elements";
 import type { RelationType } from "@/lib/eventstorming/relations";
 import type { ESEdge, ESNode } from "@/lib/store/types";
-import { BAND_H, computeContextBoxes, computeLayout, STACK_H } from "./layout";
+import {
+  BAND_H,
+  COL_W,
+  computeContextBoxes,
+  computeIsolateLayout,
+  computeLayout,
+  STACK_H,
+} from "./layout";
 
 const contexts: Context[] = [
   { id: "A", name: "Ordering", order: 0 },
@@ -239,5 +246,94 @@ describe("layout engine (RT2)", () => {
     const a = computeLayout(nodes, edges, contexts);
     const b = computeLayout(nodes, edges, contexts);
     expect(a.map((n) => n.position)).toEqual(b.map((n) => n.position));
+  });
+});
+
+// A six-column timeline where one chain skips from the first event to the last:
+// ev0 -triggers-> pol -invokes-> cmd -produces-> ev5, with ev1..ev4 filling the
+// columns in between.
+function gapModel(): { nodes: ESNode[]; edges: ESEdge[] } {
+  const ev = (id: string, order: number): ESNode => ({
+    id,
+    type: "domainEvent",
+    position: { x: 0, y: 0 },
+    data: { label: id, context: "A", order },
+  });
+  const nodes: ESNode[] = [
+    ev("ev0", 0),
+    ev("ev1", 1),
+    ev("ev2", 2),
+    ev("ev3", 3),
+    ev("ev4", 4),
+    ev("ev5", 5),
+    { id: "pol", type: "policy", position: { x: 0, y: 0 }, data: { label: "pol", context: "A" } },
+    { id: "cmd", type: "command", position: { x: 0, y: 0 }, data: { label: "cmd", context: "A" } },
+  ];
+  const e = (id: string, s: string, t: string, relation: RelationType): ESEdge => ({
+    id,
+    source: s,
+    target: t,
+    data: { relation },
+  });
+  const edges: ESEdge[] = [
+    e("t", "ev0", "pol", "triggers"),
+    e("i", "pol", "cmd", "invokes"),
+    e("p", "cmd", "ev5", "produces"),
+  ];
+  return { nodes, edges };
+}
+
+describe("isolate relayout [issue-00021]", () => {
+  it("reclaims the height of a band with no surviving node", () => {
+    const { nodes, edges } = sliceModel();
+    // On the full board the Policy band sits empty between the event and its
+    // read model, so they are two band-steps apart.
+    const full = computeLayout(nodes, edges, contexts, "design");
+    const fy = Object.fromEntries(full.map((n) => [n.id, n.position.y]));
+    expect(fy.rm - fy.ev).toBe(2 * BAND_H);
+
+    // Isolated to just those two, the bands above and between them reserve no
+    // height: the event is at the top and the read model one step below.
+    const iso = computeIsolateLayout(nodes, edges, contexts, "design", new Set(["ev", "rm"]));
+    const y = Object.fromEntries(iso.nodes.map((n) => [n.id, n.position.y]));
+    expect(iso.nodes).toHaveLength(2);
+    expect(y.ev).toBe(0);
+    expect(y.rm - y.ev).toBe(BAND_H);
+  });
+
+  it("re-ranks the columns over the surviving events so the chain sits adjacent", () => {
+    const { nodes, edges } = gapModel();
+    // On the full board ev5 is the sixth column, five steps from ev0.
+    const full = computeLayout(nodes, edges, contexts, "design");
+    const fx = Object.fromEntries(full.map((n) => [n.id, n.position.x]));
+    expect(fx.ev5 - fx.ev0).toBe(5 * COL_W);
+
+    // Isolated to the chain, the four vacated columns are reclaimed.
+    const keep = new Set(["ev0", "pol", "cmd", "ev5"]);
+    const iso = computeIsolateLayout(nodes, edges, contexts, "design", keep);
+    const x = Object.fromEntries(iso.nodes.map((n) => [n.id, n.position.x]));
+    expect(iso.nodes).toHaveLength(4);
+    expect(x.ev5 - x.ev0).toBe(COL_W);
+    expect(x.pol).toBe(x.ev0); // still in its event's column
+    expect(x.cmd).toBe(x.ev5);
+  });
+
+  it("reports band tops that match the relaid nodes, for the band rail", () => {
+    const { nodes, edges } = sliceModel();
+    const iso = computeIsolateLayout(nodes, edges, contexts, "design", new Set(["ev", "rm"]));
+    const y = Object.fromEntries(iso.nodes.map((n) => [n.id, n.position.y]));
+    expect(iso.bandTops[bandIndex("domainEvent")]).toBe(y.ev);
+    expect(iso.bandTops[bandIndex("readModel")]).toBe(y.rm);
+  });
+
+  it("drops nodes hidden at the level, so their band is reclaimed too", () => {
+    const { nodes, edges } = sliceModel();
+    // Big Picture hides Command; isolating actor+command+event keeps only the two
+    // the level allows, and they sit adjacent.
+    const keep = new Set(["act", "cmd", "ev"]);
+    const iso = computeIsolateLayout(nodes, edges, contexts, "big-picture", keep);
+    expect(iso.nodes.map((n) => n.id).sort()).toEqual(["act", "ev"]);
+    const y = Object.fromEntries(iso.nodes.map((n) => [n.id, n.position.y]));
+    expect(y.ev - y.act).toBe(BAND_H);
   });
 });

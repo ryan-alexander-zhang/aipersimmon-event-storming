@@ -117,6 +117,18 @@ on the Context Map the same focused context keeps itself, the contexts one
 relationship away and those relationships vivid while the other contexts dim.
 _Avoid_: isolate, spotlight, filter.
 
+**Isolate**:
+A transient view that keeps only one element's neighbourhood — the elements
+reachable from it within a chosen number of hops, upstream, downstream, or both —
+and **hides** everything else, laying the survivors out as their own compact
+board so the space the hidden elements vacated is reclaimed. Its **anchor** — the
+element selected when Isolate is switched on — is pinned: selecting another
+element inside the view reads that element without re-framing the view. Distinct
+from **Bounded Context Focus** (which dims rather than hides, is anchored on a
+context, and never moves anything) and from a filter (which hides by attribute,
+not by reachability).
+_Avoid_: focus mode, drill-down, neighbourhood filter.
+
 **Timeline**:
 The single global left→right ordering of all Domain Events that forms the board's
 spine, shared across every Bounded Context; every other element is placed relative

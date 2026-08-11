@@ -14,6 +14,7 @@ import { contextTint, SUBDOMAIN_STYLE } from "@/lib/eventstorming/context-color"
 import { LEVEL_TYPES } from "@/lib/eventstorming/levels";
 import { computeBandTops } from "@/lib/layout/layout";
 import { useESStore } from "@/lib/store/store";
+import type { ESNode } from "@/lib/store/types";
 
 const BAND_LABEL: Record<Band, string> = {
   actorSystem: "Actors / Systems",
@@ -40,8 +41,14 @@ const BAND_COLOR: Record<Band, string> = {
 };
 
 /** Band rail (left, y-aligned) and context headers (top, x-aligned) that track
- *  the React Flow viewport so they stay aligned to nodes under pan/zoom. */
-export function BoardChrome() {
+ *  the React Flow viewport so they stay aligned to nodes under pan/zoom.
+ *  While Isolate reflows the board the rail must read *that* layout, so the
+ *  isolated nodes and their band tops are handed in (issue-00021). */
+export function BoardChrome({
+  isolated,
+}: {
+  isolated?: { nodes: ESNode[]; bandTops: number[] } | null;
+}) {
   const { y: vy, zoom } = useViewport();
   const nodes = useESStore((s) => s.nodes);
   const edges = useESStore((s) => s.edges);
@@ -61,9 +68,14 @@ export function BoardChrome() {
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const visibleBands = new Set(LEVEL_TYPES[level].map((t) => ELEMENT_BAND[t]));
+  // Isolate collapses the bands its neighbourhood does not occupy, so the rail
+  // labels only the bands that are actually there and takes their tops from the
+  // same relayout the board is drawn from.
+  const visibleBands = isolated
+    ? new Set(isolated.nodes.map((n) => ELEMENT_BAND[n.type]))
+    : new Set(LEVEL_TYPES[level].map((t) => ELEMENT_BAND[t]));
 
-  const bandTops = computeBandTops(nodes, edges, contexts, level);
+  const bandTops = isolated?.bandTops ?? computeBandTops(nodes, edges, contexts, level);
   const nameOf = new Map(contexts.map((c) => [c.id, c.name]));
 
   const addEvent = (ctxId?: string) => {

@@ -33,7 +33,7 @@ import { ELEMENT_DEFINITIONS, ELEMENT_TYPES, type ElementType } from "@/lib/even
 import { typesForZoom } from "@/lib/eventstorming/levels";
 import { isValidConnection as canConnect } from "@/lib/eventstorming/relations";
 import { computeEdgeOffsets } from "@/lib/layout/edge-spread";
-import { COL_W, NODE_W } from "@/lib/layout/layout";
+import { COL_W, computeIsolateLayout, NODE_W } from "@/lib/layout/layout";
 import { isShownByFilter, matchesQuery } from "@/lib/store/filter";
 import { computeContextFocus, computeFocus, computeNeighborhood } from "@/lib/store/focus";
 import {
@@ -218,6 +218,7 @@ function Canvas() {
   const hoveredId = useESStore((s) => s.hoveredId);
   const focusedContext = useESStore((s) => s.focusedContext);
   const setFocusedContext = useESStore((s) => s.setFocusedContext);
+  const contexts = useESStore((s) => s.contexts);
   const level = useESStore((s) => s.level);
   const isolate = useESStore((s) => s.isolate);
   const healthOpen = useESStore((s) => s.healthOpen);
@@ -228,8 +229,9 @@ function Canvas() {
   const versionsOpen = useESStore((s) => s.versionsOpen);
   const filter = useESStore((s) => s.filter);
   const setEventOrder = useESStore((s) => s.setEventOrder);
+  const toggleIsolate = useESStore((s) => s.toggleIsolate);
   const zoom = useStore((s) => s.transform[2]);
-  const { fitView } = useReactFlow();
+  const { fitView, getNode } = useReactFlow();
 
   useAutosave();
 
@@ -279,10 +281,18 @@ function Canvas() {
         cancelRef.current = true;
         return;
       }
-      // Escape (not mid-drag) clears Bounded Context Focus (spec-00010).
+      // Escape (not mid-drag) clears Bounded Context Focus (spec-00010), and with
+      // no context focused it leaves Isolate — the keyboard exit for a mode that
+      // is sticky across the clearing click (design-00003 §3 Tier C).
       if (e.key === "Escape") {
         const s = useESStore.getState();
-        if (s.focusedContext) s.setFocusedContext(null);
+        if (s.focusedContext) {
+          s.setFocusedContext(null);
+          return;
+        }
+        const t = e.target as HTMLElement | null;
+        if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+        if (s.isolate.active) s.toggleIsolate();
         return;
       }
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -318,26 +328,57 @@ function Canvas() {
     return computeFocus(hoveredId, edges);
   }, [focusedContext, selectedId, hoveredId, nodes, edges]);
 
+  // Isolate ("focus mode"): keep only the anchor's N-hop neighbourhood; otherwise
+  // null (show everything the types allow). The anchor is pinned when Isolate is
+  // switched on, so selecting another element inside the view reads it without
+  // re-framing the view (issue-00024). A deleted anchor frames nothing.
+  const anchorId = isolate.active ? isolate.anchorId : null;
+  const isoNodeIds = useMemo(
+    () =>
+      anchorId && nodes.some((n) => n.id === anchorId)
+        ? computeNeighborhood(anchorId, edges, {
+            depth: isolate.depth,
+            direction: isolate.direction,
+          }).nodeIds
+        : null,
+    [anchorId, isolate.depth, isolate.direction, nodes, edges],
+  );
+
   // Edge-hover tracing works on any edge in the neutral state, but inside a
   // committed scope (focused Bounded Context / selected element) only on edges
   // within that scope — hovering an out-of-scope line does nothing. A clicked
   // (selected) edge gets the same emphasis but sticks when the pointer leaves;
   // a live hover on another edge still previews on top (us-00025-FR-3).
-  const committed = !!(focusedContext || selectedId);
+  // While isolating, the scope is the whole neighbourhood — everything rendered is
+  // inside it — so any of its edges traces, not just the anchor's own (issue-00023).
+  const committed = !!(focusedContext || selectedId) && !isoNodeIds;
   const candidateEdgeId = hoveredEdgeId ?? selectedEdgeId;
   const activeHoveredEdgeId =
     candidateEdgeId && (!committed || focus.edgeIds.has(candidateEdgeId)) ? candidateEdgeId : null;
 
+  // The neighbourhood is laid out as its own board, so the columns and bands the
+  // hidden elements vacated are reclaimed instead of leaving the survivors spread
+  // across empty space (issue-00021). Keyed on the isolate switch and the Level
+  // only — never on zoom or the search filter, which must not move nodes.
+  const isoLayout = useMemo(
+    () => (isoNodeIds ? computeIsolateLayout(nodes, edges, contexts, level, isoNodeIds) : null),
+    [isoNodeIds, nodes, edges, contexts, level],
+  );
+
+  // Every position-derived layer below reads the board through this: the isolate
+  // layout while isolating, the full board otherwise.
+  const boardNodes = isoLayout?.nodes ?? nodes;
+
   // Attach handle anchors per edge from current node positions, so the vertical
   // slice chain draws top↔bottom and timeline links left↔right.
   const routedEdges = useMemo(() => {
-    const pos = new Map(nodes.map((n) => [n.id, n.position]));
+    const pos = new Map(boardNodes.map((n) => [n.id, n.position]));
     return edges.map((e) => {
       const a = pos.get(e.source);
       const b = pos.get(e.target);
       return a && b ? { ...e, ...routeHandles(a, b) } : e;
     });
-  }, [nodes, edges]);
+  }, [boardNodes, edges]);
 
   // Visible element types = the Level filter, further narrowed by semantic zoom
   // (zoomed out → backbone; both never show more than the Level). Keyed by the
@@ -350,30 +391,12 @@ function Canvas() {
     [visibleTypeKey],
   );
 
-  // Isolate ("focus mode"): when on with a selected anchor, keep only that node's
-  // N-hop neighbourhood; otherwise null (show everything the types allow).
-  const isoNodeIds = useMemo(
-    () =>
-      isolate.active && selectedId
-        ? computeNeighborhood(selectedId, edges, {
-            depth: isolate.depth,
-            direction: isolate.direction,
-          }).nodeIds
-        : null,
-    [isolate.active, isolate.depth, isolate.direction, selectedId, edges],
-  );
-
-  // Level (+ semantic zoom) → Isolate neighbourhood → search/filter (spec-00006).
-  // Each stage only narrows, so filter never widens past what Level/Isolate allow.
+  // Level (+ semantic zoom) → search/filter (spec-00006). Each stage only narrows,
+  // so filter never widens past what Level allows. The Isolate neighbourhood was
+  // already applied by the relayout above, which is what `boardNodes` holds.
   const visibleNodes = useMemo(
-    () =>
-      nodes.filter(
-        (n) =>
-          visibleTypes.has(n.type) &&
-          (!isoNodeIds || isoNodeIds.has(n.id)) &&
-          isShownByFilter(n, filter),
-      ),
-    [nodes, visibleTypes, isoNodeIds, filter],
+    () => boardNodes.filter((n) => visibleTypes.has(n.type) && isShownByFilter(n, filter)),
+    [boardNodes, visibleTypes, filter],
   );
 
   // Search highlight: visible nodes whose label/description match the query. Null
@@ -414,14 +437,17 @@ function Canvas() {
   const decoratedNodes = useMemo(() => {
     // Domain Events are draggable to adjust the timeline (us-00010); every other
     // type stays locked. Dragging edits `order`, not position (design-00004 §1).
+    // Isolate is a reading lever, and its relaid columns no longer map to the full
+    // timeline, so the drag is locked while isolating — re-order on the full board
+    // (issue-00021).
     return visibleNodes.map((n) => {
       // Search hit: a blue ring, kept separate from focus dimming (spec-00006).
       const style: CSSProperties = matchIds?.has(n.id)
         ? { ...n.style, boxShadow: SEARCH_RING }
         : n.style ?? EMPTY_STYLE;
-      return { ...n, draggable: n.type === "domainEvent", style };
+      return { ...n, draggable: n.type === "domainEvent" && !isoLayout, style };
     });
-  }, [visibleNodes, matchIds]);
+  }, [visibleNodes, matchIds, isoLayout]);
   const visibleEdges = useMemo(() => {
     const ids = new Set(visibleNodes.map((n) => n.id));
     return routedEdges.filter((e) => ids.has(e.source) && ids.has(e.target));
@@ -433,12 +459,12 @@ function Canvas() {
   const nodePos = useMemo(
     () =>
       new Map(
-        nodes.map((n) => [
+        boardNodes.map((n) => [
           n.id,
           { x: n.position.x, y: n.position.y, w: n.measured?.width, h: n.measured?.height },
         ]),
       ),
-    [nodes],
+    [boardNodes],
   );
   const offsets = useMemo(() => computeEdgeOffsets(visibleEdges, nodePos), [visibleEdges, nodePos]);
 
@@ -499,12 +525,33 @@ function Canvas() {
   );
 
   // Refit the view when isolate frames a subset (or clears back to the board).
-  const isoKey =
-    isoNodeIds && selectedId ? `${selectedId}|${isolate.direction}|${isolate.depth}` : "off";
+  // `maxZoom` keeps a small neighbourhood from being blown up oversized when its
+  // compact box is scaled to the viewport (issue-00021).
+  const isoKey = isoNodeIds ? `${anchorId}|${isolate.direction}|${isolate.depth}` : "off";
+
+  // Where the camera goes when Isolate is left. The modeller wants the element they
+  // were just reading, which is the last one they selected inside the view — the
+  // anchor only while they have selected nothing else (issue-00025). Kept past the
+  // exit, and dropped when a new anchor starts a new view. A null `selectedId` never
+  // erases the selection here, so the clearing click cannot race it away.
+  const exitRef = useRef<{ anchor: string; selection: string | null } | null>(null);
   useEffect(() => {
-    const t = setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 0);
+    if (!isoNodeIds || !anchorId) return;
+    if (exitRef.current?.anchor !== anchorId) exitRef.current = { anchor: anchorId, selection: null };
+    if (selectedId && selectedId !== anchorId) exitRef.current.selection = selectedId;
+  }, [isoNodeIds, anchorId, selectedId]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      // On leaving isolate, recenter on that element — or on the anchor if it is
+      // gone (deleted mid-view); if neither is on the board, fit it as before.
+      const s = exitRef.current;
+      const id =
+        isoKey === "off" && s ? [s.selection, s.anchor].find((x) => x && getNode(x)) : undefined;
+      fitView({ padding: 0.2, duration: 300, maxZoom: 1, ...(id ? { nodes: [{ id }] } : {}) });
+    }, 0);
     return () => clearTimeout(t);
-  }, [isoKey, fitView]);
+  }, [isoKey, fitView, getNode]);
 
   // Delete / Backspace removes the selected relation edge (us-00025-FR-4). Scoped
   // to edges only — nodes are removed from the Property Panel, so a stray keypress
@@ -589,6 +636,10 @@ function Canvas() {
               setSelectedEdge(null);
               setHovered(null);
               setFocusedContext(null);
+              // The clearing click also leaves Isolate — the anchor is pinned, so
+              // otherwise nothing would take the view back to the whole board
+              // (issue-00024). The camera then recenters on that anchor.
+              if (useESStore.getState().isolate.active) toggleIsolate();
             }}
             fitView
             fitViewOptions={{ padding: 0.25 }}
@@ -602,7 +653,7 @@ function Canvas() {
             <Controls />
           </ReactFlow>
           )}
-          {boardView && <BoardChrome />}
+          {boardView && <BoardChrome isolated={isoLayout} />}
           {boardView && drop && <TimelineDropIndicator drop={drop} />}
           {boardView && walkActive && <Walkthrough />}
         </div>

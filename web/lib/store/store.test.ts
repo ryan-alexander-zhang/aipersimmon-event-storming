@@ -345,7 +345,7 @@ describe("store v2 (RT3)", () => {
   });
 
   it("tracks isolate view state and clears active on clear/setModel (TC2)", () => {
-    expect(get().isolate).toEqual({ active: false, direction: "down", depth: 2 });
+    expect(get().isolate).toEqual({ active: false, direction: "down", depth: 2, anchorId: null });
     get().toggleIsolate();
     expect(get().isolate.active).toBe(true);
     get().setIsolateDirection("up");
@@ -356,6 +356,33 @@ describe("store v2 (RT3)", () => {
     get().clear();
     expect(get().isolate.active).toBe(false);
     expect(get().isolate.direction).toBe("up"); // preference kept
+  });
+
+  it("pins the anchor when isolate is switched on, so a later selection cannot re-frame it [issue-00024]", () => {
+    const ctx = get().addContext("Ordering");
+    const a = get().addNode("domainEvent", ctx);
+    const b = get().addNode("domainEvent", ctx);
+    get().setSelected(a);
+    get().toggleIsolate();
+    expect(get().isolate.anchorId).toBe(a);
+
+    // selecting another element (or clearing the selection) leaves the frame alone
+    get().setSelected(b);
+    expect(get().isolate.anchorId).toBe(a);
+    get().setSelected(null);
+    expect(get().isolate.anchorId).toBe(a);
+    // direction/depth re-frame the same anchor
+    get().setIsolateDepth(3);
+    expect(get().isolate.anchorId).toBe(a);
+
+    // switching off releases the anchor; switching on again pins what is selected now
+    get().toggleIsolate();
+    expect(get().isolate).toMatchObject({ active: false, anchorId: null });
+    get().setSelected(b);
+    get().toggleIsolate();
+    expect(get().isolate.anchorId).toBe(b);
+    get().clear();
+    expect(get().isolate).toMatchObject({ active: false, anchorId: null });
   });
 
   it("toggles the model-health panel visibility [spec-00007]", () => {

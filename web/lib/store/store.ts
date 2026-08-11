@@ -28,12 +28,15 @@ import type { IsolateDirection } from "./focus";
 import { eventSlotIndex, gapOrder, normalizeOrders, slotOrders, timelineOrder } from "./timeline";
 import type { ESEdge, ESNode, ESNodeData } from "./types";
 
-/** Isolate ("focus mode") view state: hide everything outside the selected
- *  node's `depth`-hop neighbourhood in `direction`. Anchored on selectedId. */
+/** Isolate ("focus mode") view state: hide everything outside the anchor's
+ *  `depth`-hop neighbourhood in `direction`. The anchor is the element selected
+ *  when Isolate is switched on and stays **pinned** — selecting another element
+ *  inside the view reads it without re-framing the view. */
 export interface IsolateState {
   active: boolean;
   direction: IsolateDirection;
   depth: number;
+  anchorId: string | null;
 }
 
 /** A Domain Event on the transient discovery wall: a free x/y position and a
@@ -246,7 +249,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   focusedContext: null,
   hoveredEdgeId: null,
   selectedEdgeId: null,
-  isolate: { active: false, direction: "down", depth: 2 },
+  isolate: { active: false, direction: "down", depth: 2, anchorId: null },
   healthOpen: false,
   walk: { active: false, index: 0 },
   discovery: { active: false, items: [] },
@@ -265,7 +268,11 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       discovery:
         level === "big-picture" ? get().discovery : { ...get().discovery, active: false },
     }),
-  toggleIsolate: () => set({ isolate: { ...get().isolate, active: !get().isolate.active } }),
+  toggleIsolate: () => {
+    const on = !get().isolate.active;
+    // Switching on pins the current selection as the anchor; switching off releases it.
+    set({ isolate: { ...get().isolate, active: on, anchorId: on ? get().selectedId : null } });
+  },
   setIsolateDirection: (direction) => set({ isolate: { ...get().isolate, direction } }),
   setIsolateDepth: (depth) => set({ isolate: { ...get().isolate, depth: Math.max(1, depth) } }),
   // Health and Versions dock into the same column, so opening one closes the other.
@@ -555,7 +562,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       focusedContext: null,
       hoveredEdgeId: null,
       selectedEdgeId: null,
-      isolate: { ...get().isolate, active: false },
+      isolate: { ...get().isolate, active: false, anchorId: null },
       walk: { active: false, index: 0 },
       discovery: { active: false, items: [] },
       filter: { query: "", types: new Set(), contexts: new Set() },
@@ -576,7 +583,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       focusedContext: null,
       hoveredEdgeId: null,
       selectedEdgeId: null,
-      isolate: { ...get().isolate, active: false },
+      isolate: { ...get().isolate, active: false, anchorId: null },
       walk: { active: false, index: 0 },
       discovery: { active: false, items: [] },
       filter: { query: "", types: new Set(), contexts: new Set() },

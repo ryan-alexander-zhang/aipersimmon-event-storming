@@ -1393,6 +1393,139 @@ test("hovering one element does not re-render every node on the board [issue-000
   expect(node).toBeLessThan(rendered / 4);
 });
 
+// Isolate on "Order Placed" (e1), both directions, depth 2 → e1 + ag1 + rm1 + c1.
+// The anchor's own edges are r3 (ag1→e1) and r4 (e1→rm1); r2 (c1→ag1) is two hops
+// out, inside the view but not incident to the anchor.
+const isolateAroundOrderPlaced = async (page: Page) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await page.getByRole("button", { name: "Design" }).click();
+  await expect(page.locator(".react-flow__node")).toHaveCount(8);
+  await nodes(page, "domainEvent").filter({ hasText: "Order Placed" }).click();
+  await page.getByRole("button", { name: "Off", exact: true }).click(); // Isolate on
+  await page.getByRole("button", { name: "Both" }).click();
+  await expect(page.locator(".react-flow__node")).toHaveCount(4);
+  await page.waitForTimeout(450); // let the isolate refit (300ms) settle before hit-testing
+};
+
+test("Isolate stays visible with nothing selected and exits with Esc [design-00003]", async ({
+  page,
+}) => {
+  const all = page.locator(".react-flow__node");
+  const chip = page.getByRole("button", { name: "Exit Isolate" });
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await expect(chip).toHaveCount(0); // nothing isolated → no chip
+  await isolateAroundOrderPlaced(page);
+  await expect(chip).toBeVisible();
+
+  // Selecting an edge clears the node selection, so the panel's On/Off control goes
+  // out of view — the chip is what keeps the mode visible and exitable.
+  const bb = (await page.locator('.react-flow__edge[data-id="r3"]').boundingBox())!;
+  await page.mouse.click(bb.x + bb.width / 2, bb.y + bb.height * 0.15);
+  await expect(all).toHaveCount(4); // the pinned anchor still frames the view
+  await expect(chip).toBeVisible();
+
+  // Esc leaves the mode and the whole board comes back.
+  await page.keyboard.press("Escape");
+  await expect(chip).toHaveCount(0);
+  await expect(all).toHaveCount(8);
+});
+
+test("inside Isolate every edge of the neighbourhood traces on hover [issue-00023]", async ({
+  page,
+}) => {
+  await isolateAroundOrderPlaced(page);
+  const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
+
+  // r2 is in the view but not incident to the anchor. Before the fix the committed
+  // scope was the anchor's own edges, so hovering it did nothing.
+  await edge("r2").hover({ force: true });
+  await expect(edge("r2")).toHaveClass(/animated/);
+  await expect(edge("r3").locator(".react-flow__edge-path")).toHaveCSS("opacity", "0.12");
+
+  await page.mouse.move(5, 5);
+  await expect(edge("r2")).not.toHaveClass(/animated/);
+  await expect(edge("r3").locator(".react-flow__edge-path")).toHaveCSS("opacity", "1");
+});
+
+test("the Isolate anchor is pinned: selecting another element does not re-frame it [issue-00024]", async ({
+  page,
+}) => {
+  await isolateAroundOrderPlaced(page);
+  const all = page.locator(".react-flow__node");
+  const node = (id: string) => page.locator(`.react-flow__node[data-id="${id}"]`);
+
+  // Order View (rm1) is a leaf: re-anchoring on it would drop the command (c1) and
+  // leave three nodes. Pinned, the view is unchanged and only the selection moves.
+  await node("rm1").click();
+  await expect(all).toHaveCount(4);
+  await expect(node("c1")).toHaveCount(1);
+  await expect(page.getByLabel("Label", { exact: true })).toHaveValue("Order View");
+
+  // Re-anchoring stays possible, but only explicitly: Off then On with rm1 selected.
+  await page.getByRole("button", { name: "On", exact: true }).click();
+  await expect(all).toHaveCount(8);
+  await page.getByRole("button", { name: "Off", exact: true }).click();
+  await expect(all).toHaveCount(3);
+});
+
+test("leaving Isolate lands on the element last read inside the view [issue-00025]", async ({
+  page,
+}) => {
+  await isolateAroundOrderPlaced(page); // anchor: Order Placed (e1); view also holds rm1
+  const pane = page.locator(".react-flow__pane");
+  const pb = (await pane.boundingBox())!;
+  const centre = { x: pb.x + pb.width / 2, y: pb.y + pb.height / 2 };
+  const offCentre = async (id: string) => {
+    const b = (await page.locator(`.react-flow__node[data-id="${id}"]`).boundingBox())!;
+    return Math.hypot(b.x + b.width / 2 - centre.x, b.y + b.height / 2 - centre.y);
+  };
+
+  // read another element inside the view, then leave
+  await page.locator('.react-flow__node[data-id="rm1"]').click();
+  await pane.click({ position: { x: 20, y: pb.height / 2 } });
+  await page.waitForTimeout(600);
+  await expect(page.locator(".react-flow__node")).toHaveCount(8);
+
+  // the camera holds what was being read, not the anchor it was framed on
+  expect(await offCentre("rm1")).toBeLessThan(60);
+  expect(await offCentre("e1")).toBeGreaterThan(60);
+});
+
+test("leaving Isolate keeps the camera on the anchor, not on the whole board [issue-00021]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", largeBoard(10));
+  const events = nodes(page, "domainEvent");
+  await expect(events).toHaveCount(20);
+
+  // a mid-board event, tracked by id (the repeated copies share labels)
+  const id = await events.nth(10).getAttribute("data-id");
+  const anchor = page.locator(`.react-flow__node[data-id="${id}"]`);
+  const fitted = (await anchor.boundingBox())!; // tiny: the whole board is fitted
+
+  await anchor.click();
+  await page.getByRole("button", { name: "Off", exact: true }).click(); // Isolate on
+  await page.waitForTimeout(600);
+  expect((await anchor.boundingBox())!.width).toBeGreaterThan(fitted.width * 2);
+
+  // clear the selection on empty canvas — the board comes back, but the camera
+  // should stay where the modeller was looking
+  const pane = page.locator(".react-flow__pane");
+  const pb = (await pane.boundingBox())!;
+  await pane.click({ position: { x: 40, y: pb.height / 2 } });
+  await page.waitForTimeout(600);
+  await expect(events).toHaveCount(20);
+
+  const after = (await anchor.boundingBox())!;
+  // Before the fix this refitted all ten copies, shrinking the anchor back to
+  // `fitted` somewhere off screen; now it stays readable and centred.
+  expect(after.width).toBeGreaterThan(fitted.width * 2);
+  expect(Math.abs(after.x + after.width / 2 - (pb.x + pb.width / 2))).toBeLessThan(pb.width * 0.2);
+});
+
 test("a zoom gesture inside one semantic band does not stall a frame [issue-00019]", async ({
   page,
 }) => {

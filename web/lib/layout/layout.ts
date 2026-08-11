@@ -126,13 +126,22 @@ interface Rows {
 // cumulative top y of every band. A band grows by STACK_H per extra sub-row so
 // concurrent lanes never overflow into the band below (issue-00002). Bands
 // hidden at `level` reserve no height, so the visible bands collapse adjacent
-// (issue-00009) — layout is a function of (model, level), never of zoom.
-function computeRows(nodes: ESNode[], place: Placed["place"], level: Level): Rows {
+// (issue-00009) — layout is a function of (model, level), never of zoom. With
+// `collapseAbsentBands` a band holding no node reserves no height either; that is
+// the Isolate view only (issue-00021), where the neighbourhood is laid out as its
+// own board — the full board keeps an empty band's space.
+function computeRows(
+  nodes: ESNode[],
+  place: Placed["place"],
+  level: Level,
+  collapseAbsentBands = false,
+): Rows {
   const visibleBand = new Set(LEVEL_TYPES[level].map((t) => bandIndex(t)));
   const cellCount = new Map<string, number>();
   const subRow = new Map<string, number>();
   const globalCol = new Map<string, number>();
   const maxSubRow = new Array(BAND_ORDER.length).fill(0);
+  const present = new Set<number>();
   for (const n of nodes) {
     const p = place.get(n.id)!; // computePlacement places every node
     const gcol = p.col; // one global timeline — no per-context offset
@@ -143,14 +152,26 @@ function computeRows(nodes: ESNode[], place: Placed["place"], level: Level): Row
     const sr = p.lane + stack;
     subRow.set(n.id, sr);
     globalCol.set(n.id, gcol);
+    present.add(row);
     if (sr > maxSubRow[row]) maxSubRow[row] = sr;
   }
   const bandTops = new Array(BAND_ORDER.length).fill(0);
   for (let r = 1; r < bandTops.length; r++) {
-    const prevH = visibleBand.has(r - 1) ? maxSubRow[r - 1] * STACK_H + BAND_H : 0;
-    bandTops[r] = bandTops[r - 1] + prevH;
+    const holds = visibleBand.has(r - 1) && (!collapseAbsentBands || present.has(r - 1));
+    bandTops[r] = bandTops[r - 1] + (holds ? maxSubRow[r - 1] * STACK_H + BAND_H : 0);
   }
   return { subRow, globalCol, bandTops };
+}
+
+// Place each node from its resolved column and band row.
+function positioned(nodes: ESNode[], rows: Rows): ESNode[] {
+  return nodes.map((n) => ({
+    ...n,
+    position: {
+      x: Math.round(rows.globalCol.get(n.id)! * COL_W),
+      y: rows.bandTops[bandIndex(n.type)] + rows.subRow.get(n.id)! * STACK_H,
+    },
+  }));
 }
 
 /** Compute a new node array with positions derived from the model. Pure and
@@ -163,14 +184,29 @@ export function computeLayout(
   level: Level = "design",
 ): ESNode[] {
   const { place } = computePlacement(nodes, edges, contexts);
-  const { subRow, globalCol, bandTops } = computeRows(nodes, place, level);
-  return nodes.map((n) => ({
-    ...n,
-    position: {
-      x: Math.round(globalCol.get(n.id)! * COL_W),
-      y: bandTops[bandIndex(n.type)] + subRow.get(n.id)! * STACK_H,
-    },
-  }));
+  return positioned(nodes, computeRows(nodes, place, level));
+}
+
+/** Positions for the **Isolate** view (issue-00021): the `keep` neighbourhood laid
+ *  out as its own board, so the columns and bands the hidden elements vacated are
+ *  reclaimed instead of being left as empty space. Nodes hidden at `level` drop
+ *  out with them. Returns the surviving nodes and their band tops together, so the
+ *  board and the band rail cannot disagree. Positions stay a function of
+ *  (model, level, neighbourhood) — never of zoom or of the search filter. */
+export function computeIsolateLayout(
+  nodes: ESNode[],
+  edges: ESEdge[],
+  contexts: Context[],
+  level: Level,
+  keep: ReadonlySet<string>,
+): { nodes: ESNode[]; bandTops: number[] } {
+  const types = new Set<string>(LEVEL_TYPES[level]);
+  const kept = nodes.filter((n) => keep.has(n.id) && types.has(n.type));
+  const ids = new Set(kept.map((n) => n.id));
+  const keptEdges = edges.filter((e) => ids.has(e.source) && ids.has(e.target));
+  const { place } = computePlacement(kept, keptEdges, contexts);
+  const rows = computeRows(kept, place, level, true);
+  return { nodes: positioned(kept, rows), bandTops: rows.bandTops };
 }
 
 /** The y of each band's top (indexed by band-order row), for the band rail so it

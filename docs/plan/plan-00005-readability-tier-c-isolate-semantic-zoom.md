@@ -14,6 +14,12 @@ Builds two of the [design-00003](../design/design-00003-board-readability-at-sca
 — **no DSL and no layout-engine change** ([design-00002](../design/design-00002-structured-board.md)
 invariants hold). Terms follow [CONTEXT.md](../../CONTEXT.md).
 
+> Superseded in one respect by
+> [issue-00021](../issue/issue-00021-isolate-hides-without-relayout.md): hiding
+> without reflowing left the survivors on their full-board coordinates, so Isolate
+> now **does** relayout its neighbourhood (layout = `f(model, Level, isolate
+> neighbourhood)`, design-00003 §3 Tier C). The DSL and the model stay untouched.
+
 ## Design
 
 See design-00003 §3 Tier C. Two independent readability levers on top of Tier A/B:
