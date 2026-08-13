@@ -1612,6 +1612,38 @@ test("Isolate stays visible with nothing selected and exits with Esc [design-000
   await expect(all).toHaveCount(8);
 });
 
+test("\"i\" isolates the selected element and leaves again [design-00003]", async ({ page }) => {
+  const all = page.locator(".react-flow__node");
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await page.getByRole("button", { name: "Design" }).click();
+  await expect(all).toHaveCount(8);
+
+  // Nothing selected → nothing to anchor on, so the key does nothing.
+  await page.keyboard.press("i");
+  await expect(page.getByRole("button", { name: "Exit Isolate" })).toHaveCount(0);
+
+  await nodes(page, "domainEvent").filter({ hasText: "Order Placed" }).click();
+  await page.keyboard.press("i");
+  await expect(all).toHaveCount(2); // e1 + rm1 (default: downstream, depth 2)
+  await expect(page.getByRole("button", { name: "Exit Isolate" })).toBeVisible();
+
+  // The same key leaves it — the panel's On/Off, from the keyboard.
+  await page.keyboard.press("i");
+  await expect(all).toHaveCount(8);
+  await expect(page.getByRole("button", { name: "Exit Isolate" })).toHaveCount(0);
+});
+
+test("typing \"i\" in a field does not isolate [design-00003]", async ({ page }) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await page.getByRole("button", { name: "Design" }).click();
+  await nodes(page, "domainEvent").filter({ hasText: "Order Placed" }).click();
+  await page.getByLabel("Label", { exact: true }).pressSequentially("in");
+  await expect(page.getByRole("button", { name: "Exit Isolate" })).toHaveCount(0);
+  await expect(page.locator(".react-flow__node")).toHaveCount(8);
+});
+
 test("inside Isolate every edge of the neighbourhood traces on hover [issue-00023]", async ({
   page,
 }) => {

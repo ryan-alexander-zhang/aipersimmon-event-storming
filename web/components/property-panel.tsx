@@ -442,6 +442,7 @@ export function PropertyPanel() {
           <button
             type="button"
             aria-pressed={isolate.active}
+            title="Isolate (i)"
             onClick={toggleIsolate}
             className={`rounded px-2 py-0.5 text-xs font-medium ${
               isolate.active

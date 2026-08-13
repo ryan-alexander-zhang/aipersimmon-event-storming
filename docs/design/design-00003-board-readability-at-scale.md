@@ -139,8 +139,11 @@ change); Tier B changes edge geometry; Tier C is structural.
     and that anchor is **pinned** for the life of the view: clicking another
     element inside it reads that element without re-framing, because the view
     answers "what is connected to *this* element" (issue-00024). Re-anchoring is
-    explicit: select the new element, toggle Off then On. Exit is the clearing click
-    on empty canvas, Esc, the toolbar chip, or the panel's Off; on exit the camera
+    explicit: select the new element, toggle Off then On. **`i` is the keyboard twin
+    of that switch** — the same toggle, so re-anchoring stays `i` `i` on the new
+    selection; with nothing selected there is no anchor, so switching *on* is a
+    no-op. Exit is the clearing click on empty canvas, Esc, `i`, the toolbar chip, or
+    the panel's Off; on exit the camera
     goes to **the element last read inside the view** — the last selection there, or
     the anchor when nothing else was selected — rather than refitting the whole
     board, so the modeller does not have to hunt for where they were (issue-00021,

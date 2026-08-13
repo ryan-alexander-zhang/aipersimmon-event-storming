@@ -289,9 +289,10 @@ function Canvas() {
     [nodes, setEventOrder],
   );
 
-  // Escape mid-drag cancels the reorder (committed on mouse release). Arrow keys
-  // move the selected Domain Event one column when the canvas (not a field) has
-  // focus — the keyboard equivalent of dragging (us-00010-FR-5/FR-7).
+  // Escape mid-drag cancels the reorder (committed on mouse release). "i" toggles
+  // Isolate on the selected element. Arrow keys move the selected Domain Event one
+  // column when the canvas (not a field) has focus — the keyboard equivalent of
+  // dragging (us-00010-FR-5/FR-7).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && dragRef.current) {
@@ -310,6 +311,21 @@ function Canvas() {
         const t = e.target as HTMLElement | null;
         if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
         if (s.isolate.active) s.toggleIsolate();
+        return;
+      }
+      // "i" is the keyboard twin of the panel's Isolate On/Off — the same switch, so
+      // re-anchoring is still Off then On (issue-00024). Off works whatever is
+      // selected; On has nothing to anchor on without a selected element, which is
+      // also why the panel's control only exists there.
+      if ((e.key === "i" || e.key === "I") && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const t = e.target as HTMLElement | null;
+        if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+        const s = useESStore.getState();
+        // Isolate reshapes the board, and Discovery / Context Map / Compare replace it.
+        if (s.discovery.active || s.contextMapOpen || s.compare.active) return;
+        if (!s.isolate.active && !s.selectedId) return;
+        e.preventDefault();
+        s.toggleIsolate();
         return;
       }
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
