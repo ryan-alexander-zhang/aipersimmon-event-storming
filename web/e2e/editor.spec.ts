@@ -1,8 +1,33 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
 const fixture = (name: string) => path.join(__dirname, "fixtures", name);
+
+// Tier-A dimming repaints a muted copy of the element's own colours — it is never
+// expressed as opacity, which turned every dimmed element into its own transparency
+// group and stuttered the camera (issue-00029). "Dimmed" therefore reads as "does
+// not paint its own colour": for a sticky, a background other than its `--es-fill`;
+// for an edge, the shared muted stroke.
+const MUTED_STROKE = "rgb(216, 216, 220)";
+const stickyDimmed = (node: Locator) =>
+  node.locator(".es-sticky").first().evaluate((el) => {
+    const style = getComputedStyle(el);
+    const probe = document.createElement("div");
+    probe.style.background = style.getPropertyValue("--es-fill").trim();
+    document.body.append(probe);
+    const own = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return style.backgroundColor !== own;
+  });
+const edgeDimmed = (edge: Locator) =>
+  edge
+    .locator(".react-flow__edge-path")
+    .evaluate((el, muted) => getComputedStyle(el).stroke === muted, MUTED_STROKE);
+const expectDimmed = (node: Locator, dimmed: boolean) =>
+  expect.poll(() => stickyDimmed(node)).toBe(dimmed);
+const expectEdgeDimmed = (edge: Locator, dimmed: boolean) =>
+  expect.poll(() => edgeDimmed(edge)).toBe(dimmed);
 
 // File-scoped actions (New / Add context / Import / Export) now live in the File menu.
 const openFileMenu = (page: Page) => page.getByRole("button", { name: "File" }).click();
@@ -318,11 +343,9 @@ test("focusing a node dims the rest of the board [design-00003]", async ({ page 
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await expect(nodes(page, "readModel")).toHaveCount(1);
   await nodes(page, "readModel").click(); // focus rm1
-  const opacity = (loc: ReturnType<typeof nodes>) =>
-    loc.evaluate((el) => Number(getComputedStyle(el).opacity));
-  // The focused node stays fully opaque; an unrelated node (Payment Gateway) dims.
-  expect(await opacity(nodes(page, "readModel"))).toBe(1);
-  expect(await opacity(nodes(page, "externalSystem"))).toBeLessThan(1);
+  // The focused node keeps its own colour; an unrelated node (Payment Gateway) mutes.
+  await expectDimmed(nodes(page, "readModel"), false);
+  await expectDimmed(nodes(page, "externalSystem"), true);
 });
 
 test("focused edges flow (animated); the rest stay static [design-00003]", async ({ page }) => {
@@ -374,18 +397,17 @@ test("hovering an edge isolates it and dims the rest [design-00003]", async ({ p
   await page.getByRole("button", { name: "Design" }).click(); // show every edge
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
   const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
-  const nodeOpacity = (id: string) =>
-    page.locator(`.react-flow__node[data-id="${id}"]`).evaluate((el) => getComputedStyle(el).opacity);
+  const node = (id: string) => page.locator(`.react-flow__node[data-id="${id}"]`);
   await edge("r1").hover({ force: true }); // the "issues" edge a1→c1
   await expect(edge("r1")).toHaveClass(/animated/); // hovered edge flows/emphasised
-  await expect(edge("r3").locator(".react-flow__edge-path")).toHaveCSS("opacity", "0.12"); // another edge dims
+  await expectEdgeDimmed(edge("r3"), true); // another edge dims
   // its two endpoints (a1, c1) stay bright; an unrelated node (e1) dims
-  expect(await nodeOpacity("a1")).toBe("1");
-  expect(Number(await nodeOpacity("e1"))).toBeLessThan(1);
+  await expectDimmed(node("a1"), false);
+  await expectDimmed(node("e1"), true);
   // leaving restores the board
   await page.mouse.move(5, 5);
   await expect(edge("r1")).not.toHaveClass(/animated/);
-  expect(await nodeOpacity("e1")).toBe("1");
+  await expectDimmed(node("e1"), false);
 });
 
 test("hovering a relation edge reveals a delete control that removes it, keeping its endpoints [us-00025-AC-1.1/2.1]", async ({
@@ -418,12 +440,8 @@ test("deleting the hovered edge leaves no stale isolation behind [issue-00018]",
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await page.getByRole("button", { name: "Design" }).click(); // show every edge
   const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
-  const pathOpacity = (id: string) =>
-    edge(id)
-      .locator(".react-flow__edge-path")
-      .evaluate((el) => getComputedStyle(el).opacity);
   await expect(edge("r3")).toHaveCount(1);
-  expect(await pathOpacity("r3")).toBe("1");
+  await expectEdgeDimmed(edge("r3"), false);
 
   // Delete r1 from its hover-revealed control. The label unmounts without a
   // mouseleave, so the hovered id must be cleared by the removal itself.
@@ -432,9 +450,9 @@ test("deleting the hovered edge leaves no stale isolation behind [issue-00018]",
   await expect(edge("r1")).toHaveCount(0);
   await page.mouse.move(5, 5); // pointer off every edge
 
-  // No edge is hovered any more, so nothing isolates: r3 is fully opaque and no
-  // edge is emphasised. Before the fix every edge stayed dimmed at 0.12.
-  await expect(edge("r3").locator(".react-flow__edge-path")).toHaveCSS("opacity", "1");
+  // No edge is hovered any more, so nothing isolates: r3 paints its own colour and
+  // no edge is emphasised. Before the fix every edge stayed dimmed.
+  await expectEdgeDimmed(edge("r3"), false);
   await expect(page.locator(".react-flow__edge.animated")).toHaveCount(0);
 });
 
@@ -1128,7 +1146,10 @@ test("New clears the model and does not restore it on reload", async ({ page }) 
 });
 
 // spec-00010: Bounded Context Focus + compact header
-const DIM = "0.15"; // NODE_DIM_OPACITY
+// The Context Map is a separate canvas of a handful of context cards, and still
+// dims them with opacity (`NODE_DIM_OPACITY` in context-map-canvas.tsx); the board
+// itself mutes by colour instead — see `stickyDimmed` (issue-00029).
+const DIM = "0.15";
 
 test("focuses a context: its slice stays vivid while other contexts dim, and clears [us-00024-AC-1.1/2.1/3.1]", async ({
   page,
@@ -1152,24 +1173,24 @@ test("focuses a context: its slice stays vivid while other contexts dim, and cle
 
   // focus Context 1 → Alpha vivid, Bravo dimmed (AC-1.1)
   await focus(1);
-  await expect(alpha).toHaveCSS("opacity", "1");
-  await expect(bravo).toHaveCSS("opacity", DIM);
+  await expectDimmed(alpha, false);
+  await expectDimmed(bravo, true);
 
   // focus Context 2 → single-select swaps the emphasis (AC-2.1)
   await focus(2);
-  await expect(alpha).toHaveCSS("opacity", DIM);
-  await expect(bravo).toHaveCSS("opacity", "1");
+  await expectDimmed(alpha, true);
+  await expectDimmed(bravo, false);
 
   // re-clicking the focused context clears (toggle) (AC-3.1)
   await focus(2);
-  await expect(alpha).toHaveCSS("opacity", "1");
-  await expect(bravo).toHaveCSS("opacity", "1");
+  await expectDimmed(alpha, false);
+  await expectDimmed(bravo, false);
 
   // Esc also clears focus (AC-3.1)
   await focus(1);
-  await expect(bravo).toHaveCSS("opacity", DIM);
+  await expectDimmed(bravo, true);
   await page.keyboard.press("Escape");
-  await expect(bravo).toHaveCSS("opacity", "1");
+  await expectDimmed(bravo, false);
 });
 
 test("the Context Map reads like the board: clicking a context focuses it, dims the unrelated ones, and clears [design-00003, spec-00010]", async ({
@@ -1246,30 +1267,29 @@ test("a committed scope is sticky vs node hover; only in-scope lines trace [desi
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await page.getByRole("button", { name: "Design" }).click(); // show every node/edge
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
-  const nodeOpacity = (id: string) =>
-    page.locator(`.react-flow__node[data-id="${id}"]`).evaluate((el) => getComputedStyle(el).opacity);
+  const node = (id: string) => page.locator(`.react-flow__node[data-id="${id}"]`);
   const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
 
   // commit a scope: select rm1 → chain {rm1, e1} bright, an unrelated node dims
   await nodes(page, "readModel").click();
-  expect(await nodeOpacity("rm1")).toBe("1");
-  expect(Number(await nodeOpacity("ex1"))).toBeLessThan(1);
+  await expectDimmed(node("rm1"), false);
+  await expectDimmed(node("ex1"), true);
 
   // hovering another NODE must NOT steal the committed highlight
   await nodes(page, "externalSystem").hover({ force: true });
-  expect(await nodeOpacity("rm1")).toBe("1"); // still bright
-  expect(Number(await nodeOpacity("ex1"))).toBeLessThan(1); // hover ignored, still dim
+  await expectDimmed(node("rm1"), false); // still bright
+  await expectDimmed(node("ex1"), true); // hover ignored, still dim
 
   // hovering an OUT-OF-SCOPE line (r1: a1→c1) does nothing while committed
   await edge("r1").hover({ force: true });
   await expect(edge("r1")).not.toHaveClass(/animated/);
-  expect(await nodeOpacity("rm1")).toBe("1"); // committed scope unchanged
-  expect(Number(await nodeOpacity("a1"))).toBeLessThan(1); // out-of-scope endpoint stays dim
+  await expectDimmed(node("rm1"), false); // committed scope unchanged
+  await expectDimmed(node("a1"), true); // out-of-scope endpoint stays dim
 
   // hovering an IN-SCOPE line (r4: e1→rm1) still traces it
   await edge("r4").hover({ force: true });
   await expect(edge("r4")).toHaveClass(/animated/);
-  expect(await nodeOpacity("rm1")).toBe("1"); // endpoint bright
+  await expectDimmed(node("rm1"), false); // endpoint bright
 });
 
 // ---------------------------------------------------------------------------
@@ -1393,6 +1413,43 @@ test("hovering one element does not re-render every node on the board [issue-000
   expect(node).toBeLessThan(rendered / 4);
 });
 
+test("a dimmed board paints no translucent elements [issue-00029]", async ({ page }) => {
+  const rendered = await openLargeBoard(page);
+  const target = await onscreenNode(page, rendered);
+  await page.mouse.click(target.x, target.y); // commit a scope → the board dims
+  await expect(page.getByText("BUILD SLICE")).toBeVisible();
+
+  const translucent = await page.evaluate(() => {
+    const partial = (el: Element) => {
+      const o = Number(getComputedStyle(el).opacity);
+      return o > 0 && o < 1;
+    };
+    const nodes = [...document.querySelectorAll(".react-flow__node")].filter(partial);
+    const bodies = [...document.querySelectorAll(".es-sticky")].filter(partial);
+    const paths = [...document.querySelectorAll(".react-flow__edge-path")].filter(partial);
+    return { nodes: nodes.length, bodies: bodies.length, paths: paths.length };
+  });
+
+  // The dim is a colour swap. Expressed as opacity it made each of the hundreds of
+  // dimmed elements its own transparency group, which the compositor rebuilds on
+  // every raster — the board still looked right and dropped ~a third of the frames
+  // of any camera gesture (issue-00029). Nothing here may be partially transparent.
+  expect(translucent).toEqual({ nodes: 0, bodies: 0, paths: 0 });
+  // …and the dim is actually on: an out-of-scope sticky does not paint its own fill.
+  const dimmedSomething = await page.evaluate(() => {
+    const probe = document.createElement("div");
+    document.body.append(probe);
+    const muted = [...document.querySelectorAll<HTMLElement>(".es-sticky")].filter((el) => {
+      const style = getComputedStyle(el);
+      probe.style.background = style.getPropertyValue("--es-fill").trim();
+      return style.backgroundColor !== getComputedStyle(probe).backgroundColor;
+    }).length;
+    probe.remove();
+    return muted;
+  });
+  expect(dimmedSomething).toBeGreaterThan(rendered / 2);
+});
+
 // Isolate on "Order Placed" (e1), both directions, depth 2 → e1 + ag1 + rm1 + c1.
 // The anchor's own edges are r3 (ag1→e1) and r4 (e1→rm1); r2 (c1→ag1) is two hops
 // out, inside the view but not incident to the anchor.
@@ -1478,11 +1535,11 @@ test("inside Isolate every edge of the neighbourhood traces on hover [issue-0002
   // scope was the anchor's own edges, so hovering it did nothing.
   await edge("r2").hover({ force: true });
   await expect(edge("r2")).toHaveClass(/animated/);
-  await expect(edge("r3").locator(".react-flow__edge-path")).toHaveCSS("opacity", "0.12");
+  await expectEdgeDimmed(edge("r3"), true);
 
   await page.mouse.move(5, 5);
   await expect(edge("r2")).not.toHaveClass(/animated/);
-  await expect(edge("r3").locator(".react-flow__edge-path")).toHaveCSS("opacity", "1");
+  await expectEdgeDimmed(edge("r3"), false);
 });
 
 test("the Isolate anchor is pinned: selecting another element does not re-frame it [issue-00024]", async ({

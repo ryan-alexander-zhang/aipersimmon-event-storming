@@ -59,20 +59,28 @@ const defaultEdgeOptions = {
   labelBgStyle: { fill: "#ffffff", fillOpacity: 0.85 },
 };
 
-const NODE_DIM_OPACITY = 0.15;
-const EDGE_DIM_OPACITY = 0.12;
+// A dimmed element paints a muted copy of its own colours; it is never made
+// translucent. `opacity < 1` turns each element into its own transparency group,
+// which the compositor has to build and blend on every raster — and a camera
+// gesture re-rasters constantly, so a few hundred dimmed elements drop the frame
+// rate to a stutter while the picture is identical (issue-00029).
+const MUTED_FILL = "color-mix(in srgb, var(--es-fill) 18%, #fff)";
+const MUTED_TINT = "color-mix(in srgb, var(--es-tint, #fff) 30%, #fff)";
+const MUTED_TEXT = "#a1a1aa";
+const MUTED_STROKE = "#d8d8dc";
 const EMPTY_STYLE: CSSProperties = {};
 
 // Tier A/C dimming is delivered as one injected rule scoped to the board wrapper,
-// so it never touches per-element props (issue-00019). Element ids come from the
-// imported DSL, so they must be escaped before going into a selector.
+// so it never touches per-element props (issue-00019). The bright elements are
+// excluded from that rule by id rather than given a rule of their own, so nothing
+// has to restore an inline colour. Element ids come from the imported DSL, so they
+// must be escaped before going into a selector.
 const DIM_SCOPE = ".es-dim";
 const EDGE_DIM_SCOPE = ".es-dim-edges";
 const cssId = (id: string) =>
   typeof CSS !== "undefined" && CSS.escape ? CSS.escape(id) : id.replace(/["\\]/g, "\\$&");
-const nodeSelector = (id: string) => `.react-flow__node[data-id="${cssId(id)}"]`;
-const edgePathSelector = (id: string) =>
-  `.react-flow__edge[data-id="${cssId(id)}"] .react-flow__edge-path`;
+const except = (ids: Iterable<string>) =>
+  [...ids].map((id) => `:not([data-id="${cssId(id)}"])`).join("");
 
 // Search-hit ring (spec-00006): a blue halo around matched nodes, distinct from
 // the selection outline and from focus dimming.
@@ -433,15 +441,20 @@ function Canvas() {
   }, [activeHoveredEdgeId, edges]);
 
   // The bright set drives Tier-A dimming, but it must not reach the nodes as props:
-  // writing `opacity` per node rebuilds every node object, so React Flow re-renders
+  // writing the dim per node rebuilds every node object, so React Flow re-renders
   // the whole board (each node = 8 handles) for one pointer move. One stylesheet
-  // dims the layer and lifts the bright ids back out instead, which keeps hover at
-  // O(1) React work whatever the board size (issue-00019).
+  // mutes the layer and skips the bright ids instead, which keeps hover at O(1)
+  // React work whatever the board size (issue-00019).
   const brightNodeIds = hoveredEndpoints ?? (dimActive ? focus.nodeIds : null);
   const dimCss = useMemo(() => {
     if (!brightNodeIds) return "";
-    const lift = [...brightNodeIds].map((id) => `${DIM_SCOPE} ${nodeSelector(id)}`).join(",");
-    return `${DIM_SCOPE} .react-flow__node{opacity:${NODE_DIM_OPACITY}}${lift ? `${lift}{opacity:1}` : ""}`;
+    const dimmed = `${DIM_SCOPE} .react-flow__node${except(brightNodeIds)}`;
+    // The handles are an affordance for an element that is currently out of scope,
+    // and each carries its own alpha — hidden rather than muted.
+    return (
+      `${dimmed} .es-sticky{background:${MUTED_FILL}!important;color:${MUTED_TEXT}!important;border-left-color:${MUTED_TINT}!important}` +
+      `${dimmed} .react-flow__handle{visibility:hidden}`
+    );
   }, [brightNodeIds]);
 
   const decoratedNodes = useMemo(() => {
@@ -488,8 +501,9 @@ function Canvas() {
 
   const dimEdgeCss = useMemo(() => {
     if (!brightEdgeIds) return "";
-    const lift = [...brightEdgeIds].map((id) => `${EDGE_DIM_SCOPE} ${edgePathSelector(id)}`).join(",");
-    return `${EDGE_DIM_SCOPE} .react-flow__edge .react-flow__edge-path{opacity:${EDGE_DIM_OPACITY}}${lift ? `${lift}{opacity:1}` : ""}`;
+    // Same rule as the nodes: a muted stroke, not a translucent one. The arrowhead
+    // is a coloured marker that cannot be muted from CSS, so a dimmed edge drops it.
+    return `${EDGE_DIM_SCOPE} .react-flow__edge${except(brightEdgeIds)} .react-flow__edge-path{stroke:${MUTED_STROKE}!important;marker-end:none!important}`;
   }, [brightEdgeIds]);
 
   // Colour each edge by relation, colour its arrow to match, and spread parallel

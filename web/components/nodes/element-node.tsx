@@ -15,7 +15,7 @@ import {
   Workflow,
   Zap,
 } from "lucide-react";
-import { memo, useEffect, useRef, useState } from "react";
+import { type CSSProperties, memo, useEffect, useRef, useState } from "react";
 import { contextTint } from "@/lib/eventstorming/context-color";
 import { ELEMENT_DEFINITIONS, type ElementType } from "@/lib/eventstorming/elements";
 import { useESStore } from "@/lib/store/store";
@@ -100,15 +100,22 @@ function ElementNodeInner({ id, type, data, selected }: NodeProps<ESNode>) {
       data-testid="node-body"
       data-resolved={resolved ? "true" : undefined}
       data-context-tint={tint}
-      className={`relative rounded-md px-3 py-2 text-sm text-zinc-900 shadow-sm ${
+      className={`es-sticky relative rounded-md px-3 py-2 text-sm text-zinc-900 shadow-sm ${
         type === "externalSystem" ? "min-w-[168px] max-w-[230px]" : "min-w-[120px] max-w-[200px]"
       }`}
-      style={{
-        background: def.color,
-        outline: selected ? "2px solid #111827" : "none",
-        opacity: resolved ? 0.55 : undefined,
-        borderLeft: tint ? `5px solid ${tint}` : undefined,
-      }}
+      // The sticky's own colours are also published as custom properties: Tier-A
+      // dimming repaints a muted mix of them rather than making the node
+      // translucent, and needs the source colour to mix from (issue-00029).
+      style={
+        {
+          background: def.color,
+          "--es-fill": def.color,
+          ...(tint ? { "--es-tint": tint } : {}),
+          outline: selected ? "2px solid #111827" : "none",
+          opacity: resolved ? 0.55 : undefined,
+          borderLeft: tint ? `5px solid ${tint}` : undefined,
+        } as CSSProperties
+      }
     >
       {/* Anchor points on all four sides; edges pick the pair that matches the
           slice direction (vertical chain top↔bottom, timeline left↔right). The
