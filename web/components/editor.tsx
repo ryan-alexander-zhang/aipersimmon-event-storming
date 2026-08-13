@@ -243,7 +243,11 @@ function Canvas() {
   const filter = useESStore((s) => s.filter);
   const setEventOrder = useESStore((s) => s.setEventOrder);
   const toggleIsolate = useESStore((s) => s.toggleIsolate);
-  const zoom = useStore((s) => s.transform[2]);
+  // Visible element types = the Level filter, further narrowed by semantic zoom.
+  // Subscribed as the *band*, not the raw zoom: a wheel gesture changes the zoom on
+  // every tick, and reading it here re-rendered the whole Canvas per tick for a band
+  // that changes only at a threshold (issue-00028).
+  const visibleTypeKey = useStore((s) => typesForZoom(s.transform[2], level).join("|"));
   const { fitView, getNode } = useReactFlow();
 
   useAutosave();
@@ -335,11 +339,16 @@ function Canvas() {
   // node hover no longer overrides it. Node hover only previews in the neutral
   // state (nothing committed). Edge hover still traces on top of any of these
   // (handled below via hoveredEndpoints / decoratedEdges).
+  // Inside a committed scope the hovered node cannot change the result, so it must
+  // not be a dependency either: every node the pointer crossed rebuilt `focus`, and
+  // through it the whole edge decoration chain, for an identical set (issue-00028).
+  const scoped = !!(focusedContext || selectedId);
+  const hoverPreview = scoped ? null : hoveredId;
   const focus = useMemo(() => {
     if (focusedContext) return computeContextFocus(focusedContext, nodes, edges);
     if (selectedId) return computeFocus(selectedId, edges);
-    return computeFocus(hoveredId, edges);
-  }, [focusedContext, selectedId, hoveredId, nodes, edges]);
+    return computeFocus(hoverPreview, edges);
+  }, [focusedContext, selectedId, hoverPreview, nodes, edges]);
 
   // Isolate ("focus mode"): keep only the anchor's slice — an element's N-hop
   // neighbourhood, or a Bounded Context's members and what they are directly
@@ -398,12 +407,9 @@ function Canvas() {
     });
   }, [boardNodes, edges]);
 
-  // Visible element types = the Level filter, further narrowed by semantic zoom
-  // (zoomed out → backbone; both never show more than the Level). Keyed by the
-  // type list's *contents*: zoom changes every frame of a gesture but the band only
-  // changes at a threshold, and a fresh Set identity here would invalidate the whole
-  // node/edge decoration chain on every frame (issue-00019).
-  const visibleTypeKey = typesForZoom(zoom, level).join("|");
+  // Keyed by the type list's *contents* (see the subscription above): a fresh Set
+  // identity here would invalidate the whole node/edge decoration chain whenever the
+  // zoom band is re-read (issue-00019).
   const visibleTypes = useMemo(
     () => new Set(visibleTypeKey.split("|") as ElementType[]),
     [visibleTypeKey],
@@ -669,7 +675,13 @@ function Canvas() {
               setSelected(n.id);
               setSelectedEdge(null);
             }}
-            onNodeMouseEnter={(_, n) => setHovered(n.id)}
+            // Node hover is a preview for the neutral state only, so inside a
+            // committed scope it is not even recorded: the hovered id has one
+            // reader (`hoverPreview`), which ignores it there, and storing it
+            // re-rendered the board for every node the pointer crossed — which is
+            // most of a pan gesture (issue-00028). Normalised to null rather than
+            // skipped, so clearing the scope cannot resurrect a stale hover.
+            onNodeMouseEnter={(_, n) => setHovered(scoped ? null : n.id)}
             onNodeMouseLeave={() => setHovered(null)}
             onEdgeClick={(_, e) => {
               setSelectedEdge(e.id);

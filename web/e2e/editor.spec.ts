@@ -1413,6 +1413,93 @@ test("hovering one element does not re-render every node on the board [issue-000
   expect(node).toBeLessThan(rendered / 4);
 });
 
+/** Average main-thread time one DOM event costs during `gesture`, read from a trace.
+ *  These regressions are steady per-event overhead — a few ms on every wheel tick or
+ *  every node the pointer crosses — so they never show up as one long frame; the
+ *  observable is what a single event costs (issue-00028). */
+async function eventCost(page: Page, gesture: () => Promise<void>) {
+  const client = await page.context().newCDPSession(page);
+  type TraceEvent = { name: string; ph: string; dur?: number; args?: { data?: { type?: string } } };
+  const events: TraceEvent[] = [];
+  client.on("Tracing.dataCollected", (d) => events.push(...(d.value as unknown as TraceEvent[])));
+  await client.send("Tracing.start", {
+    categories: "devtools.timeline",
+    transferMode: "ReportEvents",
+  });
+  await gesture();
+  const done = new Promise<void>((r) => client.once("Tracing.tracingComplete", () => r()));
+  await client.send("Tracing.end");
+  await done;
+  await client.detach();
+
+  const totals: Record<string, { ms: number; n: number }> = {};
+  for (const e of events) {
+    if (e.ph !== "X" || e.name !== "EventDispatch" || !e.dur) continue;
+    const type = e.args?.data?.type ?? "?";
+    (totals[type] ??= { ms: 0, n: 0 });
+    totals[type].ms += e.dur / 1000;
+    totals[type].n += 1;
+  }
+  return (type: string) => {
+    const t = totals[type];
+    return t && t.n >= 5 ? { avg: t.ms / t.n, n: t.n } : null;
+  };
+}
+
+test("a wheel zoom does not re-render the board on every tick [issue-00028]", async ({ page }) => {
+  const rendered = await openLargeBoard(page);
+  const target = await onscreenNode(page, rendered);
+  await page.mouse.click(target.x, target.y); // a committed scope, as when reading a slice
+  await expect(page.getByText("BUILD SLICE")).toBeVisible();
+  await page.mouse.move(700, 700);
+
+  const cost = await eventCost(page, async () => {
+    for (let i = 0; i < 20; i++) {
+      await page.mouse.wheel(0, -25);
+      await page.waitForTimeout(30);
+    }
+  });
+  const wheel = cost("wheel");
+  expect(wheel).not.toBeNull();
+  // Reading the raw zoom in the board component re-rendered the whole tree per tick,
+  // for a semantic-zoom band that only changes at a threshold. Measured on this board:
+  // 5.1ms per tick before, 1.8ms after.
+  expect(wheel!.avg).toBeLessThan(3);
+});
+
+test("hover inside a committed scope costs nothing [issue-00028]", async ({ page }) => {
+  const rendered = await openLargeBoard(page);
+  const target = await onscreenNode(page, rendered);
+  await page.mouse.click(target.x, target.y);
+  await expect(page.getByText("BUILD SLICE")).toBeVisible();
+
+  // Nodes to sweep the pointer across — what a pan does to a board of stickies.
+  const all = page.locator(".react-flow__node");
+  const centres: { x: number; y: number }[] = [];
+  for (let i = 0; i < Math.min(rendered, 120) && centres.length < 8; i++) {
+    const bb = await all.nth(i).boundingBox();
+    if (bb && bb.x > 80 && bb.y > 150 && bb.x + bb.width < 1150 && bb.y + bb.height < 690 && bb.width > 20)
+      centres.push({ x: bb.x + bb.width / 2, y: bb.y + bb.height / 2 });
+  }
+  expect(centres.length).toBeGreaterThan(4);
+
+  const cost = await eventCost(page, async () => {
+    for (let pass = 0; pass < 3; pass++)
+      for (const c of centres) {
+        await page.mouse.move(c.x, c.y);
+        await page.waitForTimeout(25);
+        await page.mouse.move(40, 690); // blank margin → the node hover ends
+        await page.waitForTimeout(25);
+      }
+  });
+  const out = cost("mouseout");
+  expect(out).not.toBeNull();
+  // A committed scope is sticky: node hover cannot change what is highlighted
+  // (design-00003 Tier A), so recording it only re-rendered the board. Measured on
+  // this board: 5.8ms per hover-out before, 0.24ms after.
+  expect(out!.avg).toBeLessThan(2);
+});
+
 test("a dimmed board paints no translucent elements [issue-00029]", async ({ page }) => {
   const rendered = await openLargeBoard(page);
   const target = await onscreenNode(page, rendered);
