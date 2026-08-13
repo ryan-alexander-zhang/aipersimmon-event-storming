@@ -7,6 +7,7 @@ import {
   ChevronsRight,
   Trash2,
 } from "lucide-react";
+import { useLayoutEffect, useRef } from "react";
 import { ELEMENT_DEFINITIONS, ELEMENT_TYPES, type ElementType } from "@/lib/eventstorming/elements";
 import { isVisibleAt } from "@/lib/eventstorming/levels";
 import { useESStore } from "@/lib/store/store";
@@ -69,6 +70,15 @@ const SLICE: Partial<Record<ElementType, SliceAction[]>> = {
   ],
 };
 
+// A description is read far more often than it is edited, so the box grows to
+// its content instead of hiding the tail behind an inner scrollbar. `scrollHeight`
+// excludes the border, which `offsetHeight - clientHeight` adds back.
+function fitToContent(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+}
+
 export function PropertyPanel() {
   const selectedId = useESStore((s) => s.selectedId);
   const node = useESStore((s) => s.nodes.find((n) => n.id === s.selectedId) ?? null);
@@ -86,6 +96,11 @@ export function PropertyPanel() {
   const toggleIsolate = useESStore((s) => s.toggleIsolate);
   const setIsolateDirection = useESStore((s) => s.setIsolateDirection);
   const setIsolateDepth = useESStore((s) => s.setIsolateDepth);
+
+  const descRef = useRef<HTMLTextAreaElement>(null);
+  // Refit on every description change, including ones the panel did not make
+  // (undo, or a load) — the panel itself remounts per selection via `key`.
+  useLayoutEffect(() => fitToContent(descRef.current), [node?.data.description]);
 
   const wrap = "w-64 shrink-0 overflow-y-auto border-l border-zinc-200 bg-zinc-50 p-3";
 
@@ -232,7 +247,8 @@ export function PropertyPanel() {
         <label className="mt-3 block text-xs font-medium text-zinc-600">
           Description
           <textarea
-            className={`${field} h-16 resize-none`}
+            ref={descRef}
+            className={`${field} min-h-16 resize-none overflow-hidden`}
             value={node.data.description ?? ""}
             onChange={(e) => updateNodeData(node.id, { description: e.target.value })}
           />
