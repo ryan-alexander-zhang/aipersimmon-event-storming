@@ -1738,6 +1738,48 @@ test("leaving Isolate keeps the camera on the anchor, not on the whole board [is
   expect(Math.abs(after.x + after.width / 2 - (pb.x + pb.width / 2))).toBeLessThan(pb.width * 0.2);
 });
 
+test("re-isolating the same anchor forgets the element read in the previous view [issue-00030]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await page.getByRole("button", { name: "Design" }).click();
+  const all = page.locator(".react-flow__node");
+  await expect(all).toHaveCount(8);
+  const pane = page.locator(".react-flow__pane");
+  const pb = (await pane.boundingBox())!;
+  const centre = { x: pb.x + pb.width / 2, y: pb.y + pb.height / 2 };
+  const offCentre = async (id: string) => {
+    const b = (await page.locator(`.react-flow__node[data-id="${id}"]`).boundingBox())!;
+    return Math.hypot(b.x + b.width / 2 - centre.x, b.y + b.height / 2 - centre.y);
+  };
+  const isolate = async () => {
+    await page.keyboard.press("i");
+    await expect(all).toHaveCount(2); // e1 + rm1 (downstream, depth 2)
+    await page.waitForTimeout(450);
+  };
+  const leave = async () => {
+    await pane.click({ position: { x: 20, y: pb.height / 2 } });
+    await expect(all).toHaveCount(8);
+    await page.waitForTimeout(600);
+  };
+
+  // First view: read rm1 inside it, so leaving lands there (issue-00025).
+  await nodes(page, "domainEvent").filter({ hasText: "Order Placed" }).click();
+  await isolate();
+  await page.locator('.react-flow__node[data-id="rm1"]').click();
+  await leave();
+  expect(await offCentre("rm1")).toBeLessThan(60);
+
+  // Second view on the same anchor, same direction and depth — so the same *view*,
+  // but a new reading. Nothing was read inside it, so leaving must land on the
+  // anchor; before the fix it still landed on rm1, the previous view's selection.
+  await nodes(page, "domainEvent").filter({ hasText: "Order Placed" }).click();
+  await isolate();
+  await leave();
+  expect(await offCentre("e1")).toBeLessThan(60);
+});
+
 test("a zoom gesture inside one semantic band does not stall a frame [issue-00019]", async ({
   page,
 }) => {

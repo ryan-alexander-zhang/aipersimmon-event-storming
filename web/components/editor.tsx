@@ -584,13 +584,24 @@ function Canvas() {
   // `selectedId` never erases the selection here, so the clearing click cannot race
   // it away.
   const exitRef = useRef<{ key: string; ids: string[]; selection: string | null } | null>(null);
+  // Whether the previous render was inside a view. `isoKey` identifies the *view*, so
+  // it cannot tell two readings of the same one apart: re-isolating the same anchor at
+  // the same direction and depth kept the element read the last time round and left the
+  // camera there instead of on what was just isolated (issue-00030). Entering always
+  // starts a fresh reading. Cleared here rather than on exit, because the refit below
+  // still has to read what this effect recorded.
+  const openRef = useRef(false);
   useEffect(() => {
-    if (!isoNodeIds || !anchor) return;
-    if (exitRef.current?.key !== isoKey) {
+    if (!isoNodeIds || !anchor) {
+      openRef.current = false;
+      return;
+    }
+    if (!openRef.current || exitRef.current?.key !== isoKey) {
       // An element anchor frames itself; a context anchor frames the slice it kept.
       const ids = anchor.kind === "context" ? [...isoNodeIds] : [anchor.id];
       exitRef.current = { key: isoKey, ids, selection: null };
     }
+    openRef.current = true;
     if (selectedId && selectedId !== anchor.id) exitRef.current.selection = selectedId;
   }, [isoNodeIds, anchor, isoKey, selectedId]);
 
