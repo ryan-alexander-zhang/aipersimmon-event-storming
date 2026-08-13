@@ -142,6 +142,13 @@ A read-only traversal of the Timeline that steps through Domain Events in order,
 highlighting each event's slice, to validate the flow by telling its story.
 _Avoid_: playback, replay, tour.
 
+**Current Step**:
+The one Domain Event a Walkthrough is on. It carries the **Step Ring** — the
+marking that says "the Walkthrough is here", distinct from the selection outline
+and the search-hit ring. The events behind the cursor are **Visited**, those ahead
+are **Upcoming**; the three read differently on the board.
+_Avoid_: current slide, active event, cursor (for the event itself), past/future.
+
 **Discovery Mode**:
 A Big-Picture-only exploration surface where a modeller freely places unordered
 Domain Events at arbitrary positions, with relaxed grammar (no connections, no

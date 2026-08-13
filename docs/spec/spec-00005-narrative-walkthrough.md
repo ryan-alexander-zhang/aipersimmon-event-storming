@@ -30,16 +30,21 @@ event's slice. Design decisions (stated so they can be challenged):
   `order`) become consecutive steps.
 - **Highlight = the existing selection focus** (the event + its directly
   connected slice, rest dimmed), not a hide/isolate. One code path, consistent
-  with hover/selection.
-- **Navigation is via on-screen controls** (Prev / Next / Exit), not arrow keys —
-  arrows already nudge a selected event's timeline order, which a read-only
-  walkthrough must not do.
+  with hover/selection — plus the step's own marking per US28: the selection
+  outline alone does not read as "this is the current step".
+- **Navigation is via on-screen controls** (Prev / Next / Exit) **and the ←/→
+  arrow keys** (us-00028-FR-5). Arrows nudge a selected event's timeline order
+  only outside a walkthrough; inside one they step the cursor, which writes
+  nothing to the model, so XFR-1 still holds. (This reverses the original
+  decision to leave arrows out entirely — that kept the model safe by making the
+  most obvious key for "next" do nothing at all.)
 
 ## 2. User Stories
 
 | Story | Doc | Status | Summary |
 | --- | --- | --- | --- |
-| US14 | [us-00014-narrative-walkthrough](../us/us-00014-narrative-walkthrough.md) | draft | Start a walkthrough; step forward/back through events; each slice highlighted; exit unchanged |
+| US14 | [us-00014-narrative-walkthrough](../us/us-00014-narrative-walkthrough.md) | active | Start a walkthrough; step forward/back through events; each slice highlighted; exit unchanged |
+| US28 | [us-00028-walkthrough-step-legibility](../us/us-00028-walkthrough-step-legibility.md) | active | The current step is ringed and pulses; visited/upcoming events read differently; overlay leads with the label + progress; ←/→ step |
 
 ## 3. Cross-cutting requirements
 
@@ -70,10 +75,18 @@ returns Domain Event ids sorted by `(order, context, id)`.
 - `stopWalkthrough()` — set inactive; selection/model unchanged.
 
 **UI**: a toolbar **Walk** toggle starts/stops; while active, a small overlay
-shows `n / N`, the current event's label, and Prev / Next / Exit. The overlay
-lives inside the canvas (React Flow context) and calls `fitView` on the current
-event when the index changes. The editor suppresses the arrow-key timeline nudge
-while `walk.active` (spec-00005-XFR-1).
+leads with the current event's label and shows `n / N`, a progress bar, and
+Prev / Next / Exit. The overlay lives inside the canvas (React Flow context),
+calls `fitView` on the current event when the index changes, and owns the ←/→
+step keys. The editor suppresses the arrow-key timeline nudge while `walk.active`
+(spec-00005-XFR-1), so the same keys cannot do both.
+
+**Step rendering** (US28): the Current Step carries the **Step Ring** (a white gap
+plus a violet ring, replacing the selection outline on that node) and plays a
+one-shot halo; **Visited** events outside the current slice keep a half-muted copy
+of their own colour; **Upcoming** ones stay fully muted by the existing dim layer.
+All of it is injected CSS keyed by `data-id` — the route the dim layer already
+takes — so a step never rebuilds a node object (issue-00019).
 
 ## 5. Error handling
 

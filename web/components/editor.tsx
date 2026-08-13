@@ -50,7 +50,7 @@ import {
   saveSnapshots,
 } from "@/lib/store/persistence";
 import { useESStore } from "@/lib/store/store";
-import { dropOrder, dropTarget, slotOrders } from "@/lib/store/timeline";
+import { dropOrder, dropTarget, slotOrders, timelineOrder } from "@/lib/store/timeline";
 import type { ESEdge, ESNode } from "@/lib/store/types";
 
 const defaultEdgeOptions = {
@@ -85,6 +85,15 @@ const except = (ids: Iterable<string>) =>
 // Search-hit ring (spec-00006): a blue halo around matched nodes, distinct from
 // the selection outline and from focus dimming.
 const SEARCH_RING = "0 0 0 3px #2563eb, 0 0 10px 2px rgba(37, 99, 235, 0.45)";
+
+// Walkthrough step rendering (us-00028). The Step Ring is violet, so it reads as
+// neither the near-black selection outline nor the blue search ring, and the white
+// gap keeps it off the sticky's own colour. Visited events keep a half-muted copy
+// of that colour: brighter than the dim layer's 18%, so "walked" is a third state
+// rather than a synonym for "out of scope".
+const STEP_RING = "0 0 0 3px #ffffff, 0 0 0 6px #6d28d9";
+const VISITED_FILL = "color-mix(in srgb, var(--es-fill) 55%, #fff)";
+const VISITED_TEXT = "#52525b";
 
 // Timeline drag (us-00010 / design-00004 §5–6). Dragging a Domain Event edits
 // its `order`, never its position: the drop x is hit-tested against a snapshot
@@ -236,6 +245,7 @@ function Canvas() {
   const isolate = useESStore((s) => s.isolate);
   const healthOpen = useESStore((s) => s.healthOpen);
   const walkActive = useESStore((s) => s.walk.active);
+  const walkIndex = useESStore((s) => s.walk.index);
   const discoveryActive = useESStore((s) => s.discovery.active);
   const contextMapOpen = useESStore((s) => s.contextMapOpen);
   const compareActive = useESStore((s) => s.compare.active);
@@ -468,16 +478,57 @@ function Canvas() {
   // mutes the layer and skips the bright ids instead, which keeps hover at O(1)
   // React work whatever the board size (issue-00019).
   const brightNodeIds = hoveredEndpoints ?? (dimActive ? focus.nodeIds : null);
+
+  // The walkthrough's three states (us-00028): the Current Step, and the Visited
+  // events that are not already vivid as part of its slice. Both travel to the DOM
+  // as injected CSS keyed by id, never as node props, so a step costs the same
+  // React work whatever the board size (issue-00019).
+  const step = useMemo(() => {
+    if (!walkActive) return null;
+    const order = timelineOrder(nodes);
+    return { current: order[walkIndex] ?? null, visited: order.slice(0, walkIndex) };
+  }, [walkActive, walkIndex, nodes]);
+  const visitedIds = useMemo(
+    () => (step ? step.visited.filter((id) => !brightNodeIds?.has(id)) : []),
+    [step, brightNodeIds],
+  );
+
   const dimCss = useMemo(() => {
     if (!brightNodeIds) return "";
     const dimmed = `${DIM_SCOPE} .react-flow__node${except(brightNodeIds)}`;
+    // Visited events get their own fill below. They are excluded from this one
+    // rather than overridden by it: every exclusion here is another attribute
+    // selector, so the dim rule's specificity outruns anything that tried to.
+    const muted = `${DIM_SCOPE} .react-flow__node${except([...brightNodeIds, ...visitedIds])}`;
     // The handles are an affordance for an element that is currently out of scope,
     // and each carries its own alpha — hidden rather than muted.
     return (
-      `${dimmed} .es-sticky{background:${MUTED_FILL}!important;color:${MUTED_TEXT}!important;border-left-color:${MUTED_TINT}!important}` +
+      `${muted} .es-sticky{background:${MUTED_FILL}!important;color:${MUTED_TEXT}!important;border-left-color:${MUTED_TINT}!important}` +
       `${dimmed} .react-flow__handle{visibility:hidden}`
     );
-  }, [brightNodeIds]);
+  }, [brightNodeIds, visitedIds]);
+
+  // The Step Ring replaces the selection outline on the current event, so the step
+  // reads as one mark instead of two stacked frames. The halo restarts on every
+  // step because the rule begins matching a different element each time — a
+  // re-declared animation on the same element would not replay.
+  const stepCss = useMemo(() => {
+    // `.es-sticky` is repeated per id: a descendant appended after the comma list
+    // would bind to its last selector only.
+    const visited = visitedIds
+      .map((id) => `.react-flow__node[data-id="${cssId(id)}"] .es-sticky`)
+      .join(",");
+    const fill = visited
+      ? `${visited}{background:${VISITED_FILL}!important;color:${VISITED_TEXT}!important}`
+      : "";
+    const current = step?.current
+      ? `.react-flow__node[data-id="${cssId(step.current)}"] .es-sticky`
+      : null;
+    return current
+      ? `${fill}${current}{outline:none!important;box-shadow:${STEP_RING};animation:es-walk-step 520ms ease-out}` +
+          `@media (prefers-reduced-motion:reduce){${current}{animation:none}}`
+      : fill;
+  }, [step, visitedIds]);
 
   const decoratedNodes = useMemo(() => {
     // Domain Events are draggable to adjust the timeline (us-00010); every other
@@ -673,8 +724,9 @@ function Canvas() {
         <div
           className={`relative flex-1${brightNodeIds ? " es-dim" : ""}${brightEdgeIds ? " es-dim-edges" : ""}`}
         >
-          {/* Tier A/C dimming, as one rule rather than per-element props. */}
-          {(dimCss || dimEdgeCss) && <style>{dimCss + dimEdgeCss}</style>}
+          {/* Tier A/C dimming and the walkthrough's step marking, as one rule
+              rather than per-element props. */}
+          {(dimCss || dimEdgeCss || stepCss) && <style>{dimCss + dimEdgeCss + stepCss}</style>}
           {compareActive ? (
             <CompareDiffView />
           ) : contextMapOpen ? (

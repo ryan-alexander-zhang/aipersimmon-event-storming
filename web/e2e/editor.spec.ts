@@ -26,6 +26,14 @@ const edgeDimmed = (edge: Locator) =>
     .evaluate((el, muted) => getComputedStyle(el).stroke === muted, MUTED_STROKE);
 const expectDimmed = (node: Locator, dimmed: boolean) =>
   expect.poll(() => stickyDimmed(node)).toBe(dimmed);
+// The Walkthrough's Step Ring (us-00028) is violet — the colour is what identifies
+// it on a computed box-shadow, and keeps it apart from the blue search-hit ring.
+const STEP_RING = "rgb(109, 40, 217)";
+const stickyStyle = (node: Locator, prop: string) =>
+  node
+    .locator(".es-sticky")
+    .first()
+    .evaluate((el, p) => getComputedStyle(el).getPropertyValue(p), prop);
 const expectEdgeDimmed = (edge: Locator, dimmed: boolean) =>
   expect.poll(() => edgeDimmed(edge)).toBe(dimmed);
 
@@ -668,18 +676,94 @@ test("narrative walkthrough steps the timeline, clamps, stays read-only, and exi
   await expect(page.getByTestId("walkthrough-label")).toHaveText("Payment Taken");
   await expect(page.getByRole("button", { name: "Next event" })).toBeDisabled();
 
-  // read-only: a timeline arrow key does not reorder (us-00014-AC-4.1) — the label
-  // would flip to the other event if the nudge were not suppressed
+  // backward via the arrow key, which now steps the cursor (us-00028-AC-5.1); the
+  // first event is then the current one, so Prev disables = clamped at the start
   await page.keyboard.press("ArrowLeft");
-  await expect(page.getByTestId("walkthrough-label")).toHaveText("Payment Taken");
+  await expect(page.getByTestId("walkthrough-label")).toHaveText("Order Placed");
+  await expect(page.getByRole("button", { name: "Previous event" })).toBeDisabled();
 
-  // backward → first event again (us-00014-AC-2.1)
+  // forward then backward on the buttons (us-00014-AC-2.1)
+  await page.getByRole("button", { name: "Next event" }).click();
+  await expect(page.getByTestId("walkthrough-label")).toHaveText("Payment Taken");
   await page.getByRole("button", { name: "Previous event" }).click();
   await expect(page.getByTestId("walkthrough-label")).toHaveText("Order Placed");
 
   // exit → overlay gone (us-00014-AC-5.1)
   await page.getByRole("button", { name: "Exit walkthrough" }).click();
   await expect(wt).toHaveCount(0);
+
+  // read-only: stepping with the arrow key never reordered the timeline
+  // (us-00014-AC-4.1) — the nudge would have swapped the two events' columns
+  expect(await xOf(page, "Order Placed")).toBeLessThan(await xOf(page, "Payment Taken"));
+});
+
+test("a walkthrough step reads at a glance: ring + pulse on the current event, visited vs upcoming fills, overlay progress [us-00028-AC-1.1/2.1/3.1/4.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addContext(page);
+  for (const label of ["Alpha", "Beta", "Gamma", "Delta"]) await addLabeledEvent(page, label);
+
+  const ev = (label: string) => nodes(page, "domainEvent").filter({ hasText: label });
+  const ring = (label: string) => stickyStyle(ev(label), "box-shadow");
+  const fill = (label: string) => stickyStyle(ev(label), "background-color");
+
+  await page.getByRole("button", { name: "Walk" }).click();
+
+  // the Step Ring marks the current event, and only it (us-00028-AC-1.1)
+  await expect.poll(() => ring("Alpha")).toContain(STEP_RING);
+  for (const other of ["Beta", "Gamma", "Delta"]) {
+    expect(await ring(other)).not.toContain(STEP_RING);
+  }
+
+  // a step moves the ring and plays the one-shot pulse on the new event (AC-2.1)
+  await page.getByRole("button", { name: "Next event" }).click();
+  await expect.poll(() => ring("Beta")).toContain(STEP_RING);
+  expect(await ring("Alpha")).not.toContain(STEP_RING);
+  expect(await stickyStyle(ev("Beta"), "animation-name")).toBe("es-walk-step");
+
+  // the overlay leads with the label and is half way along four events (AC-4.1)
+  await expect(page.getByTestId("walkthrough-label")).toHaveText("Beta");
+  await expect(page.getByTestId("walkthrough-counter")).toHaveText("2 / 4");
+  const fontSize = (l: Locator) =>
+    l.evaluate((el) => Number.parseFloat(getComputedStyle(el).fontSize));
+  expect(await fontSize(page.getByTestId("walkthrough-label"))).toBeGreaterThan(
+    await fontSize(page.getByTestId("walkthrough-counter")),
+  );
+  const bar = page.getByTestId("walkthrough-progress");
+  await expect
+    .poll(async () => {
+      const f = (await bar.boundingBox())!;
+      const track = (await bar.locator("..").boundingBox())!;
+      return Math.round((f.width / track.width) * 10);
+    })
+    .toBe(5);
+
+  // visited / current / upcoming are three different fills (AC-3.1). The events are
+  // unconnected, so nothing but the current one is in the highlighted slice.
+  await page.getByRole("button", { name: "Next event" }).click();
+  await expect(page.getByTestId("walkthrough-label")).toHaveText("Gamma");
+  const visited = await fill("Beta");
+  const current = await fill("Gamma");
+  const upcoming = await fill("Delta");
+  expect(current).toBe("rgb(246, 166, 35)"); // the Domain Event's own colour
+  expect(new Set([visited, current, upcoming]).size).toBe(3);
+  expect(await fill("Alpha")).toBe(visited);
+});
+
+test("the step pulse is dropped where the reader prefers reduced motion [us-00028-FR-2]", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await addContext(page);
+  await addLabeledEvent(page, "Alpha");
+  await page.getByRole("button", { name: "Walk" }).click();
+
+  const sticky = nodes(page, "domainEvent").filter({ hasText: "Alpha" });
+  // the ring still marks the step — only its animation is gone
+  await expect.poll(() => stickyStyle(sticky, "box-shadow")).toContain(STEP_RING);
+  expect(await stickyStyle(sticky, "animation-name")).toBe("none");
 });
 
 test("discovery mode is Big-Picture only; converge builds structured events [us-00016-AC-1.1, us-00017-AC-1.1]", async ({
