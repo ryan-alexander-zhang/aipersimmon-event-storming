@@ -142,14 +142,33 @@ function computeRows(
   const globalCol = new Map<string, number>();
   const maxSubRow = new Array(BAND_ORDER.length).fill(0);
   const present = new Set<number>();
+  // A node's sub-row inside its band is its event's concurrency lane, so a subset
+  // that keeps an event but hides what serves it leaves that lane empty in every
+  // supporting band — and still pays its height. On the subset path the lanes each
+  // (band, column) actually occupies are dense-ranked, keeping their order: the
+  // reclaim the columns already do, on the lane axis (issue-00033). The Domain Events
+  // band is untouched where every lane is occupied, as during a walkthrough.
+  const laneRank = new Map<string, Map<number, number>>();
+  if (collapseAbsentBands) {
+    const lanes = new Map<string, Set<number>>();
+    for (const n of nodes) {
+      const p = place.get(n.id)!;
+      const key = `${bandIndex(n.type)}:${p.col.toFixed(2)}`;
+      (lanes.get(key) ?? lanes.set(key, new Set()).get(key)!).add(p.lane);
+    }
+    for (const [key, set] of lanes) {
+      laneRank.set(key, new Map([...set].sort((a, b) => a - b).map((lane, i) => [lane, i])));
+    }
+  }
   for (const n of nodes) {
     const p = place.get(n.id)!; // computePlacement places every node
     const gcol = p.col; // one global timeline — no per-context offset
     const row = bandIndex(n.type);
-    const cellKey = `${row}:${gcol.toFixed(2)}:${p.lane}`;
+    const lane = laneRank.get(`${row}:${gcol.toFixed(2)}`)?.get(p.lane) ?? p.lane;
+    const cellKey = `${row}:${gcol.toFixed(2)}:${lane}`;
     const stack = cellCount.get(cellKey) ?? 0;
     cellCount.set(cellKey, stack + 1);
-    const sr = p.lane + stack;
+    const sr = lane + stack;
     subRow.set(n.id, sr);
     globalCol.set(n.id, gcol);
     present.add(row);

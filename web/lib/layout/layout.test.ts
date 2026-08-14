@@ -301,6 +301,51 @@ describe("isolate relayout [issue-00021]", () => {
     expect(y.rm - y.ev).toBe(BAND_H);
   });
 
+  it("reclaims the lanes its hidden elements vacated [issue-00033]", () => {
+    // Three concurrent events (one order → one column, three lanes), each produced
+    // by its own Command. A walkthrough keeps every event but only one slice, so the
+    // Commands band is left holding a single command that belongs to the last lane.
+    const n = (id: string, type: ESNode["type"], order?: number): ESNode => ({
+      id,
+      type,
+      position: { x: 0, y: 0 },
+      data: { label: id, context: "A", ...(order !== undefined ? { order } : {}) },
+    });
+    const nodes: ESNode[] = [
+      n("ev0", "domainEvent", 0),
+      n("ev1", "domainEvent", 0),
+      n("ev2", "domainEvent", 0),
+      n("cmd0", "command"),
+      n("cmd1", "command"),
+      n("cmd2", "command"),
+    ];
+    const edges: ESEdge[] = [0, 1, 2].map((i) => ({
+      id: `p${i}`,
+      source: `cmd${i}`,
+      target: `ev${i}`,
+      data: { relation: "produces" as RelationType },
+    }));
+
+    // On the full board cmd2 sits in its event's lane, two stack steps down, and
+    // the Commands band is three lanes tall.
+    const full = computeLayout(nodes, edges, contexts, "design");
+    const fy = Object.fromEntries(full.map((x) => [x.id, x.position.y]));
+    expect(fy.cmd2 - fy.cmd0).toBe(2 * STACK_H);
+    // Commands band height + the two bands it holds away from the events (Constraints
+    // and Aggregates, empty but never collapsed on the full board).
+    expect(fy.ev0 - fy.cmd0).toBe(2 * STACK_H + 3 * BAND_H);
+
+    // Keeping every event but only cmd2, its lane is the only one the Commands band
+    // occupies: it sits at the band's top, and that band is one lane tall rather than
+    // three. The events band keeps all three lanes — they are all still real.
+    const keep = new Set(["ev0", "ev1", "ev2", "cmd2"]);
+    const iso = computeIsolateLayout(nodes, edges, contexts, "design", keep);
+    const y = Object.fromEntries(iso.nodes.map((x) => [x.id, x.position.y]));
+    expect(y.cmd2).toBe(0);
+    expect(y.ev0).toBe(BAND_H);
+    expect(y.ev2 - y.ev0).toBe(2 * STACK_H);
+  });
+
   it("re-ranks the columns over the surviving events so the chain sits adjacent", () => {
     const { nodes, edges } = gapModel();
     // On the full board ev5 is the sixth column, five steps from ev0.
