@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { StoreApi } from "zustand";
 import { exportJSON } from "@/lib/dsl/serialize";
 import { BAND_H } from "@/lib/layout/layout";
-import { createESStore, type ESState } from "./store";
+import { createESStore, type ESState, WALK_SCOPE_MAX } from "./store";
 import { gapOrder, slotOrders } from "./timeline";
 
 let store: StoreApi<ESState>;
@@ -416,7 +416,7 @@ describe("store v2 (RT3)", () => {
     const before = JSON.stringify(get().nodes);
 
     get().startWalkthrough();
-    expect(get().walk).toEqual({ active: true, index: 0 });
+    expect(get().walk).toEqual({ active: true, index: 0, scope: 1 });
     expect(get().selectedId).toBe(e0); // first event (AC-1.1)
 
     get().walkStep(1);
@@ -436,6 +436,34 @@ describe("store v2 (RT3)", () => {
     expect(JSON.stringify(get().nodes)).toBe(before); // model unchanged (AC-5.1)
   });
 
+  it("starting a walkthrough leaves isolate [issue-00031, us-00029-AC-5.1]", () => {
+    const ctx = get().addContext("c");
+    const e0 = get().addNode("domainEvent", ctx);
+    get().setSelected(e0);
+    get().toggleIsolate();
+    expect(get().isolate).toMatchObject({ active: true, anchor: { kind: "element", id: e0 } });
+
+    get().startWalkthrough();
+    expect(get().isolate).toMatchObject({ active: false, anchor: null });
+    expect(get().isolate.depth).toBe(2); // the preference itself is kept
+  });
+
+  it("carries its own reading scope, clamped [us-00029-AC-4.1]", () => {
+    expect(get().walk.scope).toBe(1); // the event's own slice
+    get().setWalkScope(2);
+    expect(get().walk.scope).toBe(2);
+    get().setWalkScope(WALK_SCOPE_MAX + 5);
+    expect(get().walk.scope).toBe(WALK_SCOPE_MAX);
+    get().setWalkScope(0);
+    expect(get().walk.scope).toBe(1);
+    // a step keeps it; leaving the board resets it with the rest of the cursor
+    get().setWalkScope(3);
+    get().startWalkthrough();
+    expect(get().walk.scope).toBe(3);
+    get().clear();
+    expect(get().walk).toEqual({ active: false, index: 0, scope: 1 });
+  });
+
   it("walkthrough on an empty board activates with no selection and no-op steps", () => {
     get().startWalkthrough();
     expect(get().walk.active).toBe(true);
@@ -450,9 +478,9 @@ describe("store v2 (RT3)", () => {
     get().addNode("domainEvent", ctx);
     get().startWalkthrough();
     get().walkStep(1);
-    expect(get().walk).toEqual({ active: true, index: 1 });
+    expect(get().walk).toEqual({ active: true, index: 1, scope: 1 });
     get().clear();
-    expect(get().walk).toEqual({ active: false, index: 0 });
+    expect(get().walk).toEqual({ active: false, index: 0, scope: 1 });
   });
 
   it("tracks the hovered edge and clears it on clear (HE1)", () => {

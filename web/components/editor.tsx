@@ -246,6 +246,7 @@ function Canvas() {
   const healthOpen = useESStore((s) => s.healthOpen);
   const walkActive = useESStore((s) => s.walk.active);
   const walkIndex = useESStore((s) => s.walk.index);
+  const scopeHops = useESStore((s) => s.walk.scope);
   const discoveryActive = useESStore((s) => s.discovery.active);
   const contextMapOpen = useESStore((s) => s.contextMapOpen);
   const compareActive = useESStore((s) => s.compare.active);
@@ -332,7 +333,9 @@ function Canvas() {
         if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
         const s = useESStore.getState();
         // Isolate reshapes the board, and Discovery / Context Map / Compare replace it.
-        if (s.discovery.active || s.contextMapOpen || s.compare.active) return;
+        // A walkthrough has its own Reading Scope and does not share the board with
+        // Isolate either (us-00029-FR-5, issue-00031).
+        if (s.discovery.active || s.contextMapOpen || s.compare.active || s.walk.active) return;
         if (!s.isolate.active && !s.selectedId) return;
         e.preventDefault();
         s.toggleIsolate();
@@ -370,11 +373,32 @@ function Canvas() {
   // through it the whole edge decoration chain, for an identical set (issue-00028).
   const scoped = !!(focusedContext || selectedId);
   const hoverPreview = scoped ? null : hoveredId;
+
+  // The walkthrough's Reading Scope (us-00029): the Current Step's neighbourhood at
+  // `walk.scope` hops in either direction. It is the walkthrough's own scope — the
+  // walkthrough never shares the board with Isolate (issue-00031) — and it drives
+  // both what is rendered and what stays vivid, so at scope 1 the picture matches
+  // the plain selection focus it replaces.
+  const walkScope = useMemo(() => {
+    if (!walkActive) return null;
+    const current = timelineOrder(nodes)[walkIndex] ?? null;
+    if (!current) return null;
+    return computeNeighborhood(current, edges, { depth: scopeHops, direction: "both" });
+  }, [walkActive, walkIndex, scopeHops, nodes, edges]);
+
+  // The whole timeline is kept whatever the scope, so the reader never loses the
+  // global picture of where the story is (us-00029-FR-1).
+  const eventIds = useMemo(
+    () => nodes.filter((n) => n.type === "domainEvent").map((n) => n.id),
+    [nodes],
+  );
+
   const focus = useMemo(() => {
+    if (walkScope) return { active: true, ...walkScope };
     if (focusedContext) return computeContextFocus(focusedContext, nodes, edges);
     if (selectedId) return computeFocus(selectedId, edges);
     return computeFocus(hoverPreview, edges);
-  }, [focusedContext, selectedId, hoverPreview, nodes, edges]);
+  }, [walkScope, focusedContext, selectedId, hoverPreview, nodes, edges]);
 
   // Isolate ("focus mode"): keep only the anchor's slice — an element's N-hop
   // neighbourhood, or a Bounded Context's members and what they are directly
@@ -384,6 +408,12 @@ function Canvas() {
   // longer on the board (deleted element, emptied context) frames nothing.
   const anchor = isolate.active ? isolate.anchor : null;
   const isoNodeIds = useMemo(() => {
+    // A walkthrough keeps the whole timeline plus the Current Step's Reading Scope,
+    // and takes the same relayout: the vacated columns and bands have to be
+    // reclaimed, or the slice is left scattered across the space the hidden
+    // elements used to hold (issue-00032). Every event survives, so the columns
+    // come from the same set of orders on every step and the spine cannot drift.
+    if (walkScope) return new Set([...eventIds, ...walkScope.nodeIds]);
     if (!anchor) return null;
     if (anchor.kind === "context") {
       const ids = computeContextNeighborhood(anchor.id, nodes, edges);
@@ -395,7 +425,7 @@ function Canvas() {
           direction: isolate.direction,
         }).nodeIds
       : null;
-  }, [anchor, isolate.depth, isolate.direction, nodes, edges]);
+  }, [walkScope, eventIds, anchor, isolate.depth, isolate.direction, nodes, edges]);
 
   // Edge-hover tracing works on any edge in the neutral state, but inside a
   // committed scope (focused Bounded Context / selected element) only on edges
@@ -460,8 +490,10 @@ function Canvas() {
   );
 
   // Dimming (Tier A) applies only when NOT isolating — isolate already removed
-  // the irrelevant nodes, so everything left stays full opacity.
-  const dimActive = focus.active && !isoNodeIds;
+  // the irrelevant nodes, so everything left stays full opacity. A walkthrough is
+  // the exception: it keeps the whole timeline as *context* rather than as scope, so
+  // the events outside the Current Step's Reading Scope still have to dim.
+  const dimActive = focus.active && (!isoNodeIds || !!walkScope);
 
   // Hovering an edge dims every node except that edge's two endpoints, so a
   // single connection reads as just "source → target". Otherwise the focus

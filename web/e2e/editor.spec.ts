@@ -53,6 +53,18 @@ const addLabeledEvent = async (page: Page, label: string) => {
 // flow-space left edge of the event whose label matches
 const xOf = async (page: Page, label: string) =>
   (await nodes(page, "domainEvent").filter({ hasText: label }).boundingBox())!.x;
+// The node's own transform — its position in flow space, so it does not move when
+// the camera does. `xOf` above is a screen coordinate and only comparable while the
+// viewport is still.
+const layoutXOf = (page: Page, label: string) =>
+  nodes(page, "domainEvent")
+    .filter({ hasText: label })
+    .evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41);
+const layoutYOf = (page: Page, selector: string, label: string) =>
+  page
+    .locator(selector)
+    .filter({ hasText: label })
+    .evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m42);
 const addUngroupedEvent = (page: Page) =>
   page.getByRole("button", { name: "Add Domain Event" }).click();
 const palette = (page: Page, label: string) =>
@@ -749,6 +761,75 @@ test("a walkthrough step reads at a glance: ring + pulse on the current event, v
   expect(current).toBe("rgb(246, 166, 35)"); // the Domain Event's own colour
   expect(new Set([visited, current, upcoming]).size).toBe(3);
   expect(await fill("Alpha")).toBe(visited);
+});
+
+test("a walkthrough keeps the whole timeline and shows only the current slice [issue-00031, us-00029-AC-1.1/1.2/3.1/4.1/5.1]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addContext(page);
+  // two events, each with its own Command; the Command is one hop from its event
+  await addLabeledEvent(page, "Alpha");
+  await slice(page, "+ Command (produces)");
+  await page.getByLabel("Label", { exact: true }).fill("Do Alpha");
+  // Alpha's Command owns an Aggregate, which is the only thing in that band. It sits
+  // between the Commands and Domain Events rows, so on the full board it holds every
+  // other event's Command away from its own event (us-00029-AC-1.3).
+  await slice(page, "+ Aggregate (handled by)");
+  await addLabeledEvent(page, "Beta");
+  await slice(page, "+ Command (produces)");
+  await page.getByLabel("Label", { exact: true }).fill("Do Beta");
+  // an Actor behind that Command: two hops from Beta, so it is out of scope at 1
+  await slice(page, "+ Actor (issues)");
+  await page.getByLabel("Label", { exact: true }).fill("Buyer");
+  await expect(nodes(page, "command")).toHaveCount(2);
+
+  // the gap between Beta and its own Command on the full board, with Alpha's
+  // Aggregate band in between
+  const gap = async () =>
+    (await layoutYOf(page, ".react-flow__node-command", "Do Beta")) -
+    (await layoutYOf(page, ".react-flow__node-domainEvent", "Beta"));
+  const spread = await gap();
+
+  // isolate is left behind when the walkthrough starts (us-00029-AC-5.1)
+  await nodes(page, "domainEvent").filter({ hasText: "Alpha" }).click();
+  await page.getByRole("button", { name: "Off", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Exit Isolate" })).toBeVisible();
+  await page.getByRole("button", { name: "Walk" }).click();
+  await expect(page.getByRole("button", { name: "Exit Isolate" })).toHaveCount(0);
+  // and cannot be switched back on while walking — the control is not offered
+  await expect(page.getByRole("button", { name: "Off", exact: true })).toHaveCount(0);
+
+  // the whole timeline stays; only the current step's Command is shown (AC-1.1)
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+  await expect(nodes(page, "command").filter({ hasText: "Do Alpha" })).toHaveCount(1);
+  await expect(nodes(page, "command").filter({ hasText: "Do Beta" })).toHaveCount(0);
+
+  // the retained spine dims; the current event and its Command stay vivid (AC-3.1)
+  await expectDimmed(nodes(page, "domainEvent").filter({ hasText: "Beta" }), true);
+  await expectDimmed(nodes(page, "command").filter({ hasText: "Do Alpha" }), false);
+
+  // stepping keeps every event's column where it was — nothing relayouts (AC-1.2)
+  const before = [await layoutXOf(page, "Alpha"), await layoutXOf(page, "Beta")];
+  await page.getByRole("button", { name: "Next event" }).click();
+  await expect(page.getByTestId("walkthrough-label")).toHaveText("Beta");
+  await expect(nodes(page, "command").filter({ hasText: "Do Beta" })).toHaveCount(1);
+  await expect(nodes(page, "command").filter({ hasText: "Do Alpha" })).toHaveCount(0);
+  expect([await layoutXOf(page, "Alpha"), await layoutXOf(page, "Beta")]).toEqual(before);
+
+  // Alpha's Aggregate is out of scope now, so its band collapses and Beta's own
+  // Command comes back to it — the slice reads as one group (us-00029-AC-1.3)
+  await expect(nodes(page, "aggregate")).toHaveCount(0);
+  expect(Math.abs(await gap())).toBeLessThan(Math.abs(spread));
+
+  // the Actor is two relation hops from Beta, so scope 1 hides it and scope 2 shows
+  // it (AC-4.1). The scope walks relations, not the timeline: Alpha and Beta are
+  // ordered neighbours with no relation between them, so no scope reaches Alpha's
+  // Command from Beta.
+  await expect(nodes(page, "actor")).toHaveCount(0);
+  await page.getByLabel("Reading scope").fill("2");
+  await expect(nodes(page, "actor").filter({ hasText: "Buyer" })).toHaveCount(1);
+  await expect(nodes(page, "command").filter({ hasText: "Do Alpha" })).toHaveCount(0);
 });
 
 test("a hovered edge's label is not swallowed by a sticky it crosses [issue-00034]", async ({

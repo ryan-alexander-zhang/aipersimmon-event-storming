@@ -2,8 +2,9 @@
 
 import { useReactFlow } from "@xyflow/react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useEffect } from "react";
-import { useESStore } from "@/lib/store/store";
+import { useEffect, useMemo } from "react";
+import { computeNeighborhood } from "@/lib/store/focus";
+import { useESStore, WALK_SCOPE_MAX } from "@/lib/store/store";
 import { timelineOrder } from "@/lib/store/timeline";
 
 /** Narrative walkthrough overlay (spec-00005): steps through the Domain Event
@@ -11,9 +12,12 @@ import { timelineOrder } from "@/lib/store/timeline";
  *  event's slice) and frames it; it never edits the model. */
 export function Walkthrough() {
   const nodes = useESStore((s) => s.nodes);
+  const edges = useESStore((s) => s.edges);
   const index = useESStore((s) => s.walk.index);
   const walkStep = useESStore((s) => s.walkStep);
   const stop = useESStore((s) => s.stopWalkthrough);
+  const scope = useESStore((s) => s.walk.scope);
+  const setWalkScope = useESStore((s) => s.setWalkScope);
   const { fitView } = useReactFlow();
 
   const order = timelineOrder(nodes);
@@ -21,12 +25,22 @@ export function Walkthrough() {
   const currentId = order[index];
   const label = nodes.find((n) => n.id === currentId)?.data.label ?? "—";
 
-  // Frame the current event as the cursor moves.
+  // Frame the Current Step's own slice — the event and what directly serves it —
+  // rather than the event alone, which left its own Command off screen on a board
+  // deep enough to separate the bands (issue-00032). Deliberately one hop whatever
+  // the Reading Scope: a wide scope reaches events far along the timeline, and
+  // fitting *that* shrinks the board to an unreadable strip and pulls the frame's
+  // centre away from the step. The wider scope is context to pan into, and moving
+  // the slider no longer throws the camera.
+  const frame = useMemo(() => {
+    if (!currentId) return null;
+    const { nodeIds } = computeNeighborhood(currentId, edges, { depth: 1, direction: "both" });
+    return [...nodeIds].map((id) => ({ id }));
+  }, [currentId, edges]);
+
   useEffect(() => {
-    if (currentId) {
-      void fitView({ nodes: [{ id: currentId }], padding: 0.4, duration: 300, maxZoom: 1.5 });
-    }
-  }, [currentId, fitView]);
+    if (frame) void fitView({ nodes: frame, padding: 0.25, duration: 300, maxZoom: 1.2 });
+  }, [frame, fitView]);
 
   // ←/→ step the cursor (us-00028-FR-5). The editor's arrow handler returns while
   // a walkthrough is active, so the same keys never also nudge the timeline
@@ -87,6 +101,24 @@ export function Walkthrough() {
       >
         <ChevronRight size={16} />
       </button>
+      {/* How much of the board around the Current Step stays visible (us-00029-FR-4).
+          One hop is the event's own slice; wider reaches into the neighbouring
+          events' slices, which is context rather than a bigger slice. */}
+      <label className="flex items-center gap-1.5 border-l border-zinc-200 pl-3 text-[11px] text-zinc-500">
+        Scope
+        <input
+          type="range"
+          min={1}
+          max={WALK_SCOPE_MAX}
+          step={1}
+          value={scope}
+          aria-label="Reading scope"
+          aria-valuetext={`${scope} ${scope === 1 ? "hop" : "hops"}`}
+          className="w-16 accent-violet-700"
+          onChange={(e) => setWalkScope(Number(e.target.value))}
+        />
+        <span className="w-2 font-mono tabular-nums text-zinc-700">{scope}</span>
+      </label>
       <button
         type="button"
         aria-label="Exit walkthrough"

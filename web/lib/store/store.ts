@@ -47,6 +47,12 @@ export interface IsolateState {
   anchor: IsolateAnchor | null;
 }
 
+/** How far the walkthrough's Reading Scope can be widened, in hops around the
+ *  Current Step (us-00029-FR-4). One hop is the event's own slice; past that the
+ *  reading reaches into the neighbouring events' slices, which is context rather
+ *  than a wider slice, so the range is deliberately short. */
+export const WALK_SCOPE_MAX = 3;
+
 /** A Domain Event on the transient discovery wall: a free x/y position and a
  *  label, with no timeline order and no context (decision-00004). Never written
  *  into the structured model or the DSL; persisted under a separate key. */
@@ -105,8 +111,9 @@ export interface ESState {
   isolate: IsolateState;
   /** Model-health panel visibility (spec-00007); view-only, never persisted. */
   healthOpen: boolean;
-  /** Narrative walkthrough cursor (spec-00005); view-only, never persisted. */
-  walk: { active: boolean; index: number };
+  /** Narrative walkthrough cursor and its Reading Scope — how many hops around the
+   *  Current Step stay visible (us-00029). View-only, never persisted. */
+  walk: { active: boolean; index: number; scope: number };
   /** Discovery Mode wall (spec-00002); transient, persisted outside the DSL. */
   discovery: DiscoveryState;
   /** Search + filter view state (spec-00006); view-only, never persisted. */
@@ -131,6 +138,8 @@ export interface ESState {
   startWalkthrough: () => void;
   /** Move the walkthrough cursor one step (clamped), selecting that event. */
   walkStep: (dir: -1 | 1) => void;
+  /** Set the Reading Scope, clamped to 1..WALK_SCOPE_MAX hops (us-00029-FR-4). */
+  setWalkScope: (scope: number) => void;
   stopWalkthrough: () => void;
 
   /** Enter Discovery Mode; no-op unless at Big Picture (decision-00004). */
@@ -260,7 +269,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   selectedEdgeId: null,
   isolate: { active: false, direction: "down", depth: 2, anchor: null },
   healthOpen: false,
-  walk: { active: false, index: 0 },
+  walk: { active: false, index: 0, scope: 1 },
   discovery: { active: false, items: [] },
   filter: EMPTY_FILTER,
   contextMapOpen: false,
@@ -294,16 +303,26 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   // Health and Versions dock into the same column, so opening one closes the other.
   toggleHealth: () => set({ healthOpen: !get().healthOpen, versionsOpen: false }),
 
+  // A walkthrough carries its own Reading Scope (us-00029), so it never shares a
+  // board with Isolate — two independent pointers into one board is what made a step
+  // land on an event the isolated board had hidden (issue-00031). Starting one leaves
+  // Isolate; the editor and the panel keep it unavailable until the walk ends.
   startWalkthrough: () => {
     const order = timelineOrder(get().nodes);
-    set({ walk: { active: true, index: 0 }, selectedId: order[0] ?? null });
+    set({
+      walk: { ...get().walk, active: true, index: 0 },
+      selectedId: order[0] ?? null,
+      isolate: { ...get().isolate, active: false, anchor: null },
+    });
   },
   walkStep: (dir) => {
     const order = timelineOrder(get().nodes);
     if (order.length === 0) return;
     const index = Math.min(order.length - 1, Math.max(0, get().walk.index + dir));
-    set({ walk: { active: true, index }, selectedId: order[index] });
+    set({ walk: { ...get().walk, index }, selectedId: order[index] });
   },
+  setWalkScope: (scope) =>
+    set({ walk: { ...get().walk, scope: Math.min(WALK_SCOPE_MAX, Math.max(1, scope)) } }),
   stopWalkthrough: () => set({ walk: { ...get().walk, active: false } }),
 
   enterDiscovery: () => {
@@ -579,7 +598,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       hoveredEdgeId: null,
       selectedEdgeId: null,
       isolate: { ...get().isolate, active: false, anchor: null },
-      walk: { active: false, index: 0 },
+      walk: { active: false, index: 0, scope: 1 },
       discovery: { active: false, items: [] },
       filter: { query: "", types: new Set(), contexts: new Set() },
       contextMapOpen: false,
@@ -600,7 +619,7 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       hoveredEdgeId: null,
       selectedEdgeId: null,
       isolate: { ...get().isolate, active: false, anchor: null },
-      walk: { active: false, index: 0 },
+      walk: { active: false, index: 0, scope: 1 },
       discovery: { active: false, items: [] },
       filter: { query: "", types: new Set(), contexts: new Set() },
       contextMapOpen: false,

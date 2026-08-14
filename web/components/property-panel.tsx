@@ -93,6 +93,7 @@ export function PropertyPanel() {
   const reassignContext = useESStore((s) => s.reassignContext);
   const setSelected = useESStore((s) => s.setSelected);
   const isolate = useESStore((s) => s.isolate);
+  const walkActive = useESStore((s) => s.walk.active);
   const toggleIsolate = useESStore((s) => s.toggleIsolate);
   const setIsolateDirection = useESStore((s) => s.setIsolateDirection);
   const setIsolateDepth = useESStore((s) => s.setIsolateDepth);
@@ -434,6 +435,10 @@ export function PropertyPanel() {
         </div>
       )}
 
+      {/* A walkthrough brings its own Reading Scope, on the stepping card, and does
+          not share the board with Isolate (us-00029-FR-5) — so Isolate is not offered
+          while one is running. */}
+      {!walkActive && (
       <div className="mt-4 border-t border-zinc-200 pt-3">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
@@ -505,6 +510,7 @@ export function PropertyPanel() {
           </div>
         )}
       </div>
+      )}
 
       <button
         type="button"

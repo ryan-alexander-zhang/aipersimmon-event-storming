@@ -45,6 +45,7 @@ event's slice. Design decisions (stated so they can be challenged):
 | --- | --- | --- | --- |
 | US14 | [us-00014-narrative-walkthrough](../us/us-00014-narrative-walkthrough.md) | active | Start a walkthrough; step forward/back through events; each slice highlighted; exit unchanged |
 | US28 | [us-00028-walkthrough-step-legibility](../us/us-00028-walkthrough-step-legibility.md) | active | The current step is ringed and pulses; visited/upcoming events read differently; overlay leads with the label + progress; ←/→ step |
+| US29 | [us-00029-walkthrough-reading-scope](../us/us-00029-walkthrough-reading-scope.md) | active | The whole timeline stays as a dimmed spine; only the current step's slice is shown, widened from a slider on the card; Isolate stays out |
 
 ## 3. Cross-cutting requirements
 
@@ -66,12 +67,14 @@ Read-only; reuses focus + selection. Terms per CONTEXT.md.
 **Pure core** — `web/lib/store/timeline.ts`: `timelineOrder(nodes): string[]`
 returns Domain Event ids sorted by `(order, context, id)`.
 
-**Store** (`store.ts`): view-only state `walk: { active: boolean; index: number }`
-(never persisted). Actions:
+**Store** (`store.ts`): view-only state
+`walk: { active: boolean; index: number; scope: number }` (never persisted).
+Actions:
 - `startWalkthrough()` — compute the order, set active, index 0, select the first
-  event (empty model → active with no selection).
+  event (empty model → active with no selection), and leave Isolate (US29).
 - `walkStep(dir: -1 | 1)` — clamp `index` within `[0, n-1]` (no wrap), select the
   event at the new index.
+- `setWalkScope(n)` — clamp the Reading Scope to `1..WALK_SCOPE_MAX`.
 - `stopWalkthrough()` — set inactive; selection/model unchanged.
 
 **UI**: a toolbar **Walk** toggle starts/stops; while active, a small overlay
@@ -80,6 +83,23 @@ Prev / Next / Exit. The overlay lives inside the canvas (React Flow context),
 calls `fitView` on the current event when the index changes, and owns the ←/→
 step keys. The editor suppresses the arrow-key timeline nudge while `walk.active`
 (spec-00005-XFR-1), so the same keys cannot do both.
+
+**Reading Scope** (US29): the walkthrough carries its own scope rather than
+borrowing Isolate — two independent pointers into one board is what let a step land
+on an event the isolated board had hidden (issue-00031). While walking, `walk.scope`
+hops (`both`, from the Current Step) is both what stays rendered and what stays
+vivid: **every Domain Event is kept** and every other element must be inside the
+scope. The retained set goes through `computeIsolateLayout`, so the space the hidden
+slices vacated is reclaimed — on the column axis and, since issue-00033, on the
+concurrency-lane axis — and the step's slice reads as one group (issue-00032);
+because columns come from the retained events' distinct orders and every event is
+retained, the spine's columns are identical step to step. Tier-A dimming stays on
+inside that layout — the timeline is kept as context, not as scope. The camera frames
+the step's own one-hop slice, whatever the scope. Set from a slider on the stepping card,
+1–`WALK_SCOPE_MAX`, starting at 1 — one hop is the event's own slice, wider reaches
+into the neighbouring slices. The scope walks *relations*, so it never crosses to an
+ordered neighbour that has no relation to the current event. Starting a walkthrough
+leaves Isolate, and Isolate is unavailable until it ends.
 
 **Step rendering** (US28): the Current Step carries the **Step Ring** (a white gap
 plus a violet ring, replacing the selection outline on that node) and plays a

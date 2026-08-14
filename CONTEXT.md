@@ -127,8 +127,10 @@ directly related to one of them, so a relation to another context (a seam) keeps
 the element on its far side and still reads as a relation. The anchor is pinned:
 selecting another element inside the view reads that element without re-framing
 the view. Distinct from **Bounded Context Focus** (which dims rather than hides and
-never moves anything, even when both are anchored on the same context) and from a
-filter (which hides by attribute, not by reachability).
+never moves anything, even when both are anchored on the same context), from a
+filter (which hides by attribute, not by reachability), and from the Walkthrough's
+**Reading Scope** — that is the Walkthrough's own, keeps the whole Timeline, and
+never touches this anchor; the two modes are never on the board together.
 _Avoid_: focus mode, drill-down, neighbourhood filter.
 
 **Timeline**:
@@ -148,6 +150,15 @@ marking that says "the Walkthrough is here", distinct from the selection outline
 and the search-hit ring. The events behind the cursor are **Visited**, those ahead
 are **Upcoming**; the three read differently on the board.
 _Avoid_: current slide, active event, cursor (for the event itself), past/future.
+
+**Reading Scope**:
+How much of the board a Walkthrough shows around its Current Step, in relation hops
+in either direction — one hop is the step's own slice. Every Domain Event is kept
+whatever the scope, so the Timeline never leaves the board; everything else outside
+the scope is hidden. It walks relations, not the Timeline, so an ordered neighbour
+with no relation to the Current Step never enters it. The Walkthrough's own — it
+neither reads nor moves Isolate's anchor.
+_Avoid_: depth, radius, zoom, isolate depth.
 
 **Discovery Mode**:
 A Big-Picture-only exploration surface where a modeller freely places unordered
