@@ -751,6 +751,34 @@ test("a walkthrough step reads at a glance: ring + pulse on the current event, v
   expect(await fill("Alpha")).toBe(visited);
 });
 
+test("a hovered edge's label is not swallowed by a sticky it crosses [issue-00034]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await openFileMenu(page);
+  await page.setInputFiles("input[type=file]", fixture("model.json"));
+  await expect(nodes(page, "domainEvent")).not.toHaveCount(0);
+
+  // "emits" runs from the External System down past the Command sharing its column,
+  // so its label lands on that sticky — the case from the report.
+  await page.locator('.react-flow__edge[data-id="r6"]').dispatchEvent("mouseover");
+  const label = page.locator(".react-flow__edgelabel-renderer > div").filter({ hasText: "emits" });
+  await expect(label).toBeVisible();
+
+  // Topmost-first at the label's own centre: nothing belonging to a node may sit
+  // above it, or the relation's delete control cannot be clicked either.
+  const stack = await label.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return document
+      .elementsFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+      .map((e) => (e.closest(".react-flow__node") ? "node" : e.closest(".react-flow__edgelabel-renderer") ? "label" : "other"));
+  });
+  expect(stack.indexOf("label")).toBeGreaterThan(-1);
+  expect(stack.indexOf("label")).toBeLessThan(
+    stack.indexOf("node") === -1 ? Number.POSITIVE_INFINITY : stack.indexOf("node"),
+  );
+});
+
 test("the step pulse is dropped where the reader prefers reduced motion [us-00028-FR-2]", async ({
   page,
 }) => {
