@@ -104,6 +104,13 @@ export function PropertyPanel() {
   // Refit on every description change, including ones the panel did not make
   // (undo, or a load) — the panel itself remounts per selection via `key`.
   useLayoutEffect(() => fitToContent(descRef.current), [node?.data.description]);
+  // A resolution is read the same way, so it fits the same way. `state` and
+  // `resolvedAt` are dependencies too: the block is conditional, and they are what
+  // mounts it — without them the first frame after resolving keeps the empty height.
+  useLayoutEffect(
+    () => fitToContent(resolutionRef.current),
+    [node?.data.resolution, node?.data.state, node?.data.resolvedAt],
+  );
 
   const wrap = "w-64 shrink-0 overflow-y-auto border-l border-zinc-200 bg-zinc-50 p-3";
 
@@ -218,8 +225,7 @@ export function PropertyPanel() {
                 Resolution
                 <textarea
                   ref={resolutionRef}
-                  className={field}
-                  rows={3}
+                  className={`${field} min-h-16 resize-none overflow-hidden`}
                   placeholder="What closed it — the answer, the decision, the mitigation"
                   value={node.data.resolution ?? ""}
                   onChange={(e) =>
