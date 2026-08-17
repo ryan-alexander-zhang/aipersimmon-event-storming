@@ -37,8 +37,33 @@ const stickyStyle = (node: Locator, prop: string) =>
 const expectEdgeDimmed = (edge: Locator, dimmed: boolean) =>
   expect.poll(() => edgeDimmed(edge)).toBe(dimmed);
 
-// File-scoped actions (New / Add context / Import / Export) now live in the File menu.
-const openFileMenu = (page: Page) => page.getByRole("button", { name: "File" }).click();
+// A board only exists inside a Project (spec-00012), so a fresh browser lands on
+// Recent with no canvas. Every test that wants a board creates one first.
+const createProject = async (page: Page, name: string) => {
+  await page.getByLabel("Project name").fill(name);
+  await page.getByRole("button", { name: "Create Project" }).click();
+  // The dialog unmounts once the Project is open; waiting here keeps its buttons
+  // from shadowing the toolbar's in later steps.
+  await expect(page.getByTestId("projects-dialog")).toHaveCount(0);
+};
+const openBoard = async (page: Page, name = "Test Project") => {
+  await page.goto("/");
+  // A second visit inside one test reopens the Project that is already active, so
+  // Recent never appears — only create one when it does.
+  const dialog = page.getByTestId("projects-dialog");
+  const file = page.getByRole("button", { name: "File", exact: true });
+  await expect(dialog.or(file).first()).toBeVisible();
+  if (await dialog.isVisible()) await createProject(page, name);
+};
+
+// File-scoped actions (Projects / Add context / Import / Export) live in the File menu.
+const openFileMenu = (page: Page) =>
+  page.getByRole("button", { name: "File", exact: true }).click();
+const openProjects = async (page: Page) => {
+  await openFileMenu(page);
+  await page.getByRole("button", { name: "Projects…" }).click();
+  await expect(page.getByTestId("projects-dialog")).toBeVisible();
+};
 const addContext = async (page: Page) => {
   await openFileMenu(page);
   await page.getByRole("button", { name: "Add context" }).click();
@@ -82,7 +107,7 @@ const normalize = (m: { nodes: { id: string }[]; edges: { id: string }[]; contex
 test("adds a Domain Event into its band via a context header [us-00001-AC-1.1, us-00006-AC-1.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addEvent(page);
   await expect(nodes(page, "domainEvent")).toHaveCount(1);
@@ -95,7 +120,7 @@ test("adds a Domain Event into its band via a context header [us-00001-AC-1.1, u
 test("creates ungrouped Domain Events on the timeline — no context bar or tint [issue-00006, issue-00011]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   // empty board — no context created first
   await addUngroupedEvent(page);
   await expect(nodes(page, "domainEvent")).toHaveCount(1);
@@ -119,7 +144,7 @@ test("creates ungrouped Domain Events on the timeline — no context bar or tint
 test("creates an Actor directly at Big Picture, no Command needed [us-00007-AC-5.1, decision-00003]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.getByRole("button", { name: "Big Picture" }).click();
   // the empty-panel palette offers Big Picture stickies only (assert before adding,
   // while nothing is selected and the palette is shown)
@@ -133,7 +158,7 @@ test("creates an Actor directly at Big Picture, no Command needed [us-00007-AC-5
 test("a Command produces a Domain Event without an Aggregate [us-00007-AC-1.2, decision-00003]", async ({
   page,
 }) => {
-  await page.goto("/"); // default Design level
+  await openBoard(page); // default Design level
   await addUngroupedEvent(page); // event created and selected
   await slice(page, "+ Command (produces)");
   await expect(nodes(page, "command")).toHaveCount(1);
@@ -142,7 +167,7 @@ test("a Command produces a Domain Event without an Aggregate [us-00007-AC-1.2, d
 });
 
 test("Constraint and Aggregate are offered only at Design [us-00008-AC-1.2, decision-00003]", async ({ page }) => {
-  await page.goto("/"); // Design
+  await openBoard(page); // Design
   await palette(page, "Command"); // command created and selected
   await expect(page.getByRole("button", { name: "+ Constraint (constrains)" })).toBeVisible();
   await expect(page.getByRole("button", { name: "+ Aggregate (handled by)" })).toBeVisible();
@@ -156,7 +181,7 @@ test("Constraint and Aggregate are offered only at Design [us-00008-AC-1.2, deci
 test("adds events across two contexts on one global timeline [us-00006-AC-1.1, us-00015-AC-1.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addContext(page);
   const evBtns = page.getByRole("button", { name: "Add Event", exact: true });
@@ -170,7 +195,7 @@ test("adds events across two contexts on one global timeline [us-00006-AC-1.1, u
 });
 
 test("a context'd event shows a context tint stripe [us-00015-AC-3.1]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addEvent(page);
   const body = nodes(page, "domainEvent").locator("[data-testid=node-body]");
@@ -180,7 +205,7 @@ test("a context'd event shows a context tint stripe [us-00015-AC-3.1]", async ({
 test("only timeline elements are drag-enabled; others stay locked [us-00007-AC-4.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addEvent(page); // one event, selected
   await slice(page, "+ Command (produces)");
@@ -194,7 +219,7 @@ test("only timeline elements are drag-enabled; others stay locked [us-00007-AC-4
 });
 
 test("moves an event to the start with the panel button [us-00010-AC-4.1]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addLabeledEvent(page, "Alpha");
   await addLabeledEvent(page, "Bravo");
@@ -206,7 +231,7 @@ test("moves an event to the start with the panel button [us-00010-AC-4.1]", asyn
 });
 
 test("nudges the selected event one column with the arrow keys [us-00010-AC-5.1]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addLabeledEvent(page, "Alpha");
   await addLabeledEvent(page, "Bravo");
@@ -220,7 +245,7 @@ test("nudges the selected event one column with the arrow keys [us-00010-AC-5.1]
 test("builds a slice: event triggers a policy and updates a read model [us-00007-AC-1.1/2.1, us-00002-AC-1.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addEvent(page); // event selected
   await slice(page, "+ Policy (triggers)");
@@ -234,7 +259,7 @@ test("builds a slice: event triggers a policy and updates a read model [us-00007
 });
 
 test("editing the label updates the node [us-00001-AC-2.1]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addEvent(page);
   await nodes(page, "domainEvent").click();
@@ -243,7 +268,7 @@ test("editing the label updates the node [us-00001-AC-2.1]", async ({ page }) =>
 });
 
 test("toggling pivotal shows the marker [us-00001-AC-3.1]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addEvent(page);
   await nodes(page, "domainEvent").click();
@@ -252,7 +277,7 @@ test("toggling pivotal shows the marker [us-00001-AC-3.1]", async ({ page }) => 
 });
 
 test("attaches and edits a hotspot [us-00003-AC-1.1/2.1]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addEvent(page);
   await nodes(page, "domainEvent").click();
@@ -266,7 +291,7 @@ test("attaches and edits a hotspot [us-00003-AC-1.1/2.1]", async ({ page }) => {
 });
 
 test("deletes a node and its attached edges [us-00001-AC-4.1]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addEvent(page);
   await slice(page, "+ Policy (triggers)");
@@ -278,7 +303,7 @@ test("deletes a node and its attached edges [us-00001-AC-4.1]", async ({ page })
 });
 
 test("level filter hides types without deleting them [us-00008-AC-1.1]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await expect(nodes(page, "command")).toHaveCount(2);
   await page.getByRole("button", { name: "Big Picture" }).click();
@@ -298,7 +323,7 @@ test("level filter hides types without deleting them [us-00008-AC-1.1]", async (
 test("import then export round-trips the model incl. level [us-00004-AC-3.1, us-00008-AC-2.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
 
@@ -314,7 +339,7 @@ test("import then export round-trips the model incl. level [us-00004-AC-3.1, us-
 });
 
 test("shows an error on invalid import and keeps the model [spec-00001-XAC-2.1]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addEvent(page);
   await page.setInputFiles("input[type=file]", fixture("invalid.json"));
@@ -327,7 +352,7 @@ test("keeps the model local — no request carries it [spec-00001-XAC-1.1]", asy
   page.on("request", (req) => {
     if (["POST", "PUT", "PATCH"].includes(req.method())) mutating.push(req.url());
   });
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addEvent(page);
   await slice(page, "+ Policy (triggers)");
@@ -336,7 +361,7 @@ test("keeps the model local — no request carries it [spec-00001-XAC-1.1]", asy
 });
 
 test("autosaves and restores on reload [us-00005-AC-1.1]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addEvent(page);
   await expect(nodes(page, "domainEvent")).toHaveCount(1);
@@ -346,7 +371,7 @@ test("autosaves and restores on reload [us-00005-AC-1.1]", async ({ page }) => {
 });
 
 test("relation labels appear only for the focused node [design-00003]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
   // Nothing focused → the un-focused board carries no relation labels.
@@ -359,7 +384,7 @@ test("relation labels appear only for the focused node [design-00003]", async ({
 });
 
 test("focusing a node dims the rest of the board [design-00003]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await expect(nodes(page, "readModel")).toHaveCount(1);
   await nodes(page, "readModel").click(); // focus rm1
@@ -369,7 +394,7 @@ test("focusing a node dims the rest of the board [design-00003]", async ({ page 
 });
 
 test("focused edges flow (animated); the rest stay static [design-00003]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await expect(nodes(page, "readModel")).toHaveCount(1);
   // Nothing focused → no edge flows.
@@ -380,7 +405,7 @@ test("focused edges flow (animated); the rest stay static [design-00003]", async
 });
 
 test("isolate keeps only the selected node's neighbourhood [design-00003]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
   await nodes(page, "domainEvent").filter({ hasText: "Order Placed" }).click();
@@ -400,7 +425,7 @@ test("isolate keeps only the selected node's neighbourhood [design-00003]", asyn
 });
 
 test("semantic zoom drops detail when zoomed out [design-00003]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await page.getByRole("button", { name: "Design" }).click(); // model.json loads at Process
   await expect(nodes(page, "aggregate")).toHaveCount(1); // Design detail at fit zoom
@@ -412,7 +437,7 @@ test("semantic zoom drops detail when zoomed out [design-00003]", async ({ page 
 });
 
 test("hovering an edge isolates it and dims the rest [design-00003]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await page.getByRole("button", { name: "Design" }).click(); // show every edge
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
@@ -433,7 +458,7 @@ test("hovering an edge isolates it and dims the rest [design-00003]", async ({ p
 test("hovering a relation edge reveals a delete control that removes it, keeping its endpoints [us-00025-AC-1.1/2.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await page.getByRole("button", { name: "Design" }).click(); // show every edge
   const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
@@ -456,7 +481,7 @@ test("hovering a relation edge reveals a delete control that removes it, keeping
 test("deleting the hovered edge leaves no stale isolation behind [issue-00018]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await page.getByRole("button", { name: "Design" }).click(); // show every edge
   const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
@@ -479,7 +504,7 @@ test("deleting the hovered edge leaves no stale isolation behind [issue-00018]",
 test("clicking a relation edge highlights it; Delete removes it, keeping endpoints [us-00025-AC-3.1/4.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await page.getByRole("button", { name: "Design" }).click(); // show every edge
   const edge = (id: string) => page.locator(`.react-flow__edge[data-id="${id}"]`);
@@ -503,7 +528,7 @@ test("clicking a relation edge highlights it; Delete removes it, keeping endpoin
 test("a manual link is drawn in the arrow direction: drag source→target creates the edge [issue-00017]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("unlinked-command-event.json"));
   const cmd = page.locator(".react-flow__node-command"); // source of `produces`
   const ev = page.locator(".react-flow__node-domainEvent"); // its target
@@ -525,7 +550,7 @@ test("a manual link is drawn in the arrow direction: drag source→target create
 test("model health lists a smell, focuses its element, and never blocks editing [us-00011-AC-1.1/3.1/5.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   // a Domain Event with no producing Command is an orphan-event smell
   await addLabeledEvent(page, "Order Placed");
@@ -551,7 +576,7 @@ test("model health lists a smell, focuses its element, and never blocks editing 
 test("model health shows a healthy empty state when the model has no smells [us-00011-AC-4.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.getByRole("button", { name: "Health" }).click();
   const panel = page.getByTestId("health-panel");
   await expect(panel).toBeVisible();
@@ -563,7 +588,7 @@ test("model health shows a healthy empty state when the model has no smells [us-
 test("hotspot workflow: resolving mutes it and drops it from model health [us-00012-AC-1.1/3.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addLabeledEvent(page, "Order Placed");
   // attach a hotspot to the selected event, then open model health
@@ -598,7 +623,7 @@ test("hotspot workflow: resolving mutes it and drops it from model health [us-00
 test("policy and constraint carry structured rule fields, persisted across export/import [us-00026-AC-1.1/2.1/3.1/4.1, us-00027-AC-1.1/2.1]", async ({
   page,
 }) => {
-  await page.goto("/"); // Design level → Policy and Constraint both in the palette
+  await openBoard(page); // Design level → Policy and Constraint both in the palette
 
   // Policy: condition + execution + a parameter (each control gated to Policy)
   await palette(page, "Policy"); // created and selected
@@ -649,7 +674,7 @@ test("policy and constraint carry structured rule fields, persisted across expor
 test("opportunity: attach to an element, distinct from a hotspot, visible at Big Picture [us-00013-AC-1.1/3.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addLabeledEvent(page, "Order Placed");
   await slice(page, "+ Opportunity");
@@ -670,7 +695,7 @@ test("opportunity: attach to an element, distinct from a hotspot, visible at Big
 test("narrative walkthrough steps the timeline, clamps, stays read-only, and exits [us-00014-AC-1.1/2.1/3.1/4.1/5.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addLabeledEvent(page, "Order Placed"); // order 0
   await addLabeledEvent(page, "Payment Taken"); // order 1
@@ -712,7 +737,7 @@ test("narrative walkthrough steps the timeline, clamps, stays read-only, and exi
 test("a walkthrough step reads at a glance: ring + pulse on the current event, visited vs upcoming fills, overlay progress [us-00028-AC-1.1/2.1/3.1/4.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   for (const label of ["Alpha", "Beta", "Gamma", "Delta"]) await addLabeledEvent(page, label);
 
@@ -766,7 +791,7 @@ test("a walkthrough step reads at a glance: ring + pulse on the current event, v
 test("a walkthrough keeps the whole timeline and shows only the current slice [issue-00031, us-00029-AC-1.1/1.2/3.1/4.1/5.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   // two events, each with its own Command; the Command is one hop from its event
   await addLabeledEvent(page, "Alpha");
@@ -835,7 +860,7 @@ test("a walkthrough keeps the whole timeline and shows only the current slice [i
 test("a hovered edge's label is not swallowed by a sticky it crosses [issue-00034]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await openFileMenu(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await expect(nodes(page, "domainEvent")).not.toHaveCount(0);
@@ -864,7 +889,7 @@ test("the step pulse is dropped where the reader prefers reduced motion [us-0002
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addLabeledEvent(page, "Alpha");
   await page.getByRole("button", { name: "Walk" }).click();
@@ -878,7 +903,7 @@ test("the step pulse is dropped where the reader prefers reduced motion [us-0002
 test("discovery mode is Big-Picture only; converge builds structured events [us-00016-AC-1.1, us-00017-AC-1.1]", async ({
   page,
 }) => {
-  await page.goto("/"); // default Design level
+  await openBoard(page); // default Design level
   // unavailable off Big Picture (us-00016-AC-1.1)
   await expect(page.getByTestId("discovery-controls")).toHaveCount(0);
 
@@ -906,7 +931,7 @@ test("discovery mode is Big-Picture only; converge builds structured events [us-
 test("the Converge button is legible: white text on the dark fill [issue-00016]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.getByRole("button", { name: "Big Picture" }).click();
   await page.getByRole("button", { name: "Discover" }).click();
   const converge = page.getByRole("button", { name: "Converge" });
@@ -918,7 +943,7 @@ test("the Converge button is legible: white text on the dark fill [issue-00016]"
 test("renames a wall event inline without spawning extra events [us-00016-AC-2.1/4.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.getByRole("button", { name: "Big Picture" }).click();
   await page.getByRole("button", { name: "Discover" }).click();
   await page.getByRole("button", { name: "Add wall event" }).click();
@@ -940,7 +965,7 @@ test("renames a wall event inline without spawning extra events [us-00016-AC-2.1
 test("the discovery wall survives a reload and stays out of the exported DSL [us-00016-AC-5.1/6.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.getByRole("button", { name: "Big Picture" }).click();
   await page.getByRole("button", { name: "Discover" }).click();
   await page.getByRole("button", { name: "Add wall event" }).click();
@@ -967,7 +992,7 @@ test("the discovery wall survives a reload and stays out of the exported DSL [us
 test("search highlights matching elements and reports a count [us-00018-AC-1.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addLabeledEvent(page, "Order Placed");
   await page.locator(".react-flow__pane").click({ position: { x: 10, y: 10 } });
@@ -987,7 +1012,7 @@ test("search highlights matching elements and reports a count [us-00018-AC-1.1]"
 test("type filter hides non-selected types; composes with Level [us-00018-AC-3.1/7.1, spec-00006-XAC-2.1]", async ({
   page,
 }) => {
-  await page.goto("/"); // Design
+  await openBoard(page); // Design
   await addUngroupedEvent(page); // a Domain Event, selected
   await slice(page, "+ Command (produces)"); // adds a Command
   await expect(nodes(page, "command")).toHaveCount(1);
@@ -1008,7 +1033,7 @@ test("type filter hides non-selected types; composes with Level [us-00018-AC-3.1
 test("search and filter never change the exported model [us-00018-AC-5.1, spec-00006-XAC-1.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
 
@@ -1034,7 +1059,7 @@ test("search and filter never change the exported model [us-00018-AC-5.1, spec-0
 test("classifies a Bounded Context and shows the badge; export carries it [us-00019-AC-1.1/2.1/3.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   const badge = page.getByText("Core", { exact: true });
   await expect(badge).toHaveCount(0); // unclassified by default
@@ -1066,7 +1091,7 @@ test("classifies a Bounded Context and shows the badge; export carries it [us-00
 test("Context Map renders contexts + a typed relationship; edits and deletes it; leaves the board intact [us-00020-AC-1.1/3.1/4.1/7.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("context-map.json"));
   await expect(nodes(page, "domainEvent")).toHaveCount(1);
 
@@ -1114,7 +1139,7 @@ test("Context Map renders contexts + a typed relationship; edits and deletes it;
 test("captures a named snapshot, keeps it out of the export, and restores it [us-00021-AC-1.1/2.1/5.1, spec-00008-XAC-1.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addLabeledEvent(page, "Order Placed");
   await expect(nodes(page, "domainEvent")).toHaveCount(1);
@@ -1162,7 +1187,7 @@ test("compare shows a unified diff — added, removed, summary, read-only, uncha
     return JSON.parse(readFileSync(await d.path(), "utf8"));
   };
 
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addLabeledEvent(page, "Order Placed");
 
@@ -1215,7 +1240,7 @@ test("compare shows a unified diff — added, removed, summary, read-only, uncha
 });
 
 test("compare boards render with a non-zero height [issue-00014]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   await addLabeledEvent(page, "Order Placed");
 
@@ -1245,7 +1270,7 @@ test("compare boards render with a non-zero height [issue-00014]", async ({ page
 test("compare diff lays out all bands so level-hidden types don't overlap [issue-00015]", async ({
   page,
 }) => {
-  await page.goto("/"); // Design
+  await openBoard(page); // Design
   await addUngroupedEvent(page); // a Domain Event, selected
   await slice(page, "+ Command (produces)"); // Command is hidden (collapsed) at Big Picture
   await expect(nodes(page, "command")).toHaveCount(1);
@@ -1281,7 +1306,7 @@ test("compare diff lays out all bands so level-hidden types don't overlap [issue
 test("compare diff shows what changed: struck old label, direction chip, hover detail [us-00023-AC-8.1/8.2/9.1]", async ({
   page,
 }) => {
-  await page.goto("/"); // Design
+  await openBoard(page); // Design
   await addContext(page);
   await addLabeledEvent(page, "测试3"); // event A
   await page.locator(".react-flow__pane").click({ position: { x: 10, y: 10 } });
@@ -1321,21 +1346,63 @@ test("compare diff shows what changed: struck old label, direction chip, hover d
   expect(detail).toContain("label: 测试3 → 测试3改");
 });
 
-test("New clears the model and does not restore it on reload", async ({ page }) => {
+// spec-00012: Projects — create, reopen from Recent, delete
+test("a fresh browser lands on Recent with no board [us-00030-AC-5.1]", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByTestId("projects-dialog")).toBeVisible();
+  await expect(page.getByText("No projects yet.", { exact: false })).toBeVisible();
+  await expect(page.locator(".react-flow")).toHaveCount(0);
+});
+
+test("creating a Project opens an empty board and lists it [us-00030-AC-1.1]", async ({ page }) => {
+  await openBoard(page, "Ordering");
+  await expect(page.getByTestId("projects-dialog")).toHaveCount(0);
+  await expect(nodes(page, "domainEvent")).toHaveCount(0);
+  await openProjects(page);
+  await expect(page.getByTestId("recent-projects")).toContainText("Ordering");
+});
+
+test("a reload reopens the Project that was open [us-00030-AC-4.1]", async ({ page }) => {
+  await openBoard(page, "Ordering");
   await addContext(page);
-  await addEvent(page);
-  await expect(nodes(page, "domainEvent")).toHaveCount(1);
-  await page.waitForTimeout(600); // let autosave persist the current model
+  await addLabeledEvent(page, "Order Placed");
+  await page.waitForTimeout(600); // let autosave persist the Project
 
-  page.once("dialog", (d) => d.accept());
-  await openFileMenu(page);
-  await page.getByRole("button", { name: "New" }).click();
-  await expect(nodes(page, "domainEvent")).toHaveCount(0);
-
-  await page.waitForTimeout(600);
   await page.reload();
+  await expect(nodes(page, "domainEvent").filter({ hasText: "Order Placed" })).toHaveCount(1);
+});
+
+test("switching Projects carries nothing over [us-00030-AC-3.1]", async ({ page }) => {
+  await openBoard(page, "Ordering");
+  await addContext(page);
+  await addLabeledEvent(page, "Order Placed");
+  await page.waitForTimeout(600);
+
+  // A second Project starts empty...
+  await openProjects(page);
+  await createProject(page, "Payment");
   await expect(nodes(page, "domainEvent")).toHaveCount(0);
+
+  // ...and the first still holds its own board.
+  await openProjects(page);
+  await page.getByRole("button", { name: "Open Ordering" }).click();
+  await expect(nodes(page, "domainEvent").filter({ hasText: "Order Placed" })).toHaveCount(1);
+});
+
+test("a deleted Project stays gone, and its sibling does not [us-00030-AC-6.1]", async ({ page }) => {
+  await openBoard(page, "Ordering");
+  await openProjects(page);
+  await createProject(page, "Payment");
+
+  await openProjects(page);
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Delete Ordering" }).click();
+  await expect(page.getByTestId("recent-projects")).not.toContainText("Ordering");
+
+  await page.reload();
+  await openProjects(page);
+  await expect(page.getByTestId("recent-projects")).not.toContainText("Ordering");
+  await expect(page.getByTestId("recent-projects")).toContainText("Payment");
 });
 
 // spec-00010: Bounded Context Focus + compact header
@@ -1347,7 +1414,7 @@ const DIM = "0.15";
 test("focuses a context: its slice stays vivid while other contexts dim, and clears [us-00024-AC-1.1/2.1/3.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page); // Context 1
   await addContext(page); // Context 2
   const addBtns = page.getByRole("button", { name: "Add Event", exact: true });
@@ -1389,7 +1456,7 @@ test("focuses a context: its slice stays vivid while other contexts dim, and cle
 test("a resting relationship label stays under the contexts it crosses [issue-00035]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("context-map-overlap.json"));
   await page.getByRole("button", { name: "Context Map" }).click();
   await expect(page.getByTestId("context-node")).toHaveCount(3);
@@ -1428,7 +1495,7 @@ test("a resting relationship label stays under the contexts it crosses [issue-00
 test("the Context Map reads like the board: clicking a context focuses it, dims the unrelated ones, and clears [design-00003, spec-00010]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("context-map-focus.json"));
   await expect(nodes(page, "domainEvent")).toHaveCount(1);
   await page.getByRole("button", { name: "Context Map" }).click();
@@ -1480,7 +1547,7 @@ test("the Context Map reads like the board: clicking a context focuses it, dims 
 test("the context header stays one fixed-height row as contexts scale [us-00024-AC-5.1]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await addContext(page);
   const legend = page.getByTestId("context-legend");
   const oneRow = (await legend.boundingBox())!.height;
@@ -1495,7 +1562,7 @@ test("the context header stays one fixed-height row as contexts scale [us-00024-
 test("a committed scope is sticky vs node hover; only in-scope lines trace [design-00003]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await page.getByRole("button", { name: "Design" }).click(); // show every node/edge
   await expect(nodes(page, "domainEvent")).toHaveCount(2);
@@ -1600,7 +1667,7 @@ window.__reset = () => { window.__c = { node: 0, edge: 0 }; };
 `;
 
 async function openLargeBoard(page: Page, times = 20) {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", largeBoard(times));
   await page.getByRole("button", { name: "Design" }).click();
   // Zoom in past the semantic-zoom thresholds so every band renders.
@@ -1773,7 +1840,7 @@ test("a dimmed board paints no translucent elements [issue-00029]", async ({ pag
 // The anchor's own edges are r3 (ag1→e1) and r4 (e1→rm1); r2 (c1→ag1) is two hops
 // out, inside the view but not incident to the anchor.
 const isolateAroundOrderPlaced = async (page: Page) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await page.getByRole("button", { name: "Design" }).click();
   await expect(page.locator(".react-flow__node")).toHaveCount(8);
@@ -1787,7 +1854,7 @@ const isolateAroundOrderPlaced = async (page: Page) => {
 test("isolates a whole Bounded Context from its menu, keeping the far side of a seam [design-00003]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await page.getByRole("button", { name: "Design" }).click();
   const all = page.locator(".react-flow__node");
@@ -1825,7 +1892,7 @@ test("Isolate stays visible with nothing selected and exits with Esc [design-000
 }) => {
   const all = page.locator(".react-flow__node");
   const chip = page.getByRole("button", { name: "Exit Isolate" });
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await expect(chip).toHaveCount(0); // nothing isolated → no chip
   await isolateAroundOrderPlaced(page);
@@ -1846,7 +1913,7 @@ test("Isolate stays visible with nothing selected and exits with Esc [design-000
 
 test("\"i\" isolates the selected element and leaves again [design-00003]", async ({ page }) => {
   const all = page.locator(".react-flow__node");
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await page.getByRole("button", { name: "Design" }).click();
   await expect(all).toHaveCount(8);
@@ -1867,7 +1934,7 @@ test("\"i\" isolates the selected element and leaves again [design-00003]", asyn
 });
 
 test("typing \"i\" in a field does not isolate [design-00003]", async ({ page }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await page.getByRole("button", { name: "Design" }).click();
   await nodes(page, "domainEvent").filter({ hasText: "Order Placed" }).click();
@@ -1940,7 +2007,7 @@ test("leaving Isolate lands on the element last read inside the view [issue-0002
 test("leaving Isolate keeps the camera on the anchor, not on the whole board [issue-00021]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", largeBoard(10));
   const events = nodes(page, "domainEvent");
   await expect(events).toHaveCount(20);
@@ -1973,7 +2040,7 @@ test("leaving Isolate keeps the camera on the anchor, not on the whole board [is
 test("re-isolating the same anchor forgets the element read in the previous view [issue-00030]", async ({
   page,
 }) => {
-  await page.goto("/");
+  await openBoard(page);
   await page.setInputFiles("input[type=file]", fixture("model.json"));
   await page.getByRole("button", { name: "Design" }).click();
   const all = page.locator(".react-flow__node");
@@ -2036,4 +2103,211 @@ test("a zoom gesture inside one semantic band does not stall a frame [issue-0001
   // holds there even under load, where the worst frame alone can hit 68ms from one
   // scheduling stall. So the guard reads the second worst, at 50ms (issue-00020).
   expect(frames.second).toBeLessThan(50);
+});
+
+// spec-00012 / us-00031: a Project's source file, and refreshing from it.
+// The File System Access picker cannot be driven from a test — it opens a native
+// dialog — so a stub handle stands in, reading a string the test controls. The
+// handle keeps its methods on a prototype so it still survives the structured clone
+// into IndexedDB, exactly as a real handle does.
+const FILE_STUB = `
+class StubHandle {
+  constructor(name) { this.name = name; }
+  async queryPermission() { return window.__file.permission; }
+  async requestPermission() { return window.__file.permission; }
+  async getFile() {
+    if (window.__file.missing) throw new DOMException("gone", "NotFoundError");
+    const text = window.__file.text;
+    return { text: async () => text };
+  }
+}
+window.showOpenFilePicker = async () => [new StubHandle("ordering.json")];
+`;
+
+const withStubbedFile = async (page: Page, text: string) => {
+  await page.addInitScript(`window.__file = { text: ${JSON.stringify(text)}, permission: "granted", missing: false };\n${FILE_STUB}`);
+};
+const setFileOnDisk = (page: Page, patch: Record<string, unknown>) =>
+  page.evaluate(
+    (p) => Object.assign((window as unknown as { __file: object }).__file, p),
+    patch,
+  );
+
+const readFixture = (name: string) => readFileSync(fixture(name), "utf8");
+// The same fixture with one more Domain Event — "the file changed on disk".
+const modelPlusEvent = () => {
+  const model = JSON.parse(readFixture("model.json"));
+  model.nodes.push({
+    id: "e3",
+    type: "domainEvent",
+    label: "Order Shipped",
+    context: "ord",
+    order: 2,
+    properties: {},
+  });
+  return JSON.stringify(model);
+};
+
+const importSourceFile = async (page: Page) => {
+  await page.getByRole("button", { name: "Import" }).click();
+  await expect(page.getByRole("button", { name: "Refresh" })).toBeVisible();
+};
+
+test("importing a file names it as the Project's source [us-00031-AC-1.1]", async ({ page }) => {
+  await withStubbedFile(page, readFixture("model.json"));
+  await openBoard(page, "Ordering");
+  await importSourceFile(page);
+  await expect(page.getByTitle("ordering.json")).toBeVisible();
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+});
+
+test("Refresh re-reads the file and picks up what changed [us-00031-AC-3.1]", async ({ page }) => {
+  await withStubbedFile(page, readFixture("model.json"));
+  await openBoard(page, "Ordering");
+  await importSourceFile(page);
+
+  await setFileOnDisk(page, { text: modelPlusEvent() });
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(nodes(page, "domainEvent").filter({ hasText: "Order Shipped" })).toHaveCount(1);
+});
+
+test("Refresh warns before dropping local changes, and drops them on yes [us-00031-AC-4.1]", async ({
+  page,
+}) => {
+  await withStubbedFile(page, readFixture("model.json"));
+  await openBoard(page, "Ordering");
+  await importSourceFile(page);
+  await addLabeledEvent(page, "Only Local");
+  await expect(nodes(page, "domainEvent").filter({ hasText: "Only Local" })).toHaveCount(1);
+
+  let asked = false;
+  page.once("dialog", (d) => {
+    asked = true;
+    void d.accept();
+  });
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(nodes(page, "domainEvent").filter({ hasText: "Only Local" })).toHaveCount(0);
+  expect(asked).toBe(true);
+});
+
+test("declining the warning leaves the board alone [us-00031-AC-4.2]", async ({ page }) => {
+  await withStubbedFile(page, readFixture("model.json"));
+  await openBoard(page, "Ordering");
+  await importSourceFile(page);
+  await addLabeledEvent(page, "Only Local");
+
+  page.once("dialog", (d) => void d.dismiss());
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(nodes(page, "domainEvent").filter({ hasText: "Only Local" })).toHaveCount(1);
+});
+
+test("a denied permission keeps the board and says so [us-00031-AC-5.1]", async ({ page }) => {
+  await withStubbedFile(page, readFixture("model.json"));
+  await openBoard(page, "Ordering");
+  await importSourceFile(page);
+
+  await setFileOnDisk(page, { permission: "denied", text: modelPlusEvent() });
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(page.getByTestId("import-error")).toContainText("permission");
+  await expect(nodes(page, "domainEvent")).toHaveCount(2); // unchanged
+});
+
+test("a missing file keeps the board and says so [us-00031-AC-6.1]", async ({ page }) => {
+  await withStubbedFile(page, readFixture("model.json"));
+  await openBoard(page, "Ordering");
+  await importSourceFile(page);
+
+  await setFileOnDisk(page, { missing: true });
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(page.getByTestId("import-error")).toContainText("could not be found");
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+});
+
+test("an invalid file leaves the Model in place [spec-00001-XFR-2]", async ({ page }) => {
+  await withStubbedFile(page, readFixture("model.json"));
+  await openBoard(page, "Ordering");
+  await importSourceFile(page);
+
+  await setFileOnDisk(page, { text: "{ not json ]" });
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(page.getByTestId("import-error")).toBeVisible();
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+});
+
+test("without retained file access, reloading re-picks the file [us-00031-AC-7.1]", async ({
+  page,
+}) => {
+  // Firefox and Safari, modelled by taking the picker away.
+  await page.addInitScript(() => {
+    delete (window as unknown as { showOpenFilePicker?: unknown }).showOpenFilePicker;
+  });
+  await openBoard(page, "Ordering");
+  await addContext(page);
+  await expect(page.getByRole("button", { name: "Refresh" })).toHaveCount(0);
+
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Reload from file…" }).click();
+  (await chooser).setFiles(fixture("model.json"));
+  await expect(nodes(page, "domainEvent")).toHaveCount(2);
+});
+
+test("the Project names the export and its file [spec-00012-XAC-3.1]", async ({ page }) => {
+  await openBoard(page, "Ordering");
+  await addContext(page);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    (async () => {
+      await openFileMenu(page);
+      await page.getByRole("button", { name: "Export" }).click();
+    })(),
+  ]);
+  expect(download.suggestedFilename()).toBe("Ordering.json");
+  const exported = JSON.parse(readFileSync(await download.path(), "utf8"));
+  expect(exported.meta.name).toBe("Ordering");
+});
+
+test("a refused write is reported, and the session keeps working [us-00032-AC-5.1]", async ({
+  page,
+}) => {
+  await openBoard(page, "Ordering");
+  // Storage goes away under the session — quota, or a browser in a private mode.
+  await page.evaluate(() => {
+    window.indexedDB.open = () => {
+      throw new DOMException("no storage", "InvalidStateError");
+    };
+  });
+  await addContext(page);
+  await addLabeledEvent(page, "Order Placed");
+  await expect(page.getByTestId("save-error")).toBeVisible();
+  // The board still takes the edit; only its persistence failed.
+  await expect(nodes(page, "domainEvent").filter({ hasText: "Order Placed" })).toHaveCount(1);
+});
+
+test("a Project keeps its Snapshots to itself across a reload [us-00032-AC-1.1, AC-2.1]", async ({
+  page,
+}) => {
+  await openBoard(page, "Ordering");
+  await addContext(page);
+  await addLabeledEvent(page, "Order Placed");
+  await page.getByRole("button", { name: "Versions", exact: true }).click();
+  page.once("dialog", (d) => d.accept("as-is"));
+  await page.getByRole("button", { name: "Capture snapshot" }).click();
+  await expect(page.getByTestId("snapshot-row")).toHaveCount(1);
+  await page.getByRole("button", { name: "Versions", exact: true }).click();
+  await page.waitForTimeout(600); // let autosave persist the Project
+
+  // A second Project sees none of it...
+  await openProjects(page);
+  await createProject(page, "Payment");
+  await page.getByRole("button", { name: "Versions", exact: true }).click();
+  await expect(page.getByTestId("snapshot-row")).toHaveCount(0);
+  await page.getByRole("button", { name: "Versions", exact: true }).click();
+
+  // ...and the first still has it after a reload.
+  await openProjects(page);
+  await page.getByRole("button", { name: "Open Ordering" }).click();
+  await page.reload();
+  await expect(nodes(page, "domainEvent").filter({ hasText: "Order Placed" })).toHaveCount(1);
+  await page.getByRole("button", { name: "Versions", exact: true }).click();
+  await expect(page.getByTestId("snapshot-row")).toContainText("as-is");
 });

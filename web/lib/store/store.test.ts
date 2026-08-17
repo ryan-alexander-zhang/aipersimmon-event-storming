@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { StoreApi } from "zustand";
+import type { Model } from "@/lib/dsl/schema";
 import { exportJSON } from "@/lib/dsl/serialize";
 import { BAND_H } from "@/lib/layout/layout";
+import type { ProjectRecord } from "./projects";
 import { createESStore, type ESState, WALK_SCOPE_MAX } from "./store";
 import { gapOrder, slotOrders } from "./timeline";
 
@@ -959,5 +961,105 @@ describe("snapshots + compare [spec-00008]", () => {
     expect(get().compare).toEqual({ active: false, leftId: null, rightId: null });
     get().clear();
     expect(get().snapshots).toEqual([]); // "New model" discards them
+  });
+});
+
+describe("the active Project [spec-00012]", () => {
+  const model: Model = {
+    version: "4.0",
+    meta: { name: "Ordering", level: "design", createdAt: "2026-01-01T00:00:00.000Z" },
+    contexts: [{ id: "ord", name: "Ordering", order: 0 }],
+    contextRelationships: [],
+    nodes: [
+      { id: "e1", type: "domainEvent", label: "Order Placed", context: "ord", order: 0, properties: {} },
+    ],
+    edges: [],
+  };
+  const record = (over: Partial<ProjectRecord> = {}): ProjectRecord => ({
+    id: "p1",
+    name: "Ordering",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    lastOpenedAt: "2026-01-01T00:00:00.000Z",
+    model,
+    discovery: [],
+    snapshots: [],
+    dirty: false,
+    ...over,
+  });
+
+  it("loads the Project's Model, wall, and Snapshots [us-00030-AC-3.1]", () => {
+    get().openProject(
+      record({
+        discovery: [{ id: "d1", label: "Order Placed", x: 0, y: 0 }],
+        snapshots: [{ id: "s1", name: "as-is", createdAt: "t", model }],
+      }),
+    );
+    expect(get().activeProject?.name).toBe("Ordering");
+    expect(get().nodes.map((n) => n.data.label)).toEqual(["Order Placed"]);
+    expect(get().discovery.items).toHaveLength(1);
+    expect(get().snapshots).toHaveLength(1);
+  });
+
+  it("carries nothing over from the previous Project [us-00032-AC-2.1]", () => {
+    get().openProject(
+      record({
+        discovery: [{ id: "d1", label: "Order Placed", x: 0, y: 0 }],
+        snapshots: [{ id: "s1", name: "as-is", createdAt: "t", model }],
+      }),
+    );
+    get().openProject(record({ id: "p2", name: "Payment", model: { ...model, nodes: [] } }));
+    expect(get().activeProject?.id).toBe("p2");
+    expect(get().nodes).toEqual([]);
+    expect(get().discovery.items).toEqual([]);
+    expect(get().snapshots).toEqual([]);
+  });
+
+  it("resets view-only state when a Project becomes active [spec-00012-XAC-2.1]", () => {
+    get().openProject(record());
+    get().setFocusedContext("ord");
+    get().startWalkthrough();
+    get().toggleVersions();
+    expect(get().walk.active).toBe(true);
+    get().openProject(record({ id: "p2", name: "Payment" }));
+    expect(get().walk.active).toBe(false);
+    expect(get().focusedContext).toBeNull();
+    expect(get().versionsOpen).toBe(false);
+  });
+
+  it("tracks whether the Model changed since the source file [us-00031-FR-4]", () => {
+    get().openProject(record({ dirty: false }));
+    expect(get().activeProject?.dirty).toBe(false);
+    get().markDirty();
+    expect(get().activeProject?.dirty).toBe(true);
+    get().markSynced();
+    expect(get().activeProject?.dirty).toBe(false);
+  });
+
+  it("records the source file on sync", () => {
+    const source = { handle: {} as FileSystemFileHandle, name: "a.json", lastRefreshedAt: "t" };
+    get().openProject(record());
+    get().markSynced(source);
+    expect(get().activeProject?.source?.name).toBe("a.json");
+  });
+
+  it("ignores Project bookkeeping when none is open", () => {
+    expect(() => get().markDirty()).not.toThrow();
+    expect(() => get().markSynced()).not.toThrow();
+    expect(get().activeProject).toBeNull();
+  });
+
+  it("closes back to no board, clearing the Model [us-00030-FR-5]", () => {
+    get().openProject(record({ snapshots: [{ id: "s1", name: "as-is", createdAt: "t", model }] }));
+    get().closeProject();
+    expect(get().activeProject).toBeNull();
+    expect(get().nodes).toEqual([]);
+    expect(get().snapshots).toEqual([]);
+  });
+
+  it("holds the reason a save did not land [us-00032-FR-5]", () => {
+    get().setSaveError("nope");
+    expect(get().saveError).toBe("nope");
+    get().openProject(record());
+    expect(get().saveError).toBeNull(); // a fresh Project starts clean
   });
 });

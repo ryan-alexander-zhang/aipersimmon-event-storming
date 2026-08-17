@@ -195,6 +195,29 @@ _Avoid_: parallel events, simultaneous, same-slot (when precision matters).
 
 ### Artifacts
 
+**Project**:
+A named, browser-local workspace holding exactly one Model, its Discovery wall,
+and its Snapshots. Everything a Modeler opens or edits belongs to one Project;
+nothing is shared between them. Optionally linked to a Source File.
+_Avoid_: workspace, document, file, board (for the container).
+
+**Recent**:
+The list of every stored Project, most-recently-opened first — where a Project is
+created, reopened, or deleted.
+_Avoid_: recent files, history, project list.
+
+**Source File**:
+The `.json` file a Project was imported from, when the browser can retain access
+to it. Refreshing re-reads it and replaces the Project's Model; the tool never
+writes back to it.
+_Avoid_: linked file, path, attachment.
+
+**Refresh**:
+Re-reading a Project's Source File and replacing the Model with its contents.
+The file wins; local changes are confirmed away first. Distinct from a browser
+page reload, which restores a Project from local storage instead.
+_Avoid_: reload, sync, re-import.
+
 **Model**:
 The whole Event Storming diagram — its elements, relations, and hotspots — as
 held on the canvas and persisted locally.
@@ -206,9 +229,10 @@ import, and local save. The single source of truth for the Model's shape.
 _Avoid_: schema (that is the Zod definition of the DSL), export format.
 
 **Snapshot**:
-A named, timestamped copy of the whole Model captured at a point in time, kept
-locally so a modeller can save an as-is version and return to it. Stored outside
-the model DSL and never part of the current Model's export (decision-00008).
+A named, timestamped copy of the whole Model captured at a point in time, kept on
+its Project so a modeller can save an as-is version and return to it. Stored
+outside the model DSL and never part of the current Model's export
+(decision-00008, scoped to a Project by decision-00011).
 _Avoid_: version (unqualified), backup, save.
 
 **Version Compare**:

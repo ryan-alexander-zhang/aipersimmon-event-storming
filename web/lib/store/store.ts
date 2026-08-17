@@ -25,6 +25,7 @@ import { resolveRelation } from "@/lib/eventstorming/relations";
 import { computeLayout } from "@/lib/layout/layout";
 import { EMPTY_FILTER, type FilterState } from "./filter";
 import type { IsolateDirection } from "./focus";
+import type { ProjectRecord, ProjectSource } from "./projects";
 import { eventSlotIndex, gapOrder, normalizeOrders, slotOrders, timelineOrder } from "./timeline";
 import type { ESEdge, ESNode, ESNodeData } from "./types";
 
@@ -81,6 +82,22 @@ export interface Snapshot {
   model: Model;
 }
 
+/** The open Project's identity (spec-00012). Its content is the store's own
+ *  nodes/edges/discovery/snapshots; only what identifies and tracks the Project
+ *  lives here. */
+export interface ActiveProject {
+  id: string;
+  name: string;
+  createdAt: string;
+  lastOpenedAt: string;
+  source?: ProjectSource;
+  dirty: boolean;
+  /** Bumped whenever the Model is loaded from the source file. Autosave watches it
+   *  to tell a load apart from an edit — without it, importing a file would count
+   *  as a change *against* that same file. */
+  syncToken: number;
+}
+
 /** Side-by-side compare (spec-00008 FR10): which two snapshots and whether the
  *  read-only compare view is open. View-only, never persisted. */
 export interface CompareState {
@@ -120,13 +137,22 @@ export interface ESState {
   filter: FilterState;
   /** Context Map view visibility (spec-00004 FR5); view-only, never persisted. */
   contextMapOpen: boolean;
-  /** Named model snapshots (spec-00008 FR10); persisted under their own key,
-   *  outside the model DSL (decision-00008). */
+  /** Named model snapshots (spec-00008 FR10); persisted on the active Project,
+   *  outside the model DSL (decision-00008, narrowed by decision-00011). */
   snapshots: Snapshot[];
   /** Versions panel visibility (spec-00008); view-only, never persisted. */
   versionsOpen: boolean;
   /** Side-by-side compare view (spec-00008 FR10); view-only, never persisted. */
   compare: CompareState;
+  /** The open Project (spec-00012). Null means no board: the Modeler has to create
+   *  or open one first (us-00030-FR-5). */
+  activeProject: ActiveProject | null;
+  /** Why the last autosave did not land, or null. Surfaced rather than swallowed
+   *  (us-00032-FR-5); view-only. */
+  saveError: string | null;
+  /** Recent visibility. Forced open whenever no Project is active — with no board
+   *  there is nothing else to show (us-00030-FR-5). View-only. */
+  projectsOpen: boolean;
 
   setLevel: (level: Level) => void;
   toggleIsolate: () => void;
@@ -247,6 +273,19 @@ export interface ESState {
     level?: Level;
   }) => void;
   clear: () => void;
+
+  /** Make a Project active: its Model, discovery wall, and Snapshots replace
+   *  whatever the previous Project had (us-00032-FR-2). */
+  openProject: (record: ProjectRecord) => void;
+  closeProject: () => void;
+  /** The Model changed since it was last loaded from the Project's source file
+   *  (us-00031-FR-4). Set by autosave, not by each mutating action. */
+  markDirty: () => void;
+  /** Record that the Model now matches the source file — on import and refresh. */
+  markSynced: (source?: ProjectSource) => void;
+  setSaveError: (message: string | null) => void;
+  openProjects: () => void;
+  closeProjects: () => void;
 }
 
 // Recompute positions from the model whenever structure — or the Level — changes.
@@ -276,6 +315,9 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   snapshots: [],
   versionsOpen: false,
   compare: { active: false, leftId: null, rightId: null },
+  activeProject: null,
+  saveError: null,
+  projectsOpen: false,
 
   setLevel: (level) =>
     set({
@@ -628,6 +670,53 @@ const initializer: StateCreator<ESState> = (set, get) => ({
       versionsOpen: false,
       compare: { active: false, leftId: null, rightId: null },
     }),
+
+  // Everything a Project owns moves together: setModel already resets the view and
+  // the discovery wall, so only the wall's items, the Snapshots, and the Project's
+  // identity are layered on top. Nothing of the previous Project survives
+  // (us-00032-FR-2) — the decision-00008 §4 carry-over is gone.
+  openProject: (record) => {
+    get().setModel(fromModel(record.model));
+    set({
+      discovery: { active: false, items: record.discovery },
+      snapshots: record.snapshots,
+      saveError: null,
+      projectsOpen: false,
+      activeProject: {
+        id: record.id,
+        name: record.name,
+        createdAt: record.createdAt,
+        lastOpenedAt: record.lastOpenedAt,
+        ...(record.source ? { source: record.source } : {}),
+        dirty: record.dirty,
+        syncToken: 0,
+      },
+    });
+  },
+  closeProject: () => {
+    get().clear();
+    set({ activeProject: null, saveError: null });
+  },
+  markDirty: () => {
+    const project = get().activeProject;
+    if (!project || project.dirty) return;
+    set({ activeProject: { ...project, dirty: true } });
+  },
+  markSynced: (source) => {
+    const project = get().activeProject;
+    if (!project) return;
+    set({
+      activeProject: {
+        ...project,
+        ...(source ? { source } : {}),
+        dirty: false,
+        syncToken: project.syncToken + 1,
+      },
+    });
+  },
+  setSaveError: (message) => set({ saveError: message }),
+  openProjects: () => set({ projectsOpen: true }),
+  closeProjects: () => set({ projectsOpen: false }),
 });
 
 export const useESStore = create<ESState>()(initializer);

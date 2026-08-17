@@ -2,11 +2,15 @@
 id: us-00005-local-persistence
 type: us
 role: main
-status: active
+status: archived
 parent: spec-00001-mvp-editor
 ---
 
 # User Story: local autosave and restore
+
+> **Superseded by [us-00032](./us-00032-project-scoped-local-save.md)** (spec-00012).
+> Autosave is now per Project, in IndexedDB, not one implicit model under fixed
+> `localStorage` keys. Kept for the history of the single-model build.
 
 As a Modeler,
 I want my work to be saved locally and restored when I return,

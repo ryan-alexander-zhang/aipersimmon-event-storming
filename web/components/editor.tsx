@@ -26,8 +26,10 @@ import { HealthPanel } from "@/components/health-panel";
 import { PanelRail } from "@/components/panel-rail";
 import { Walkthrough } from "@/components/walkthrough";
 import { ElementNode, routeHandles } from "@/components/nodes/element-node";
+import { ProjectsDialog } from "@/components/projects-dialog";
 import { PropertyPanel } from "@/components/property-panel";
 import { Toolbar } from "@/components/toolbar";
+import { toModel } from "@/lib/dsl/serialize";
 import { RELATION_STYLE } from "@/lib/eventstorming/edge-style";
 import { ELEMENT_DEFINITIONS, ELEMENT_TYPES, type ElementType } from "@/lib/eventstorming/elements";
 import { FULL_DETAIL_ZOOM, typesForZoom } from "@/lib/eventstorming/levels";
@@ -42,14 +44,13 @@ import {
   computeNeighborhood,
 } from "@/lib/store/focus";
 import {
-  loadDiscovery,
-  loadModel,
-  loadSnapshots,
-  saveDiscovery,
-  saveModel,
-  saveSnapshots,
-} from "@/lib/store/persistence";
-import { useESStore } from "@/lib/store/store";
+  getActiveProjectId,
+  loadProject,
+  migrateLegacy,
+  saveProject,
+  setActiveProjectId,
+} from "@/lib/store/projects";
+import { type ESState, useESStore } from "@/lib/store/store";
 import { dropOrder, dropTarget, slotOrders, timelineOrder } from "@/lib/store/timeline";
 import type { ESEdge, ESNode } from "@/lib/store/types";
 
@@ -176,49 +177,119 @@ function TimelineDropIndicator({ drop }: { drop: DropView }) {
   );
 }
 
-/** Hydrate from local storage on mount, then debounce-save on every change. The
- *  discovery wall is saved under its own key (spec-00002 §5), never in the DSL. */
+// Only the persisted slices matter. The store also carries view-only state (hover,
+// selection, zoom band), and reacting to that re-serialized the whole model on every
+// pointer rest (issue-00019).
+function persistedSlice(s: ESState): unknown[] {
+  return [
+    s.nodes,
+    s.edges,
+    s.contexts,
+    s.level,
+    s.contextRelationships,
+    s.discovery.items,
+    s.snapshots,
+  ];
+}
+
+// What "changed since the source file" means (us-00031-FR-4). It cannot be the nodes
+// array: React Flow hands back new node objects for size, position, and selection
+// changes, and the layout engine rebuilds them on every reflow — none of which the
+// file holds. So this compares only what does end up in the DSL. Each element keeps
+// its `data` object identity through all of the above, which makes the comparison a
+// walk of references rather than a serialization.
+function modelFingerprint(s: ESState): unknown[] {
+  const out: unknown[] = [s.contexts, s.contextRelationships, s.level, s.nodes.length, s.edges.length];
+  for (const n of s.nodes) out.push(n.id, n.type, n.data);
+  for (const e of s.edges) out.push(e.id, e.source, e.target, e.data);
+  return out;
+}
+
+const same = (a: unknown[], b: unknown[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+/** Write the open Project back to IndexedDB. A refused write is reported rather
+ *  than swallowed (us-00032-FR-5) — with several Projects, quota is reachable. */
+async function persistActiveProject(): Promise<void> {
+  const s = useESStore.getState();
+  const project = s.activeProject;
+  if (!project) return;
+  try {
+    const model = toModel(
+      s.nodes,
+      s.edges,
+      s.contexts,
+      { name: project.name, createdAt: project.createdAt, level: s.level },
+      s.contextRelationships,
+    );
+    await saveProject({
+      id: project.id,
+      name: project.name,
+      createdAt: project.createdAt,
+      lastOpenedAt: project.lastOpenedAt,
+      model,
+      discovery: s.discovery.items,
+      snapshots: s.snapshots,
+      ...(project.source ? { source: project.source } : {}),
+      dirty: useESStore.getState().activeProject?.dirty ?? false,
+    });
+    useESStore.getState().setSaveError(null);
+  } catch {
+    useESStore.getState().setSaveError("This Project was not saved — the browser refused to store it.");
+  }
+}
+
+/** Open the last active Project on mount (migrating any pre-Project data first),
+ *  then debounce-save it back on every change. Nothing is written while no Project
+ *  is open, so the empty state can never overwrite a Project's Model. */
 function useAutosave() {
   useEffect(() => {
-    const loaded = loadModel();
-    if (loaded && (loaded.nodes.length > 0 || loaded.contexts.length > 0)) {
-      useESStore.getState().setModel(loaded);
-    }
-    const wall = loadDiscovery();
-    if (wall.length > 0) {
-      useESStore.setState({ discovery: { active: false, items: wall } });
-    }
-    const snaps = loadSnapshots();
-    if (snaps.length > 0) {
-      useESStore.setState({ snapshots: snaps });
-    }
+    let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
-    // Only the persisted slices matter. The store also carries view-only state
-    // (hover, selection, zoom band), and reacting to that re-serialized the whole
-    // model on every pointer rest (issue-00019).
-    let saved: unknown[] = [];
-    const unsubscribe = useESStore.subscribe((s) => {
-      const slice = [
-        s.nodes,
-        s.edges,
-        s.contexts,
-        s.level,
-        s.contextRelationships,
-        s.discovery.items,
-        s.snapshots,
-      ];
-      if (slice.every((v, i) => v === saved[i])) return;
-      saved = slice;
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        saveModel(s.nodes, s.edges, s.contexts, s.level, s.contextRelationships);
-        saveDiscovery(s.discovery.items);
-        saveSnapshots(s.snapshots);
-      }, 400);
-    });
+    let unsubscribe: (() => void) | undefined;
+
+    void (async () => {
+      const migrated = await migrateLegacy();
+      const activeId = getActiveProjectId();
+      const record = migrated ?? (activeId === null ? null : await loadProject(activeId));
+      if (cancelled) return;
+      if (record) {
+        useESStore.getState().openProject(record);
+        setActiveProjectId(record.id);
+      }
+
+      const generation = (s: ESState) =>
+        s.activeProject && `${s.activeProject.id}:${s.activeProject.syncToken}`;
+      let openGen = generation(useESStore.getState());
+      let saved = persistedSlice(useESStore.getState());
+      let fingerprint = modelFingerprint(useESStore.getState());
+      unsubscribe = useESStore.subscribe((s) => {
+        if (!s.activeProject) return;
+        // Opening a Project — or loading its source file — is not an edit of it:
+        // re-baseline instead of counting a load as a change against that same file.
+        if (generation(s) !== openGen) {
+          openGen = generation(s);
+          saved = persistedSlice(s);
+          fingerprint = modelFingerprint(s);
+          return;
+        }
+        const slice = persistedSlice(s);
+        if (same(slice, saved)) return;
+        saved = slice;
+        const next = modelFingerprint(s);
+        const modelChanged = !same(next, fingerprint);
+        fingerprint = next; // before markDirty, so its notification falls through here
+        // Immediately, not at the debounced save: a Refresh one keystroke after an
+        // edit still has to warn that the edit is about to go (us-00031-FR-4).
+        if (modelChanged) useESStore.getState().markDirty();
+        clearTimeout(timer);
+        timer = setTimeout(() => void persistActiveProject(), 400);
+      });
+    })();
+
     return () => {
+      cancelled = true;
       clearTimeout(timer);
-      unsubscribe();
+      unsubscribe?.();
     };
   }, []);
 }
@@ -260,8 +331,6 @@ function Canvas() {
   // that changes only at a threshold (issue-00028).
   const visibleTypeKey = useStore((s) => typesForZoom(s.transform[2], level).join("|"));
   const { fitView, getNode } = useReactFlow();
-
-  useAutosave();
 
   // Timeline drag session (us-00010). `dragRef` freezes the pre-drag columns so
   // hit-testing is stable; `cancelRef` records an Escape mid-drag; `drop` drives
@@ -838,9 +907,15 @@ function Canvas() {
 }
 
 export function Editor() {
+  // The autosave cycle lives here, not in Canvas: it is what opens the Project that
+  // decides whether a board renders at all (us-00030-FR-5).
+  useAutosave();
+  const activeProject = useESStore((s) => s.activeProject);
+  const projectsOpen = useESStore((s) => s.projectsOpen);
   return (
     <ReactFlowProvider>
-      <Canvas />
+      {activeProject ? <Canvas /> : null}
+      {(!activeProject || projectsOpen) && <ProjectsDialog />}
     </ReactFlowProvider>
   );
 }

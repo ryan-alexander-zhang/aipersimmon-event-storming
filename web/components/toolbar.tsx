@@ -3,6 +3,7 @@
 import { Combine, Crosshair, Network, Plus, Sparkles, X } from "lucide-react";
 import { FileMenu } from "@/components/file-menu";
 import { FilterControls } from "@/components/filter-controls";
+import { SourceFileControls } from "@/components/source-file";
 import { LEVEL_LABEL, LEVELS } from "@/lib/eventstorming/levels";
 import { useESStore } from "@/lib/store/store";
 
@@ -19,6 +20,8 @@ export function Toolbar() {
   const compareActive = useESStore((s) => s.compare.active);
   const isolate = useESStore((s) => s.isolate);
   const toggleIsolate = useESStore((s) => s.toggleIsolate);
+  const projectName = useESStore((s) => s.activeProject?.name ?? "Event Storming");
+  const saveError = useESStore((s) => s.saveError);
 
   // Drop a wall event in a light left→right cascade so freshly added events are
   // spatially ordered out of the box; the modeller then drags them where they want.
@@ -54,7 +57,10 @@ export function Toolbar() {
 
   return (
     <header className="flex items-center gap-2 border-b border-zinc-200 bg-white px-3 py-2">
-      <span className="text-sm font-semibold text-zinc-800">Event Storming</span>
+      {/* The open Project names the board (spec-00012). */}
+      <span className="max-w-[14rem] truncate text-sm font-semibold text-zinc-800" title={projectName}>
+        {projectName}
+      </span>
       <div className="ml-3 flex items-center rounded-md border border-zinc-300 p-0.5" role="group" aria-label="View">
         <button type="button" className={seg(view === "board")} aria-pressed={view === "board"} onClick={goBoard}>
           Board
@@ -131,8 +137,22 @@ export function Toolbar() {
         </div>
       )}
       <div className="ml-auto flex items-center gap-2">
+        {/* A refused write is the one storage failure the Modeler has to know about:
+            the session keeps working, but this Project is no longer being kept
+            (us-00032-FR-5). */}
+        {saveError && (
+          <span
+            className="rounded-md bg-red-50 px-2 py-1 text-[11px] text-red-600"
+            role="alert"
+            data-testid="save-error"
+            title={saveError}
+          >
+            Not saved
+          </span>
+        )}
         {/* Search + filter target the structured board; hidden in the alternate views. */}
         {!discoveryActive && !contextMapOpen && !compareActive && <FilterControls />}
+        <SourceFileControls />
         <FileMenu />
       </div>
     </header>

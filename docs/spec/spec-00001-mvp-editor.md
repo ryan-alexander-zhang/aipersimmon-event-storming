@@ -33,7 +33,7 @@ annotates); Model and DSL. Inputs:
 | US2 | [us-00002-connect-elements](../us/us-00002-connect-elements.md) | active | Relations follow the grammar; slice actions auto-link, manual links validated |
 | US3 | [us-00003-annotate-hotspots](../us/us-00003-annotate-hotspots.md) | active | Attach hotspots to any element |
 | US4 | [us-00004-export-import](../us/us-00004-export-import.md) | active | Export/import the model (DSL v2: contexts + timeline order) losslessly |
-| US5 | [us-00005-local-persistence](../us/us-00005-local-persistence.md) | active | Autosave locally and restore on reload |
+| US5 | [us-00005-local-persistence](../us/us-00005-local-persistence.md) | archived | Autosave locally and restore on reload — superseded by [us-00032](../us/us-00032-project-scoped-local-save.md) (spec-00012), which scopes it to a Project |
 | US6 | [us-00006-bounded-contexts-timeline](../us/us-00006-bounded-contexts-timeline.md) | active | Organize the board into bounded contexts along an ordered timeline |
 | US7 | [us-00007-structured-slice-editing](../us/us-00007-structured-slice-editing.md) | active | Build event slices; layout is computed, positions never hand-set |
 | US8 | [us-00008-levels](../us/us-00008-levels.md) | active | Switch Big Picture / Process / Design levels (view filter over one model) |
@@ -83,7 +83,8 @@ controlled canvas. No server, no routes.
 
 ### 4.2 Data
 The DSL `Model` (`meta`, `nodes[]`, `edges[]`) is the only persisted shape:
-exported as a JSON file and autosaved to localStorage.
+exported as a JSON file and autosaved locally — to localStorage here, on the
+active Project in IndexedDB since [spec-00012](./spec-00012-project-workspace.md).
 
 ### 4.3 Error Handling (each row maps to a requirement id)
 | Error | Handling | Requirement |
@@ -91,7 +92,7 @@ exported as a JSON file and autosaved to localStorage.
 | invalid connection attempt | reject, show non-blocking feedback | us-00002-FR-2 |
 | malformed/invalid import | reject, keep current model, show error | spec-00001-XFR-2 / spec-00001-XAC-2.1 |
 | unknown DSL version on import | reject with version message | spec-00001-XFR-3 |
-| corrupt localStorage on load | start empty, do not crash | us-00005-FR-2 |
+| corrupt stored model on load | start empty, do not crash | us-00005-FR-2 → us-00032-FR-3 |
 
 ## 5. Out of Scope
 

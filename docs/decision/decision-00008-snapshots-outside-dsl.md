@@ -51,6 +51,13 @@ DSL (shape 2). Each snapshot is `{ id, name, createdAt, model: Model }`.
 4. **Snapshots are model-scoped, not file-scoped.** They belong to the browser-local
    working model. `clear()` ("New model") discards them; importing a different model
    leaves them in place (a known, documented boundary — see spec-00008 §5).
+   > **Narrowed by [decision-00011](./decision-00011-projects-in-indexeddb-file-handle-optional.md) §5.**
+   > There is no single browser-local working model any more: Snapshots belong to a
+   > **Project** and travel with it, so opening another Project shows only its own.
+   > The "importing a different model leaves them in place" boundary is gone — it
+   > only existed because there was one implicit model to scope them to. Points 1–3
+   > stand: Snapshots still live outside the DSL, under their own storage, migrated
+   > and validated per Snapshot.
 
 ## Consequences
 
