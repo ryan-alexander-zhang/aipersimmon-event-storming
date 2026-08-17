@@ -30,6 +30,7 @@ const SLICE: Partial<Record<ElementType, SliceAction[]>> = {
   ],
   command: [
     { label: "+ Actor (issues)", type: "actor", dir: "from" },
+    { label: "+ External System (issues)", type: "externalSystem", dir: "from" },
     { label: "+ Domain Event (produces)", type: "domainEvent", dir: "to" },
     { label: "+ Constraint (constrains)", type: "constraint", dir: "to" },
     { label: "+ Aggregate (handled by)", type: "aggregate", dir: "to" },
@@ -64,6 +65,9 @@ const SLICE: Partial<Record<ElementType, SliceAction[]>> = {
   ],
   externalSystem: [
     { label: "+ Domain Event (emits)", type: "domainEvent", dir: "to" },
+    // Both directions, and they mean different things: `issues` is the outside
+    // system asking us to act, `handled by` is us calling it (issue-00037).
+    { label: "+ Command (issues)", type: "command", dir: "to" },
     { label: "+ Command (handled by)", type: "command", dir: "from" },
     { label: "+ Hotspot", type: "hotspot", dir: "from" },
     { label: "+ Opportunity", type: "opportunity", dir: "from" },

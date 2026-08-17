@@ -2383,3 +2383,29 @@ test("hotspots stacked on one slice never overlap each other [issue-00036]", asy
   for (let i = 1; i < boxes.length; i++)
     expect(boxes[i - 1].bottom).toBeLessThanOrEqual(boxes[i].top + 1);
 });
+
+test("an External System issues a Command, as well as handling one [issue-00037, decision-00003]", async ({
+  page,
+}) => {
+  await openBoard(page);
+  await page.getByRole("button", { name: "Process", exact: true }).click();
+  await palette(page, "External System"); // created and selected
+
+  // The outside system as the one asking: a provider callback we may still refuse.
+  await slice(page, "+ Command (issues)");
+  await expect(nodes(page, "command")).toHaveCount(1);
+  await expect(page.getByText("issues", { exact: true })).toBeVisible();
+
+  // It lays out like any other issuer: above the Command it issues.
+  const sys = (await nodes(page, "externalSystem").boundingBox())!;
+  const cmd = (await nodes(page, "command").boundingBox())!;
+  expect(sys.y + sys.height).toBeLessThanOrEqual(cmd.y);
+
+  // And the other direction still means the other thing: us calling it.
+  await nodes(page, "command").click();
+  await expect(page.getByRole("button", { name: "+ External System (issues)" })).toBeVisible();
+  await nodes(page, "externalSystem").click();
+  await slice(page, "+ Command (handled by)");
+  await expect(nodes(page, "command")).toHaveCount(2);
+  await expect(page.getByText("handledBy", { exact: true })).toBeVisible();
+});

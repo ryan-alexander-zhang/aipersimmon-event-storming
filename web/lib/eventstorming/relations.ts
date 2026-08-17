@@ -27,7 +27,11 @@ export interface ConnectionRule {
 }
 
 export const CONNECTION_RULES: ConnectionRule[] = [
-  { relation: "issues", sources: ["actor"], targets: ["command"] },
+  // A Command's origin is a person, a Policy (`invokes`), or an outside system
+  // asking us to act — a provider callback that we may still refuse or constrain
+  // (decision-00003 Process grammar, issue-00037). Direction keeps that apart from
+  // `handledBy`, which is us calling the outside system.
+  { relation: "issues", sources: ["actor", "externalSystem"], targets: ["command"] },
   // Process-level causal spine: a Command produces the Domain Event it causes,
   // without needing an Aggregate (decision-00003).
   { relation: "produces", sources: ["command"], targets: ["domainEvent"] },

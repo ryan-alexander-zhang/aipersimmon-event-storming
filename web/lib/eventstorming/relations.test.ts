@@ -6,6 +6,9 @@ import { isValidConnection, resolveRelation } from "./relations";
 // expressed as valid (source, relation, target) triples.
 const VALID: Array<[ElementType, string, ElementType]> = [
   ["actor", "issues", "command"],
+  // An outside system can be the one asking, not only the one we call
+  // (decision-00003 Process grammar, issue-00037).
+  ["externalSystem", "issues", "command"],
   ["command", "produces", "domainEvent"],
   ["command", "constrainedBy", "constraint"],
   ["command", "handledBy", "aggregate"],
@@ -22,6 +25,13 @@ describe("connection rules", () => {
   it.each(VALID)("%s -> %s resolves to %s", (source, relation, target) => {
     expect(resolveRelation(source, target)).toBe(relation);
     expect(isValidConnection(source, target)).toBe(true);
+  });
+
+  it("keeps the two directions between a Command and an External System apart [issue-00037]", () => {
+    // the outside system asks us to do something...
+    expect(resolveRelation("externalSystem", "command")).toBe("issues");
+    // ...and we call out to it; direction is what tells them apart.
+    expect(resolveRelation("command", "externalSystem")).toBe("handledBy");
   });
 
   it("lets a hotspot annotate any element type", () => {
