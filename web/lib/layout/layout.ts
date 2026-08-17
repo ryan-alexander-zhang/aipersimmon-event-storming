@@ -13,7 +13,11 @@ import type { ESEdge, ESNode } from "@/lib/store/types";
 
 export const COL_W = 230;
 export const BAND_H = 132;
-export const STACK_H = 70;
+// The stacking pitch is also the sticky's height ceiling: nodes sharing a cell sit
+// one STACK_H apart, so a taller sticky covers the one below (issue-00036). The
+// tallest sticky is a Hotspot — a two-line label (the card clamps it there) plus its
+// kind/priority chips, measured at 92px — and the rest of the pitch is its gap.
+export const STACK_H = 96;
 export const NODE_W = 190;
 
 interface Placement {

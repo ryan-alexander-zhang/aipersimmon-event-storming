@@ -2362,3 +2362,24 @@ test("a Project keeps its Snapshots to itself across a reload [us-00032-AC-1.1, 
   await page.getByRole("button", { name: "Versions", exact: true }).click();
   await expect(page.getByTestId("snapshot-row")).toContainText("as-is");
 });
+
+test("hotspots stacked on one slice never overlap each other [issue-00036]", async ({ page }) => {
+  await openBoard(page);
+  await page.setInputFiles("input[type=file]", fixture("stacked-hotspots.json"));
+  await expect(nodes(page, "hotspot")).toHaveCount(3);
+
+  // Every hotspot of this slice shares the slice's column and lane, so the three
+  // stack in the Hotspots band, one stacking pitch apart. A sticky taller than that
+  // pitch — a wrapped question plus its kind/priority chips — covers the one below.
+  // Boxes are screen-space, so the comparison is zoom-invariant either way.
+  const boxes = await nodes(page, "hotspot").evaluateAll((els) =>
+    els
+      .map((el) => {
+        const body = el.querySelector("[data-testid=node-body]")!.getBoundingClientRect();
+        return { top: body.top, bottom: body.bottom };
+      })
+      .sort((a, b) => a.top - b.top),
+  );
+  for (let i = 1; i < boxes.length; i++)
+    expect(boxes[i - 1].bottom).toBeLessThanOrEqual(boxes[i].top + 1);
+});

@@ -153,7 +153,14 @@ function ElementNodeInner({ id, type, data, selected }: NodeProps<ESNode>) {
           }}
         />
       ) : (
-        <div className="mt-1 cursor-text break-words font-medium" onDoubleClick={startEditing}>
+        // The label is clamped to two lines so the sticky cannot grow past the
+        // layout's stacking pitch and cover the sticky below it (issue-00036); the
+        // full text stays one hover (title) or one click (property panel) away.
+        <div
+          className="mt-1 line-clamp-2 cursor-text break-words font-medium"
+          title={data.label}
+          onDoubleClick={startEditing}
+        >
           {data.label}
         </div>
       )}

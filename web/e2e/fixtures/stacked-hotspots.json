@@ -1,0 +1,38 @@
+{
+  "version": "4.0",
+  "meta": { "name": "Stacked hotspots", "level": "design", "createdAt": "2026-08-17T00:00:00Z" },
+  "contexts": [{ "id": "pay", "name": "Payment", "order": 0 }],
+  "nodes": [
+    { "id": "c1", "type": "command", "label": "Charge Payment", "context": "pay", "properties": {} },
+    { "id": "ag1", "type": "aggregate", "label": "Charge", "context": "pay", "properties": {} },
+    { "id": "e1", "type": "domainEvent", "label": "Payment Charged", "context": "pay", "order": 0, "properties": {} },
+    {
+      "id": "h1",
+      "type": "hotspot",
+      "label": "Charge Policy reads Payment-context facts — path unmodeled",
+      "context": "pay",
+      "properties": { "kind": "question", "priority": "medium" }
+    },
+    {
+      "id": "h2",
+      "type": "hotspot",
+      "label": "Pre-charge notice required in the target markets?",
+      "context": "pay",
+      "properties": { "kind": "question", "priority": "high" }
+    },
+    {
+      "id": "h3",
+      "type": "hotspot",
+      "label": "Automatic Charge on redirect-only provider?",
+      "context": "pay",
+      "properties": { "kind": "question", "priority": "medium" }
+    }
+  ],
+  "edges": [
+    { "id": "r1", "source": "c1", "target": "ag1", "relation": "handledBy" },
+    { "id": "r2", "source": "ag1", "target": "e1", "relation": "emits" },
+    { "id": "r3", "source": "h1", "target": "e1", "relation": "annotates" },
+    { "id": "r4", "source": "h2", "target": "c1", "relation": "annotates" },
+    { "id": "r5", "source": "h3", "target": "ag1", "relation": "annotates" }
+  ]
+}

@@ -57,7 +57,8 @@ export function SnapshotNode({ type, data }: NodeProps<ESNode>) {
           <Star size={12} className="ml-auto fill-current opacity-80" aria-label="pivotal" />
         )}
       </div>
-      <div className="mt-1 break-words font-medium">{data.label}</div>
+      {/* Clamped like the live sticky, for the same reason (issue-00036). */}
+      <div className="mt-1 line-clamp-2 break-words font-medium">{data.label}</div>
       {change?.renamedFrom && (
         <div className="break-words text-xs text-rose-700/70 line-through" data-testid="diff-renamed-from">
           {change.renamedFrom}
