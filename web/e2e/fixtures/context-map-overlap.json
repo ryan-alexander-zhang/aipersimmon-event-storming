@@ -1,0 +1,16 @@
+{
+  "version": "4.0",
+  "meta": { "name": "Context map overlap", "level": "big-picture", "createdAt": "2026-08-17T00:00:00Z" },
+  "contexts": [
+    { "id": "ord", "name": "Ordering", "order": 0, "classification": "core" },
+    { "id": "pay", "name": "Payment", "order": 1, "classification": "generic" },
+    { "id": "shp", "name": "Shipping", "order": 2 }
+  ],
+  "contextRelationships": [
+    { "id": "cr1", "source": "ord", "target": "shp", "type": "customerSupplier" }
+  ],
+  "nodes": [
+    { "id": "e1", "type": "domainEvent", "label": "Order Placed", "context": "ord", "order": 0, "properties": {} }
+  ],
+  "edges": []
+}

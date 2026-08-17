@@ -17,6 +17,16 @@ export interface RelationStyle {
 const CHAIN_W = 2;
 const SECONDARY_W = 1.25;
 
+/** Lift for the label of an emphasised edge, on either surface. React Flow stacks
+ *  its viewport layers — edges, edge labels, nodes — by DOM order at `z-index: auto`,
+ *  so a node paints over any label under it and swallows the pointer with it: the
+ *  label carries the relation's picker and delete, which then cannot be clicked
+ *  (issue-00034). It is carried by the label itself rather than by the layer, so a
+ *  resting label still reads as *under* the board — on the Context Map every label is
+ *  always visible, and lifting the layer floated all of them over the context cards
+ *  (issue-00035). 1001 clears the 1000 React Flow gives a selected node. */
+export const EDGE_LABEL_Z = 1001;
+
 export const RELATION_STYLE: Record<RelationType, RelationStyle> = {
   issues: { tier: "chain", color: "#2563eb", width: CHAIN_W },
   produces: { tier: "chain", color: "#b45309", width: CHAIN_W },

@@ -1386,6 +1386,45 @@ test("focuses a context: its slice stays vivid while other contexts dim, and cle
   await expectDimmed(bravo, false);
 });
 
+test("a resting relationship label stays under the contexts it crosses [issue-00035]", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.setInputFiles("input[type=file]", fixture("context-map-overlap.json"));
+  await page.getByRole("button", { name: "Context Map" }).click();
+  await expect(page.getByTestId("context-node")).toHaveCount(3);
+
+  // Ordering → Shipping spans the row, so its label lands on Payment, the context
+  // laid out between them. Context Map labels are always visible, so an always-on
+  // lift would leave one covering that card's name.
+  const label = page.getByTestId("context-relation-label");
+  const stack = async () =>
+    label.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return document
+        .elementsFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+        .map((e) =>
+          e.closest(".react-flow__node")
+            ? "node"
+            : e.closest(".react-flow__edgelabel-renderer")
+              ? "label"
+              : "other",
+        );
+    });
+  const above = (s: string[], a: string, b: string) =>
+    s.indexOf(a) > -1 && (s.indexOf(b) === -1 || s.indexOf(a) < s.indexOf(b));
+
+  await expect(page.locator(".react-flow__node").filter({ hasText: "Payment" })).toBeVisible();
+  expect(above(await stack(), "node", "label")).toBe(true);
+
+  // Hovering the relationship is what lifts it: the picker and the delete have to be
+  // reachable wherever the label lands (issue-00034), and the line is reachable even
+  // where the label is covered.
+  await page.locator('.react-flow__edge[data-id="cr1"]').dispatchEvent("mouseover");
+  await expect(page.getByRole("button", { name: "Delete relationship" })).toBeVisible();
+  expect(above(await stack(), "label", "node")).toBe(true);
+});
+
 test("the Context Map reads like the board: clicking a context focuses it, dims the unrelated ones, and clears [design-00003, spec-00010]", async ({
   page,
 }) => {

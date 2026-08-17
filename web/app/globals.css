@@ -25,17 +25,6 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* React Flow stacks its three viewport layers — edges, edge labels, nodes — purely
-   by DOM order, all at `z-index: auto`, so a sticky paints over any label under it
-   and swallows the pointer with it. An emphasised edge is already lifted above the
-   nodes by its own `zIndex`, which left the line on top and its label behind the
-   sticky it crossed; the label also carries the relation's delete control, so being
-   covered made it unclickable (issue-00034). Labels only render for the emphasised
-   set (hover/focus), so lifting the layer affects nothing else. */
-.react-flow__edgelabel-renderer {
-  z-index: 1001;
-}
-
 /* The Walkthrough's Current Step (us-00028): a halo that grows out of the Step
    Ring and fades, played once when the cursor lands on an event. The ring's own
    two layers are repeated in both frames so they stay put while the third

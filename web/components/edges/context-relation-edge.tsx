@@ -13,6 +13,7 @@ import {
   CONTEXT_RELATION_TYPES,
   type ContextRelationType,
 } from "@/lib/eventstorming/context-relations";
+import { EDGE_LABEL_Z } from "@/lib/eventstorming/edge-style";
 import { offsetOrthogonalPath } from "@/lib/layout/edge-path";
 import { useESStore } from "@/lib/store/store";
 
@@ -91,9 +92,13 @@ export function ContextRelationEdge({
       <EdgeLabelRenderer>
         <div
           className="nodrag nopan pointer-events-auto absolute flex items-center gap-1 rounded bg-white/95 px-1 py-0.5 text-[10px] shadow-sm"
+          // Every relationship's label is on here, so only the hovered one is lifted
+          // above the contexts: an always-on lift floats resting labels over the cards
+          // they cross and hides their names (issue-00035).
           style={{
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
             opacity: dimmed ? DIM_LABEL_OPACITY : 1,
+            ...(emphasised ? { zIndex: EDGE_LABEL_Z } : {}),
           }}
           data-testid="context-relation-label"
           // The label is a separate overlay layer, so React Flow's own

@@ -9,7 +9,7 @@ import {
 } from "@xyflow/react";
 import { X } from "lucide-react";
 import { memo } from "react";
-import { RELATION_STYLE } from "@/lib/eventstorming/edge-style";
+import { EDGE_LABEL_Z, RELATION_STYLE } from "@/lib/eventstorming/edge-style";
 import { offsetOrthogonalPath } from "@/lib/layout/edge-path";
 import { useESStore } from "@/lib/store/store";
 import type { ESEdge } from "@/lib/store/types";
@@ -92,7 +92,12 @@ function RelationEdgeInner({
         <EdgeLabelRenderer>
           <div
             className={`nodrag nopan absolute flex items-center gap-1 rounded bg-white/85 px-1 py-0.5 text-[10px] font-medium text-zinc-600 shadow-sm ${emphasised ? "pointer-events-auto" : "pointer-events-none"}`}
-            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+            // Labels render only for the emphasised set here, so each one that exists
+            // is lifted above the stickies it crosses (issue-00034).
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              zIndex: EDGE_LABEL_Z,
+            }}
             // While the pointer sits on the label (a separate overlay layer), keep
             // this edge emphasised so the hover-revealed delete stays reachable —
             // otherwise onEdgeMouseLeave would unmount it before the click lands.
