@@ -12,6 +12,10 @@ const DESIGN = path.join(__dirname, "../../docs/design/design-00002-structured-b
 const DESIGN_SECTION = "### Relations (connection-rule table)";
 const GLOSSARY = path.join(__dirname, "../../CONTEXT.md");
 const GLOSSARY_SECTION = "### Relations (canvas edges)";
+const SKILL = path.join(__dirname, "../../skills/event-storming");
+const SKILL_DSL = path.join(SKILL, "reference/dsl.md");
+const SKILL_SECTION = "## Relations";
+const VALIDATOR = path.join(SKILL, "scripts/validate.py");
 
 type Table = Map<string, { sources: string[]; targets: string[] }>;
 
@@ -24,10 +28,10 @@ function section(file: string, heading: string): string[] {
   return text.slice(from).split("\n");
 }
 
-// "any element" stands for every element type — a Hotspot annotates anything.
+// "any element" / "any type" stands for every element type — a Hotspot annotates anything.
 const types = (text: string, byLabel = false): string[] => {
   const clean = text.replaceAll("`", "").replaceAll("*", "").trim();
-  if (clean === "any element") return [...ELEMENT_TYPES];
+  if (clean === "any element" || clean === "any type") return [...ELEMENT_TYPES];
   return clean.split(",").map((part) => {
     const name = part.trim();
     if (!byLabel) return name;
@@ -67,9 +71,51 @@ function glossaryTable(): Table {
   return table;
 }
 
+/** The authoring skill's own table: `| relation | source -> target, source -> target |`,
+ *  a row of pairs rather than two cells. */
+function skillTable(): Table {
+  const lines = section(SKILL_DSL, SKILL_SECTION);
+  const start = lines.findIndex((l) => l.startsWith("|"));
+  const end = lines.findIndex((l, i) => i > start && !l.startsWith("|"));
+  const table: Table = new Map();
+  for (const row of lines.slice(start, end)) {
+    if (row.includes("---") || row.includes("relation |")) continue;
+    const [, relation, pairs] = row.split("|").map((c) => c.trim());
+    const sources = new Set<string>();
+    const targets = new Set<string>();
+    for (const pair of pairs.split(",")) {
+      const [source, target] = pair.split("->");
+      expect(target, `no arrow in "${row}"`).toBeDefined();
+      for (const t of types(source)) sources.add(t);
+      for (const t of types(target)) targets.add(t);
+    }
+    table.set(types(relation)[0], { sources: [...sources], targets: [...targets] });
+  }
+  return table;
+}
+
+/** The skill's validator enforces the same grammar in Python: a RULES list of
+ *  `(relation, {sources}, {targets})`. A model the app accepts must not be rejected
+ *  by the script the authoring skill runs on every write. */
+function validatorRules(): Table {
+  const text = readFileSync(VALIDATOR, "utf8");
+  const table: Table = new Map();
+  const rule = /\("(\w+)",\s*\{([^}]*)\},\s*(\{[^}]*\}|set\(ELEMENTS\))\)/g;
+  const pyTypes = (raw: string): string[] =>
+    raw.includes("set(ELEMENTS)")
+      ? [...ELEMENT_TYPES]
+      : raw.replaceAll(/[{}"]/g, "").split(",").map((s) => s.trim());
+  for (const [, relation, sources, targets] of text.matchAll(rule)) {
+    table.set(relation, { sources: pyTypes(sources), targets: pyTypes(targets) });
+  }
+  return table;
+}
+
 const MIRRORS: Array<[name: string, read: () => Table]> = [
   ["design-00002 §3", designTable],
   ["CONTEXT.md glossary", glossaryTable],
+  ["the authoring skill's reference/dsl.md", skillTable],
+  ["the authoring skill's validate.py", validatorRules],
 ];
 
 describe.each(MIRRORS)("%s mirrors CONNECTION_RULES (issue-00037)", (_name, read) => {

@@ -42,7 +42,7 @@
 | `policy` | "when X happened, do Y" | carries `condition`, `execution`, `parameters` |
 | `aggregate` | consistency boundary handling a command | design output |
 | `constraint` | precondition that must hold to run a command | design input; carries `rule` |
-| `externalSystem` | outside system, black box | can handle commands and emit events |
+| `externalSystem` | outside system, black box | can issue and handle commands, and emit events |
 | `hotspot` | conflict, question or risk on any element | carries `state`, `kind`, `priority`, and once closed `resolution` + `resolvedAt` |
 | `opportunity` | idea or value to pursue on any element | positive counterpart of hotspot |
 
@@ -106,7 +106,7 @@ Hotspot full form:
 
 | relation | source -> target |
 | --- | --- |
-| `issues` | actor -> command |
+| `issues` | actor -> command, externalSystem -> command |
 | `produces` | command -> domainEvent |
 | `constrainedBy` | command -> constraint |
 | `handledBy` | command -> aggregate, command -> externalSystem |

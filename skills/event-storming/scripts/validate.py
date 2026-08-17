@@ -24,7 +24,7 @@ LEVEL_TYPES = {
 
 # (relation, allowed source types, allowed target types)
 RULES = [
-    ("issues", {"actor"}, {"command"}),
+    ("issues", {"actor", "externalSystem"}, {"command"}),
     ("produces", {"command"}, {"domainEvent"}),
     ("constrainedBy", {"command"}, {"constraint"}),
     ("handledBy", {"command"}, {"aggregate", "externalSystem"}),
@@ -218,7 +218,7 @@ def check_health(nodes, edges, level, ctx_ids):
             if not reaches_event(nid, out, nodes):
                 warn(f"dangling command '{n['label']}': it produces no domain event")
             if not any(r in ("issues", "invokes") for _, r in inc[nid]):
-                warn(f"command '{n['label']}': no actor issues it and no policy invokes it")
+                warn(f"command '{n['label']}': nothing issues it and no policy invokes it")
         if t == "aggregate":
             c = sum(1 for _, r in inc[nid] if r == "handledBy")
             ev = sum(1 for _, r in out[nid] if r == "emits")

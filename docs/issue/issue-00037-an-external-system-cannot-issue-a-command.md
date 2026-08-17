@@ -87,6 +87,14 @@ first erases exactly the validation and rejection the model exists to expose.
     where they are defined — the enumeration was stale by four relations.
   - `design-00001` §2 is left as it was: that doc is `archived` and superseded by
     design-00002, so its table is history, not a claim about today.
+  - The **authoring skill** carried the grammar twice more, and one copy was worse than
+    stale: `skills/event-storming/scripts/validate.py`'s `RULES` **rejected**
+    `externalSystem -> command` outright (`ERROR edge e1: externalSystem -> command is
+    not a legal connection`), so the skill would have refused to write a model the app
+    now accepts. Both its copies — `reference/dsl.md`'s table and the validator — are
+    fixed and guarded, and the prose that repeated the old rule follows:
+    `reference/process.md` step 2 and its gate, `reference/dsl.md`'s element table
+    ("can issue and handle commands"), and `SKILL.md`'s Process gate.
 
 ## Reproduction (test-first)
 
@@ -104,9 +112,15 @@ first erases exactly the validation and rejection the model exists to expose.
 
 ## Verification
 
-- unit **325 passed** (`bun run test`), e2e **92 passed, 1 failed** — the failure is
+- unit **373 passed** (`bun run test`), e2e **92 passed, 1 failed** — the failure is
   the pre-existing `[issue-00028]` wheel-zoom timing budget, which fails the same way
   on a clean tree. `tsc --noEmit` and lint clean.
+- The guard was checked in both directions: it goes red when a mirror is edited back
+  (design-00002's `issues` row, `CONTEXT.md`'s `handledBy` line), and it was red on
+  both skill mirrors before they were fixed.
+- `validate.py` run on a minimal `externalSystem —issues→ command —produces→ event`
+  model: 1 error before the fix, 0 after. Re-run on `template.json` and all five
+  `examples/*.json`: 0 errors each, warnings unchanged.
 
 ## Noted, not fixed
 

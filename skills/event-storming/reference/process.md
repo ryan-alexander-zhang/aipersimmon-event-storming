@@ -9,7 +9,7 @@ Adds: `command`, `policy`, `readModel`. Keep the phase 1 events and their `order
 Work event by event, in `order`. For each event ask the four questions:
 
 1. **What command caused it?** Add `command --produces--> domainEvent`. If an outside system caused it instead: `command --handledBy--> externalSystem --emits--> domainEvent`, or just the external system emitting it.
-2. **Who issues that command?** A person or role -> `actor --issues--> command`. Nobody -> it is automatic, so a policy invokes it (step 4).
+2. **Who issues that command?** A person or role -> `actor --issues--> command`. An outside system asking us to act (a provider callback we may still refuse) -> `externalSystem --issues--> command`. Nobody -> it is automatic, so a policy invokes it (step 4).
 3. **What does the actor need to know first?** -> `readModel`, wired `domainEvent --updates--> readModel --informs--> actor`.
 4. **What reacts to this event automatically?** -> `policy`, wired `domainEvent --triggers--> policy --invokes--> command`.
 
@@ -39,7 +39,7 @@ Ask for the numbers. "Retry a few times" is not an answer: how many, how long be
 ## Gate
 
 - [ ] Every `domainEvent` has an incoming `produces` or `emits`.
-- [ ] Every `command` has an `issues` from an actor or an `invokes` from a policy.
+- [ ] Every `command` has an `issues` from an actor or an external system, or an `invokes` from a policy.
 - [ ] Every actor decision that needs data has a read model informing it.
 - [ ] Every policy has `execution`, plus `condition` and `parameters` where they exist.
 - [ ] Reaction loops are intentional (the validator flags policy cycles - confirm each one is a real retry loop with a bound).
