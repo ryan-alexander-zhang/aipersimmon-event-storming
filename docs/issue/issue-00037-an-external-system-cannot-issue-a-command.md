@@ -95,6 +95,11 @@ first erases exactly the validation and rejection the model exists to expose.
     fixed and guarded, and the prose that repeated the old rule follows:
     `reference/process.md` step 2 and its gate, `reference/dsl.md`'s element table
     ("can issue and handle commands"), and `SKILL.md`'s Process gate.
+  - The guard covers the skill's other two copies of the grammar for the same reason,
+    though neither had drifted yet: its element-type list (vs `ELEMENT_TYPES`) and its
+    level gating (vs `LEVEL_TYPES`), in both `reference/dsl.md` and `validate.py`. A new
+    element type, or a type moving between levels, would otherwise leave the validator
+    rejecting what the app allows — exactly how the `issues` rule failed.
 
 ## Reproduction (test-first)
 
@@ -112,12 +117,14 @@ first erases exactly the validation and rejection the model exists to expose.
 
 ## Verification
 
-- unit **373 passed** (`bun run test`), e2e **92 passed, 1 failed** — the failure is
+- unit **381 passed** (`bun run test`), e2e **92 passed, 1 failed** — the failure is
   the pre-existing `[issue-00028]` wheel-zoom timing budget, which fails the same way
   on a clean tree. `tsc --noEmit` and lint clean.
 - The guard was checked in both directions: it goes red when a mirror is edited back
   (design-00002's `issues` row, `CONTEXT.md`'s `handledBy` line), and it was red on
-  both skill mirrors before they were fixed.
+  both skill mirrors before they were fixed. The element-type and level guards were
+  checked the same way — dropping `opportunity` from either copy, and moving
+  `readModel` out of Process in either copy, each turns them red.
 - `validate.py` run on a minimal `externalSystem —issues→ command —produces→ event`
   model: 1 error before the fix, 0 after. Re-run on `template.json` and all five
   `examples/*.json`: 0 errors each, warnings unchanged.

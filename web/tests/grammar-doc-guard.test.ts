@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { ELEMENT_DEFINITIONS, ELEMENT_TYPES } from "@/lib/eventstorming/elements";
+import { type Level, LEVEL_TYPES, LEVELS } from "@/lib/eventstorming/levels";
 import { CONNECTION_RULES } from "@/lib/eventstorming/relations";
 
 // Guard for issue-00037: decision-00003 declared `External System —issues→ Command`
@@ -15,6 +16,8 @@ const GLOSSARY_SECTION = "### Relations (canvas edges)";
 const SKILL = path.join(__dirname, "../../skills/event-storming");
 const SKILL_DSL = path.join(SKILL, "reference/dsl.md");
 const SKILL_SECTION = "## Relations";
+const SKILL_TYPE_SECTION = "## Element types";
+const SKILL_LEVEL_SECTION = "## Level gating";
 const VALIDATOR = path.join(SKILL, "scripts/validate.py");
 
 type Table = Map<string, { sources: string[]; targets: string[] }>;
@@ -94,21 +97,65 @@ function skillTable(): Table {
   return table;
 }
 
+const validator = (): string => readFileSync(VALIDATOR, "utf8");
+// A Python literal of element types: `{"a", "b"}`, `["a", "b"]`, or `set(ELEMENTS)`.
+const pyTypes = (raw: string): string[] =>
+  raw.includes("set(ELEMENTS)")
+    ? [...ELEMENT_TYPES]
+    : raw
+        .replaceAll(/[{}[\]"\n]/g, " ")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
 /** The skill's validator enforces the same grammar in Python: a RULES list of
  *  `(relation, {sources}, {targets})`. A model the app accepts must not be rejected
  *  by the script the authoring skill runs on every write. */
 function validatorRules(): Table {
-  const text = readFileSync(VALIDATOR, "utf8");
   const table: Table = new Map();
   const rule = /\("(\w+)",\s*\{([^}]*)\},\s*(\{[^}]*\}|set\(ELEMENTS\))\)/g;
-  const pyTypes = (raw: string): string[] =>
-    raw.includes("set(ELEMENTS)")
-      ? [...ELEMENT_TYPES]
-      : raw.replaceAll(/[{}"]/g, "").split(",").map((s) => s.trim());
-  for (const [, relation, sources, targets] of text.matchAll(rule)) {
+  for (const [, relation, sources, targets] of validator().matchAll(rule)) {
     table.set(relation, { sources: pyTypes(sources), targets: pyTypes(targets) });
   }
   return table;
+}
+
+/** The first column of a `| type | … |` table under `heading`. */
+function firstColumn(file: string, heading: string): string[] {
+  const lines = section(file, heading);
+  const start = lines.findIndex((l) => l.startsWith("|"));
+  const end = lines.findIndex((l, i) => i > start && !l.startsWith("|"));
+  return lines
+    .slice(start, end)
+    .filter((l) => !l.includes("---") && !l.includes("| type |") && !l.includes("| level |"))
+    .map((l) => types(l.split("|")[1])[0]);
+}
+
+/** The skill's level table is cumulative: `big-picture` lists its types, the levels
+ *  below it add to the one above with `+ command, policy, …`. */
+function skillLevels(): Record<Level, string[]> {
+  const lines = section(SKILL_DSL, SKILL_LEVEL_SECTION);
+  const start = lines.findIndex((l) => l.startsWith("|"));
+  const end = lines.findIndex((l, i) => i > start && !l.startsWith("|"));
+  const levels = {} as Record<Level, string[]>;
+  let running: string[] = [];
+  for (const row of lines.slice(start, end)) {
+    if (row.includes("---") || row.includes("| level |")) continue;
+    const [, level, allowed] = row.split("|").map((c) => c.trim());
+    running = [...running, ...types(allowed.replace("+", ""))];
+    levels[types(level)[0] as Level] = running;
+  }
+  return levels;
+}
+
+/** `LEVEL_TYPES = { "big-picture": {…}, … }` in the validator. */
+function validatorLevels(): Record<Level, string[]> {
+  const levels = {} as Record<Level, string[]>;
+  const entry = /"(big-picture|process|design)":\s*(\{[^}]*\}|set\(ELEMENTS\))/g;
+  for (const [, level, allowed] of validator().matchAll(entry)) {
+    levels[level as Level] = pyTypes(allowed);
+  }
+  return levels;
 }
 
 const MIRRORS: Array<[name: string, read: () => Table]> = [
@@ -132,5 +179,26 @@ describe.each(MIRRORS)("%s mirrors CONNECTION_RULES (issue-00037)", (_name, read
     expect(row, `no entry for ${rule.relation}`).toBeDefined();
     expect(sorted(row!.sources)).toEqual(sorted(rule.sources));
     expect(sorted(row!.targets)).toEqual(sorted(rule.targets));
+  });
+});
+
+// The same drift is possible on the two other lists the skill keeps its own copy of:
+// a new element type, or a type moving between levels, would leave the validator
+// rejecting what the app allows exactly as the `issues` rule did.
+describe.each([
+  ["the authoring skill's reference/dsl.md", () => firstColumn(SKILL_DSL, SKILL_TYPE_SECTION)],
+  ["the authoring skill's validate.py", () => pyTypes(/ELEMENTS = (\[[^\]]*\])/.exec(validator())![1])],
+])("%s mirrors ELEMENT_TYPES", (_name, read) => {
+  it("lists every element type, and no others", () => {
+    expect(sorted(read())).toEqual(sorted(ELEMENT_TYPES));
+  });
+});
+
+describe.each([
+  ["the authoring skill's reference/dsl.md", skillLevels],
+  ["the authoring skill's validate.py", validatorLevels],
+])("%s mirrors LEVEL_TYPES", (_name, read) => {
+  it.each(LEVELS)("allows the same types at %s", (level) => {
+    expect(sorted(read()[level] ?? [])).toEqual(sorted(LEVEL_TYPES[level]));
   });
 });
