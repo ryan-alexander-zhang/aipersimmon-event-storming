@@ -1,5 +1,11 @@
 # DSL v4.0 - full grammar
 
+`scripts/grammar.json` is the machine-readable copy of the element types, level gating,
+edge rules and context-relationship types below - it is what `scripts/validate.py`
+enforces, and what the editor's own test suite checks itself against. The tables here
+are for reading; if one ever disagrees with the JSON, the JSON is right and the
+validator will say so.
+
 ## Contents
 - File shape
 - Element types

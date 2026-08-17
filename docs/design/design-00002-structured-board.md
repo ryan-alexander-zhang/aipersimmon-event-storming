@@ -59,11 +59,13 @@ assigns a default single context and a derived order).
 
 ### Relations (connection-rule table)
 
-The whole grammar, kept in step with `CONNECTION_RULES`
-(`web/lib/eventstorming/relations.ts`) — the code is the source of truth and
-`web/tests/grammar-doc-guard.test.ts` fails if this table drifts from it
-(issue-00037). One row per relation; `resolveRelation` matches on the (source,
-target) pair, so a pair reversed is a different relation or nothing at all.
+The whole grammar. `CONNECTION_RULES` (`web/lib/eventstorming/relations.ts`) is the
+source of truth — this table documents it and is not machine-checked, so read the code
+when it matters. The one copy that *is* checked against it lives outside the app:
+`skills/event-storming/scripts/grammar.json`, which the authoring skill ships because it
+runs on the user's machine and cannot import the tables (`web/tests/skill-grammar-guard.test.ts`,
+issue-00037). One row per relation; `resolveRelation` matches on the (source, target)
+pair, so a pair reversed is a different relation or nothing at all.
 
 | relation | source | target |
 |---|---|---|

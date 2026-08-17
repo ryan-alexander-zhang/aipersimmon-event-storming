@@ -1,0 +1,53 @@
+{
+  "_comment": "The DSL grammar this skill writes and validate.py enforces. Mirrors the editor's own tables (web/lib/eventstorming/{elements,levels,relations,context-relations}.ts and DSL_VERSION); web/tests/skill-grammar-guard.test.ts fails if the two disagree. \"*\" means every element type.",
+  "dslVersion": "4.0",
+  "elements": [
+    "domainEvent",
+    "command",
+    "actor",
+    "constraint",
+    "aggregate",
+    "policy",
+    "readModel",
+    "externalSystem",
+    "hotspot",
+    "opportunity"
+  ],
+  "levels": {
+    "big-picture": ["actor", "externalSystem", "domainEvent", "hotspot", "opportunity"],
+    "process": [
+      "actor",
+      "externalSystem",
+      "command",
+      "domainEvent",
+      "policy",
+      "readModel",
+      "hotspot",
+      "opportunity"
+    ],
+    "design": ["*"]
+  },
+  "relations": [
+    { "relation": "issues", "sources": ["actor", "externalSystem"], "targets": ["command"] },
+    { "relation": "produces", "sources": ["command"], "targets": ["domainEvent"] },
+    { "relation": "constrainedBy", "sources": ["command"], "targets": ["constraint"] },
+    { "relation": "handledBy", "sources": ["command"], "targets": ["aggregate", "externalSystem"] },
+    { "relation": "emits", "sources": ["aggregate", "externalSystem"], "targets": ["domainEvent"] },
+    { "relation": "triggers", "sources": ["domainEvent"], "targets": ["policy"] },
+    { "relation": "invokes", "sources": ["policy"], "targets": ["command"] },
+    { "relation": "updates", "sources": ["domainEvent"], "targets": ["readModel"] },
+    { "relation": "informs", "sources": ["readModel"], "targets": ["actor"] },
+    { "relation": "annotates", "sources": ["hotspot"], "targets": ["*"] },
+    { "relation": "highlights", "sources": ["opportunity"], "targets": ["*"] }
+  ],
+  "contextRelations": [
+    "partnership",
+    "sharedKernel",
+    "customerSupplier",
+    "conformist",
+    "acl",
+    "openHostService",
+    "publishedLanguage",
+    "separateWays"
+  ]
+}

@@ -11,35 +11,37 @@ Exit code 1 when there is at least one ERROR.
 import json
 import sys
 from collections import defaultdict
+from pathlib import Path
 
-ELEMENTS = ["domainEvent", "command", "actor", "constraint", "aggregate", "policy",
-            "readModel", "externalSystem", "hotspot", "opportunity"]
+# The grammar is data, not code: grammar.json next to this script is the one copy the
+# skill keeps, and the editor's test suite checks it against the editor's own tables.
+# Duplicating it here in Python is what let the two drift apart (issue-00037).
+GRAMMAR_PATH = Path(__file__).resolve().parent / "grammar.json"
+try:
+    with open(GRAMMAR_PATH, encoding="utf-8") as f:
+        GRAMMAR = json.load(f)
+except OSError as e:
+    sys.exit(f"cannot read the grammar next to this script ({GRAMMAR_PATH}): {e}")
+except json.JSONDecodeError as e:
+    sys.exit(f"{GRAMMAR_PATH} is not valid JSON: {e}")
 
-LEVEL_TYPES = {
-    "big-picture": {"actor", "externalSystem", "domainEvent", "hotspot", "opportunity"},
-    "process": {"actor", "externalSystem", "domainEvent", "hotspot", "opportunity",
-                "command", "policy", "readModel"},
-    "design": set(ELEMENTS),
-}
+DSL_VERSION = GRAMMAR["dslVersion"]
+ELEMENTS = GRAMMAR["elements"]
+
+
+def _types(names):
+    """Expand the grammar's "*" (every element type) into a set of type names."""
+    return set(ELEMENTS) if "*" in names else set(names)
+
+
+LEVEL_TYPES = {level: _types(names) for level, names in GRAMMAR["levels"].items()}
 
 # (relation, allowed source types, allowed target types)
-RULES = [
-    ("issues", {"actor", "externalSystem"}, {"command"}),
-    ("produces", {"command"}, {"domainEvent"}),
-    ("constrainedBy", {"command"}, {"constraint"}),
-    ("handledBy", {"command"}, {"aggregate", "externalSystem"}),
-    ("emits", {"aggregate", "externalSystem"}, {"domainEvent"}),
-    ("triggers", {"domainEvent"}, {"policy"}),
-    ("invokes", {"policy"}, {"command"}),
-    ("updates", {"domainEvent"}, {"readModel"}),
-    ("informs", {"readModel"}, {"actor"}),
-    ("annotates", {"hotspot"}, set(ELEMENTS)),
-    ("highlights", {"opportunity"}, set(ELEMENTS)),
-]
+RULES = [(r["relation"], _types(r["sources"]), _types(r["targets"]))
+         for r in GRAMMAR["relations"]]
 RELATIONS = [r[0] for r in RULES]
 
-CTX_RELS = ["partnership", "sharedKernel", "customerSupplier", "conformist",
-            "acl", "openHostService", "publishedLanguage", "separateWays"]
+CTX_RELS = GRAMMAR["contextRelations"]
 
 # property -> the node types allowed to carry it (None = any type)
 PROPS = {"description": None, "pivotal": {"domainEvent"}, "state": {"hotspot"},
@@ -314,8 +316,8 @@ def main():
         print("ERROR the model must be a JSON object")
         return 1
 
-    if model.get("version") != "4.0":
-        err(f"version must be the string \"4.0\", found {model.get('version')!r}")
+    if model.get("version") != DSL_VERSION:
+        err(f"version must be the string \"{DSL_VERSION}\", found {model.get('version')!r}")
     meta = model.get("meta")
     if not isinstance(meta, dict):
         err("meta is required: { name, level, createdAt }")

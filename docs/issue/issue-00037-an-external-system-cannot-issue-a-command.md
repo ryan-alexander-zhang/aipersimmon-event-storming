@@ -117,17 +117,36 @@ first erases exactly the validation and rejection the model exists to expose.
 
 ## Verification
 
-- unit **381 passed** (`bun run test`), e2e **92 passed, 1 failed** — the failure is
+- unit **344 passed** (`bun run test`), e2e **92 passed, 1 failed** — the failure is
   the pre-existing `[issue-00028]` wheel-zoom timing budget, which fails the same way
   on a clean tree. `tsc --noEmit` and lint clean.
 - The guard was checked in both directions: it goes red when a mirror is edited back
   (design-00002's `issues` row, `CONTEXT.md`'s `handledBy` line), and it was red on
-  both skill mirrors before they were fixed. The element-type and level guards were
-  checked the same way — dropping `opportunity` from either copy, and moving
-  `readModel` out of Process in either copy, each turns them red.
+  both skill mirrors before they were fixed. The `grammar.json` guard that replaced them
+  was checked the same way: dropping `externalSystem` from the `issues` sources, dropping
+  `opportunity` from the element list, moving `readModel` out of Process, bumping
+  `dslVersion`, or dropping a context-relationship type each turns it red.
 - `validate.py` run on a minimal `externalSystem —issues→ command —produces→ event`
   model: 1 error before the fix, 0 after. Re-run on `template.json` and all five
   `examples/*.json`: 0 errors each, warnings unchanged.
+
+## Follow-up: the guard reads data, not prose
+
+The first version of the guard parsed the Markdown tables and the Python source. That
+worked, but it tied the tests to the *shape* of four documents: renaming a heading or
+inserting a blank line inside a table failed the suite while the content was still
+correct. The skill now ships `scripts/grammar.json` — element types, level gating, edge
+rules, context-relationship types, DSL version — `validate.py` loads it instead of
+carrying its own literals, and `web/tests/skill-grammar-guard.test.ts` compares that JSON
+with `ELEMENT_TYPES` / `LEVEL_TYPES` / `CONNECTION_RULES` / `CONTEXT_RELATION_TYPES` /
+`DSL_VERSION`. Data against data: one machine-checked mirror instead of four
+prose-parsed ones.
+
+The prose is then free to be prose: `design-00002` §3, `CONTEXT.md` and the skill's
+`reference/dsl.md` keep their tables as documentation, each saying where the source of
+truth is. A drifted table in the skill's reference is now bounded rather than silent —
+`SKILL.md` makes `validate.py` mandatory on every write, and the validator enforces the
+JSON.
 
 ## Noted, not fixed
 
