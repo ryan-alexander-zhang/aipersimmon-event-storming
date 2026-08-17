@@ -7,7 +7,7 @@ import {
   ChevronsRight,
   Trash2,
 } from "lucide-react";
-import { useLayoutEffect, useRef } from "react";
+import { type ComponentProps, type RefObject, useLayoutEffect, useRef } from "react";
 import { ELEMENT_DEFINITIONS, ELEMENT_TYPES, type ElementType } from "@/lib/eventstorming/elements";
 import { isVisibleAt } from "@/lib/eventstorming/levels";
 import { useESStore } from "@/lib/store/store";
@@ -70,13 +70,40 @@ const SLICE: Partial<Record<ElementType, SliceAction[]>> = {
   ],
 };
 
-// A description is read far more often than it is edited, so the box grows to
-// its content instead of hiding the tail behind an inner scrollbar. `scrollHeight`
-// excludes the border, which `offsetHeight - clientHeight` adds back.
-function fitToContent(el: HTMLTextAreaElement | null) {
-  if (!el) return;
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+// Every long-text field here is read far more often than it is edited, so the box
+// grows to its content instead of hiding the tail behind an inner scrollbar or a
+// drag handle. It is a component rather than a helper so a field added later cannot
+// forget to fit. `scrollHeight` excludes the border, which `offsetHeight -
+// clientHeight` adds back.
+function FitTextarea({
+  boxRef,
+  className,
+  value,
+  ...props
+}: ComponentProps<"textarea"> & {
+  // Only for a caller that also needs the element itself — the Resolution field
+  // takes the cursor when a Hotspot is resolved.
+  boxRef?: RefObject<HTMLTextAreaElement | null>;
+  value: string;
+}) {
+  const own = useRef<HTMLTextAreaElement>(null);
+  const ref = boxRef ?? own;
+  // Refits on mount (a conditionally shown field arrives already filled) and on
+  // every value change, including ones this panel did not make — undo, or a load.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+  }, [ref, value]);
+  return (
+    <textarea
+      ref={ref}
+      className={`${className} min-h-16 resize-none overflow-hidden`}
+      value={value}
+      {...props}
+    />
+  );
 }
 
 export function PropertyPanel() {
@@ -99,18 +126,7 @@ export function PropertyPanel() {
   const setIsolateDirection = useESStore((s) => s.setIsolateDirection);
   const setIsolateDepth = useESStore((s) => s.setIsolateDepth);
 
-  const descRef = useRef<HTMLTextAreaElement>(null);
   const resolutionRef = useRef<HTMLTextAreaElement>(null);
-  // Refit on every description change, including ones the panel did not make
-  // (undo, or a load) — the panel itself remounts per selection via `key`.
-  useLayoutEffect(() => fitToContent(descRef.current), [node?.data.description]);
-  // A resolution is read the same way, so it fits the same way. `state` and
-  // `resolvedAt` are dependencies too: the block is conditional, and they are what
-  // mounts it — without them the first frame after resolving keeps the empty height.
-  useLayoutEffect(
-    () => fitToContent(resolutionRef.current),
-    [node?.data.resolution, node?.data.state, node?.data.resolvedAt],
-  );
 
   const wrap = "w-64 shrink-0 overflow-y-auto border-l border-zinc-200 bg-zinc-50 p-3";
 
@@ -223,9 +239,9 @@ export function PropertyPanel() {
             <div>
               <label className="block text-xs font-medium text-zinc-600">
                 Resolution
-                <textarea
-                  ref={resolutionRef}
-                  className={`${field} min-h-16 resize-none overflow-hidden`}
+                <FitTextarea
+                  boxRef={resolutionRef}
+                  className={field}
                   placeholder="What closed it — the answer, the decision, the mitigation"
                   value={node.data.resolution ?? ""}
                   onChange={(e) =>
@@ -287,9 +303,8 @@ export function PropertyPanel() {
       {!isAnnotation && (
         <label className="mt-3 block text-xs font-medium text-zinc-600">
           Description
-          <textarea
-            ref={descRef}
-            className={`${field} min-h-16 resize-none overflow-hidden`}
+          <FitTextarea
+            className={field}
             value={node.data.description ?? ""}
             onChange={(e) => updateNodeData(node.id, { description: e.target.value })}
           />
@@ -299,8 +314,8 @@ export function PropertyPanel() {
       {node.type === "constraint" && (
         <label className="mt-3 block text-xs font-medium text-zinc-600">
           Rule
-          <textarea
-            className={`${field} h-16 resize-none`}
+          <FitTextarea
+            className={field}
             placeholder="The invariant that must hold"
             value={node.data.rule ?? ""}
             onChange={(e) => updateNodeData(node.id, { rule: e.target.value || undefined })}
