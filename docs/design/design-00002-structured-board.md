@@ -57,21 +57,39 @@ Changes vs v1: add `contexts` + `node.context` + `node.order`; **remove
 single source of truth; a v1→v2 migration accepts old files (drops positions,
 assigns a default single context and a derived order).
 
-### Relations (connection-rule table v2)
+### Relations (connection-rule table)
+
+The whole grammar, kept in step with `CONNECTION_RULES`
+(`web/lib/eventstorming/relations.ts`) — the code is the source of truth and
+`web/tests/grammar-doc-guard.test.ts` fails if this table drifts from it
+(issue-00037). One row per relation; `resolveRelation` matches on the (source,
+target) pair, so a pair reversed is a different relation or nothing at all.
 
 | relation | source | target |
 |---|---|---|
-| issues | actor | command |
-| handledBy (actsOn) | command | aggregate, externalSystem |
-| emits (produces) | aggregate, externalSystem | domainEvent |
+| issues | actor, externalSystem | command |
+| produces | command | domainEvent |
+| constrainedBy | command | constraint |
+| handledBy | command | aggregate, externalSystem |
+| emits | aggregate, externalSystem | domainEvent |
 | triggers | domainEvent | policy |
 | invokes | policy | command |
-| **updates** *(new)* | domainEvent | readModel |
+| updates | domainEvent | readModel |
 | informs | readModel | actor |
-| annotates | hotspot | any |
+| annotates | hotspot | any element |
+| highlights | opportunity | any element |
 
-New vs design-00001: **`updates`** (Domain Event → Read Model), completing the
-grammar `event → updates → readModel → informs → actor`.
+How it got here, newest first — this design introduced `updates`, completing
+`event → updates → readModel → informs → actor`; the rest arrived after it:
+
+- `issues` from an **externalSystem** — issue-00037, closing the half of
+  [decision-00003](../decision/decision-00003-level-grammar-constraint-vs-aggregate.md)'s
+  Process grammar that was never implemented. It is the outside system *asking* us to
+  act, which `handledBy` (us calling it) cannot express.
+- `produces` and `constrainedBy` — [decision-00003](../decision/decision-00003-level-grammar-constraint-vs-aggregate.md):
+  the direct Command→Domain Event spine, and Constraint as a Command's input.
+- `highlights` — [spec-00003](../spec/spec-00003-hotspot-workflow-opportunity.md):
+  Opportunity as the positive counterpart to Hotspot.
 
 ## 4. Layout engine (deterministic)
 

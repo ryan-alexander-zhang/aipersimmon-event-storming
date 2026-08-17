@@ -82,12 +82,12 @@ _Avoid_: milestone, key event.
 
 Edges carry a **semantic type**, not just a geometric connection:
 
-**issues**: Actor → Command.
+**issues**: Actor, External System → Command.
 **produces**: Command → Domain Event. The Process-level causal spine; at Design
 it is refined by the Aggregate boundary (handledBy + emits).
 **constrainedBy**: Command → Constraint.
-**handledBy**: Command → Aggregate.
-**emits**: Aggregate → Domain Event (also External System → Domain Event).
+**handledBy**: Command → Aggregate, External System.
+**emits**: Aggregate, External System → Domain Event.
 **triggers**: Domain Event → Policy.
 **invokes**: Policy → Command.
 **updates**: Domain Event → Read Model.

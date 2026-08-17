@@ -73,7 +73,20 @@ first erases exactly the validation and rejection the model exists to expose.
 - Nothing else needed changing: `computePlacement` already pulls a Command's `issues`
   source into the Command's column ([`layout.ts:72`](../../web/lib/layout/layout.ts)),
   the `actorSystem` band puts it above, and model health does not look at issuer type.
-- `design-00001` §2's rule table updated to match.
+- The prose mirrors of the rule table are aligned with the code and **guarded** so
+  they cannot drift again — `web/tests/grammar-doc-guard.test.ts` parses both
+  `design-00002` §3 and `CONTEXT.md`'s relation list and fails if either disagrees
+  with `CONNECTION_RULES`:
+  - `design-00002` §3 gains the four relations it never listed (`produces`,
+    `constrainedBy`, `updates` was there, `highlights`) and the `issues` source added
+    here, with a note recording which decision brought each.
+  - `CONTEXT.md`: `issues` gains External System; `handledBy` gains it too (a
+    pre-existing omission the guard surfaced); `emits`'s parenthetical becomes a plain
+    second source so the glossary parses.
+  - `spec-00001` §1 stops enumerating the terms and points at `CONTEXT.md`, which is
+    where they are defined — the enumeration was stale by four relations.
+  - `design-00001` §2 is left as it was: that doc is `archived` and superseded by
+    design-00002, so its table is history, not a claim about today.
 
 ## Reproduction (test-first)
 
@@ -97,7 +110,9 @@ first erases exactly the validation and rejection the model exists to expose.
 
 ## Noted, not fixed
 
-`design-00001` §2's table is stale beyond the row corrected here: it predates
-decision-00003 and spec-00003, so it still omits `produces`, `constrainedBy`, and
-`highlights`, and its element list omits `constraint` and `opportunity`. Left alone to
-keep this change surgical.
+`design-00002`'s other sections still describe the board as it was designed then — DSL
+v2 in §3's class diagram, and a per-context column model in §4 that
+[decision-00005](../decision/decision-00005-global-timeline-bc-as-region.md) replaced
+with one global timeline. Those read as the record of that design step rather than as
+current claims, and re-deriving them is a doc job of its own; only the rule table was
+presented as live truth, and only it is guarded.

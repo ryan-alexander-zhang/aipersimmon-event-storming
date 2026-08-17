@@ -38,7 +38,7 @@ The only valid connections; anything else is rejected by `isValidConnection`.
 
 | relation | source | target |
 |---|---|---|
-| issues | actor, externalSystem | command |
+| issues | actor | command |
 | handledBy | command | aggregate, externalSystem |
 | emits | aggregate, externalSystem | domainEvent |
 | triggers | domainEvent | policy |

@@ -13,10 +13,9 @@ parent: prd-00001-event-storming-tool
 
 ## 1. Context
 
-Canonical terms from [CONTEXT.md](../../CONTEXT.md): Domain Event, Command, Actor,
-Aggregate, Policy, Read Model, External System, Hotspot, Pivotal Event, and the
-semantic relations (issues, handledBy, emits, triggers, invokes, informs,
-annotates); Model and DSL. Inputs:
+Canonical terms are the element types and semantic relations defined in
+[CONTEXT.md](../../CONTEXT.md) — enumerating them here only let the list go stale
+(issue-00037) — plus Pivotal Event, Model, and DSL. Inputs:
 [prd-00001](../prd/prd-00001-event-storming-tool.md),
 [analysis-00001](../analysis/analysis-00001-tech-stack-and-tooling.md).
 
