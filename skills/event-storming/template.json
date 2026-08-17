@@ -98,7 +98,13 @@
       "type": "hotspot",
       "label": "How long is the refund window?",
       "context": "pay",
-      "properties": { "kind": "risk", "priority": "medium", "state": "resolved" }
+      "properties": {
+        "kind": "risk",
+        "priority": "medium",
+        "state": "resolved",
+        "resolution": "30 days from delivery, matching the carrier's own window - agreed with finance.",
+        "resolvedAt": "2026-02-14T10:20:00.000Z"
+      }
     },
 
     {

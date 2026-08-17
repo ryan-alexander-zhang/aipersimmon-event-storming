@@ -43,7 +43,7 @@
 | `aggregate` | consistency boundary handling a command | design output |
 | `constraint` | precondition that must hold to run a command | design input; carries `rule` |
 | `externalSystem` | outside system, black box | can handle commands and emit events |
-| `hotspot` | conflict, question or risk on any element | carries `state`, `kind`, `priority` |
+| `hotspot` | conflict, question or risk on any element | carries `state`, `kind`, `priority`, and once closed `resolution` + `resolvedAt` |
 | `opportunity` | idea or value to pursue on any element | positive counterpart of hotspot |
 
 ## Node properties per type
@@ -57,6 +57,8 @@
 | `state` | enum | `open` \| `resolved` (absent = open) | `hotspot` |
 | `kind` | enum | `conflict` \| `question` \| `risk` | `hotspot` |
 | `priority` | enum | `low` \| `medium` \| `high` | `hotspot` |
+| `resolution` | string | what closed it: the answer, the decision, the mitigation (or "accepted"). Beside `description`, never over it - the description holds the question and has to survive being answered | `hotspot` |
+| `resolvedAt` | string | ISO timestamp of when it was resolved. Reverting `state` to `open` leaves it: it *was* resolved then | `hotspot` |
 | `condition` | string | the guard, no "if": `"retry attempts < maxRetries"` | `policy` |
 | `execution` | enum | `automatic` \| `manual` | `policy` |
 | `parameters` | array | `[{ "name": "maxRetries", "value": "3" }]`, both strings | `policy` |

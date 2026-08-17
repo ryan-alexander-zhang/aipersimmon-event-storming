@@ -43,7 +43,8 @@ CTX_RELS = ["partnership", "sharedKernel", "customerSupplier", "conformist",
 
 # property -> the node types allowed to carry it (None = any type)
 PROPS = {"description": None, "pivotal": {"domainEvent"}, "state": {"hotspot"},
-         "kind": {"hotspot"}, "priority": {"hotspot"}, "condition": {"policy"},
+         "kind": {"hotspot"}, "priority": {"hotspot"}, "resolution": {"hotspot"},
+         "resolvedAt": {"hotspot"}, "condition": {"policy"},
          "execution": {"policy"}, "parameters": {"policy"}, "rule": {"constraint"}}
 
 ENUMS = {"state": ["open", "resolved"], "kind": ["conflict", "question", "risk"],
@@ -235,6 +236,15 @@ def check_health(nodes, edges, level, ctx_ids):
                if n["type"] == "hotspot" and n.get("properties", {}).get("state") != "resolved"]
     if open_hs:
         warn(f"{len(open_hs)} open hotspot(s): " + "; ".join(n["label"] for n in open_hs))
+
+    # A hotspot ticked off with nothing written down loses why it was closed.
+    closed_blank = [n for n in nodes.values()
+                    if n["type"] == "hotspot"
+                    and n.get("properties", {}).get("state") == "resolved"
+                    and not (n.get("properties", {}).get("resolution") or "").strip()]
+    if closed_blank:
+        warn(f"{len(closed_blank)} resolved hotspot(s) with no resolution: "
+             + "; ".join(n["label"] for n in closed_blank))
 
     for cyc in policy_cycles(nodes, edges):
         warn("reaction cycle: " + " -> ".join(nodes[i]["label"] for i in cyc))

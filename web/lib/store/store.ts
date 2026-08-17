@@ -222,6 +222,9 @@ export interface ESState {
   removeNode: (id: string) => void;
   /** Attach a hotspot to `targetId` (inherits its context); returns the hotspot id. */
   addHotspot: (targetId: string, text: string) => string;
+  /** Open or resolve a Hotspot. Resolving stamps `resolvedAt`; setting it back to
+   *  `open` changes the state and nothing else (us-00033-FR-3). */
+  setHotspotState: (id: string, state: "open" | "resolved") => void;
   /** Attach an opportunity to `targetId` (inherits its context); returns its id. */
   addOpportunity: (targetId: string, text: string) => string;
   /** Create a semantic edge if the connection is valid; returns success. */
@@ -520,6 +523,16 @@ const initializer: StateCreator<ESState> = (set, get) => ({
     get().connect({ source: id, target: targetId, sourceHandle: null, targetHandle: null });
     return id;
   },
+
+  // Resolving is a two-field change, so it is one action rather than two calls the
+  // panel has to order correctly. Setting it back to `open` does not clear
+  // `resolvedAt`: the Hotspot *was* resolved then, and that trace is the point of
+  // recording it at all. (This is the Hotspot's state, unrelated to opening a Project.)
+  setHotspotState: (id, state) =>
+    get().updateNodeData(id, {
+      state,
+      ...(state === "resolved" ? { resolvedAt: new Date().toISOString() } : {}),
+    }),
 
   addOpportunity: (targetId, text) => {
     const target = get().nodes.find((n) => n.id === targetId);

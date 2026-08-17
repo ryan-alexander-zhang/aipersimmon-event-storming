@@ -1063,3 +1063,53 @@ describe("the active Project [spec-00012]", () => {
     expect(get().saveError).toBeNull(); // a fresh Project starts clean
   });
 });
+
+describe("hotspot resolution [us-00033]", () => {
+  const hotspotOn = (label: string) => {
+    const ctx = get().addContext("Ordering");
+    const target = get().addNode("domainEvent", ctx);
+    return get().addHotspot(target, label);
+  };
+
+  it("stamps when it was resolved, and leaves the resolution text alone [us-00033-AC-2.1]", () => {
+    const id = hotspotOn("Who owns stock?");
+    get().updateNodeData(id, { resolution: "warehouse owns it" });
+    get().setHotspotState(id, "resolved");
+    const data = get().nodes.find((n) => n.id === id)?.data;
+    expect(data?.state).toBe("resolved");
+    expect(data?.resolvedAt).toEqual(expect.any(String));
+    expect(data?.resolution).toBe("warehouse owns it");
+  });
+
+  it("keeps both when it is set back to open — it was resolved then [us-00033-AC-3.1]", () => {
+    const id = hotspotOn("Who owns stock?");
+    get().updateNodeData(id, { resolution: "warehouse owns it" });
+    get().setHotspotState(id, "resolved");
+    const resolvedAt = get().nodes.find((n) => n.id === id)?.data.resolvedAt;
+
+    get().setHotspotState(id, "open");
+    const data = get().nodes.find((n) => n.id === id)?.data;
+    expect(data?.state).toBe("open");
+    expect(data?.resolvedAt).toBe(resolvedAt);
+    expect(data?.resolution).toBe("warehouse owns it");
+  });
+
+  it("records the latest resolving, not the first [us-00033-AC-3.2]", async () => {
+    const id = hotspotOn("Who owns stock?");
+    get().setHotspotState(id, "resolved");
+    const first = get().nodes.find((n) => n.id === id)?.data.resolvedAt;
+    get().setHotspotState(id, "open");
+    await new Promise((r) => setTimeout(r, 2)); // a distinguishable instant later
+    get().setHotspotState(id, "resolved");
+    expect(get().nodes.find((n) => n.id === id)?.data.resolvedAt).not.toBe(first);
+  });
+
+  it("writes the resolution beside the description, never over it [us-00033-AC-1.1]", () => {
+    const id = hotspotOn("Who owns stock?");
+    get().updateNodeData(id, { description: "warehouse and ordering both claim it" });
+    get().updateNodeData(id, { resolution: "warehouse owns it" });
+    const data = get().nodes.find((n) => n.id === id)?.data;
+    expect(data?.description).toBe("warehouse and ordering both claim it");
+    expect(data?.resolution).toBe("warehouse owns it");
+  });
+});

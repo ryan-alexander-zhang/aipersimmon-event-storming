@@ -13,7 +13,8 @@ export type SmellType =
   | "dangling-command"
   | "overloaded-aggregate"
   | "policy-cycle"
-  | "unresolved-hotspots";
+  | "unresolved-hotspots"
+  | "unrecorded-resolution";
 
 export interface Finding {
   id: string;
@@ -170,6 +171,23 @@ export function analyzeModel(nodes: ESNode[], edges: ESEdge[]): Finding[] {
       severity: "info",
       message: `${hotspots.length} unresolved hotspot(s)`,
       elementIds: hotspots.map((h) => h.id),
+    });
+  }
+
+  // unrecorded-resolution: a Hotspot ticked off with nothing written down — the
+  // "we agreed in the room" case, which is the one that loses the reasoning
+  // (us-00033-FR-5). A warning, not info: the trace is already gone by the time
+  // anyone reads this.
+  const undocumented = nodes.filter(
+    (n) => n.type === "hotspot" && n.data.state === "resolved" && !n.data.resolution?.trim(),
+  );
+  if (undocumented.length > 0) {
+    findings.push({
+      id: "unrecorded-resolution",
+      type: "unrecorded-resolution",
+      severity: "warning",
+      message: `${undocumented.length} resolved hotspot(s) with no resolution recorded`,
+      elementIds: undocumented.map((h) => h.id),
     });
   }
 

@@ -14,6 +14,9 @@ export type ESNodeData = {
   state?: "open" | "resolved";
   kind?: "conflict" | "question" | "risk";
   priority?: "low" | "medium" | "high";
+  // What closed the Hotspot, and when (us-00033).
+  resolution?: string;
+  resolvedAt?: string;
   // Structured rule expression (spec-00011); Policy's condition/execution/
   // parameters, Constraint's rule. All optional.
   condition?: string;

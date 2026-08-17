@@ -620,6 +620,57 @@ test("hotspot workflow: resolving mutes it and drops it from model health [us-00
   );
 });
 
+test("resolving a hotspot asks for the resolution and keeps it [us-00033-AC-2.1/4.1/3.1]", async ({
+  page,
+}) => {
+  await openBoard(page);
+  await addContext(page);
+  await addLabeledEvent(page, "Order Placed");
+  await slice(page, "+ Hotspot");
+
+  // Nothing to resolve yet, so nothing is asked for.
+  await expect(page.getByLabel("Resolution")).toHaveCount(0);
+
+  // Resolving reveals the field and puts the cursor in it, without blocking the
+  // state change (us-00033-AC-2.1).
+  await page.getByLabel("Resolved").check();
+  const resolution = page.getByLabel("Resolution");
+  await expect(resolution).toBeFocused();
+  await expect(page.getByLabel("Resolved")).toBeChecked();
+  await expect(page.getByTestId("resolved-at")).toHaveText(/^Resolved /);
+
+  await resolution.fill("warehouse owns stock; ordering asks");
+  // Health stops asking for it once it is written down (us-00033-AC-5.1).
+  const health = page.getByRole("button", { name: "Health", exact: true });
+  await health.click();
+  await expect(
+    page.getByTestId("health-panel").getByTestId("health-finding").filter({ hasText: "no resolution" }),
+  ).toHaveCount(0);
+  await health.click();
+
+  // Setting it back to open changes the state and nothing else: it *was* resolved
+  // then (us-00033-AC-3.1).
+  await nodes(page, "hotspot").click();
+  await page.getByLabel("Resolved").uncheck();
+  await expect(page.getByLabel("Resolution")).toHaveValue("warehouse owns stock; ordering asks");
+  await expect(page.getByTestId("resolved-at")).toHaveText(/^Last resolved /);
+});
+
+test("a hotspot resolved with nothing written down is reported [us-00033-AC-5.1]", async ({
+  page,
+}) => {
+  await openBoard(page);
+  await addContext(page);
+  await addLabeledEvent(page, "Order Placed");
+  await slice(page, "+ Hotspot");
+  await page.getByLabel("Resolved").check();
+
+  await page.getByRole("button", { name: "Health", exact: true }).click();
+  await expect(
+    page.getByTestId("health-panel").getByTestId("health-finding").filter({ hasText: "no resolution" }),
+  ).toBeVisible();
+});
+
 test("policy and constraint carry structured rule fields, persisted across export/import [us-00026-AC-1.1/2.1/3.1/4.1, us-00027-AC-1.1/2.1]", async ({
   page,
 }) => {

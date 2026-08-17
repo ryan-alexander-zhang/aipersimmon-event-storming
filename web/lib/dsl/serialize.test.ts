@@ -57,6 +57,47 @@ describe("serialize v2 (T2/RT1)", () => {
     });
   });
 
+  it("round-trips a Hotspot's resolution and when it was resolved [us-00033-AC-6.1]", () => {
+    const nodes: ESNode[] = [
+      {
+        id: "h1",
+        type: "hotspot",
+        position: { x: 0, y: 0 },
+        data: {
+          label: "who owns stock?",
+          description: "warehouse and ordering both claim it",
+          state: "resolved",
+          resolution: "warehouse owns it; ordering asks",
+          resolvedAt: "2026-08-17T09:00:00.000Z",
+        },
+      },
+    ];
+    const back = fromModel(toModel(nodes, [], [], META));
+    expect(back.nodes[0].data).toMatchObject({
+      description: "warehouse and ordering both claim it",
+      resolution: "warehouse owns it; ordering asks",
+      resolvedAt: "2026-08-17T09:00:00.000Z",
+    });
+  });
+
+  it("reads a Hotspot written before resolutions existed [us-00033-AC-6.2]", () => {
+    const model = importJSON(
+      JSON.stringify({
+        version: "4.0",
+        meta: META,
+        contexts: [],
+        contextRelationships: [],
+        nodes: [{ id: "h1", type: "hotspot", label: "who owns stock?", properties: { state: "resolved" } }],
+        edges: [],
+      }),
+    );
+    expect(model.ok).toBe(true);
+    if (!model.ok) return;
+    const back = fromModel(model.model);
+    expect(back.nodes[0].data.state).toBe("resolved");
+    expect(back.nodes[0].data.resolution).toBeUndefined();
+  });
+
   it("round-trips a Policy's rule fields and a Constraint's rule [us-00026-AC-4.1, us-00027-AC-2.1]", () => {
     const nodes: ESNode[] = [
       {

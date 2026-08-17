@@ -48,4 +48,5 @@ The timeline is carried by `order`, not by edges. Do not invent event-to-event e
 - [ ] Concurrency shown by shared `order`, not by invented order.
 - [ ] Pivotal events marked.
 - [ ] Every unknown or disagreement is a hotspot with `kind` and `priority`.
+- [ ] Any hotspot you close during the session carries a `resolution` - what the answer/decision/mitigation was. Closing one with nothing written down loses why it was closed; the validator warns.
 - [ ] Validator clean (`orphan-event` warnings are expected at this level - no commands exist yet).

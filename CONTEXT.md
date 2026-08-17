@@ -56,8 +56,17 @@ _Avoid_: third party, integration, service.
 A marked conflict, question, risk, or objection attached to any element. The
 neon-pink sticky. Carries a **state** (open → resolved), a **kind** (conflict /
 question / risk), and a **priority** (low / medium / high); absent state means
-open.
+open. Resolving one records a **Resolution**. The state is the Hotspot's own; it
+has nothing to do with opening a Project.
 _Avoid_: issue, note, problem.
+
+**Resolution**:
+What closed a Hotspot: the answer to a question, the decision on a conflict, the
+mitigation of a risk (or an explicit "accepted"). Recorded on the Hotspot
+alongside its description — the description holds the uncertainty and must
+survive being answered — together with the moment it was resolved. Reverting a
+Hotspot to `open` leaves both standing: it *was* resolved then.
+_Avoid_: answer, outcome, fix, description.
 
 **Opportunity**:
 A marked idea, possibility, or value to pursue, attached to any element — the

@@ -87,6 +87,7 @@ export function PropertyPanel() {
   const addNode = useESStore((s) => s.addNode);
   const connect = useESStore((s) => s.connect);
   const updateNodeData = useESStore((s) => s.updateNodeData);
+  const setHotspotState = useESStore((s) => s.setHotspotState);
   const removeNode = useESStore((s) => s.removeNode);
   const nudgeEvent = useESStore((s) => s.nudgeEvent);
   const moveEventToEnd = useESStore((s) => s.moveEventToEnd);
@@ -99,6 +100,7 @@ export function PropertyPanel() {
   const setIsolateDepth = useESStore((s) => s.setIsolateDepth);
 
   const descRef = useRef<HTMLTextAreaElement>(null);
+  const resolutionRef = useRef<HTMLTextAreaElement>(null);
   // Refit on every description change, including ones the panel did not make
   // (undo, or a load) — the panel itself remounts per selection via `key`.
   useLayoutEffect(() => fitToContent(descRef.current), [node?.data.description]);
@@ -197,12 +199,44 @@ export function PropertyPanel() {
             <input
               type="checkbox"
               checked={node.data.state === "resolved"}
-              onChange={(e) =>
-                updateNodeData(node.id, { state: e.target.checked ? "resolved" : "open" })
-              }
+              onChange={(e) => {
+                setHotspotState(node.id, e.target.checked ? "resolved" : "open");
+                // Prompted, never blocking: resolving puts the cursor in the
+                // Resolution field, which the same click has just revealed.
+                if (e.target.checked) {
+                  requestAnimationFrame(() => resolutionRef.current?.focus());
+                }
+              }}
             />
             Resolved
           </label>
+          {/* Shown once there is anything to show, so a Hotspot set back to `open`
+              still carries what closed it last time (us-00033-FR-4). */}
+          {(node.data.state === "resolved" || node.data.resolution || node.data.resolvedAt) && (
+            <div>
+              <label className="block text-xs font-medium text-zinc-600">
+                Resolution
+                <textarea
+                  ref={resolutionRef}
+                  className={field}
+                  rows={3}
+                  placeholder="What closed it — the answer, the decision, the mitigation"
+                  value={node.data.resolution ?? ""}
+                  onChange={(e) =>
+                    updateNodeData(node.id, { resolution: e.target.value || undefined })
+                  }
+                />
+              </label>
+              {/* Outside the label on purpose: inside, the timestamp becomes part of
+                  the field's accessible name ("Resolution resolved 8/17/2026"). */}
+              {node.data.resolvedAt && (
+                <p className="mt-1 text-[11px] text-zinc-400" data-testid="resolved-at">
+                  {node.data.state === "resolved" ? "Resolved" : "Last resolved"}{" "}
+                  {new Date(node.data.resolvedAt).toLocaleString()}
+                </p>
+              )}
+            </div>
+          )}
           <label className="block text-xs font-medium text-zinc-600">
             Kind
             <select

@@ -34,7 +34,7 @@ Stop at the level the user asked for. Never skip a phase: a Design board needs a
 
 1. **One file, grown in place.** Each phase edits the same JSON and raises `meta.level`. Never restart from scratch.
 2. **Validate every write:** `python3 <skill-dir>/scripts/validate.py <file>`. Fix all ERRORs, re-run until clean, report WARNs to the user. Python 3, no packages needed.
-3. **Ask, don't invent.** A domain fact you cannot read from the repo or the brief is a question. Still unknown after asking? Write a `hotspot`, not a guess.
+3. **Ask, don't invent.** A domain fact you cannot read from the repo or the brief is a question. Still unknown after asking? Write a `hotspot`, not a guess. If the user answers it later, set `state: "resolved"` **and** write the answer into `resolution` - a hotspot closed with nothing written down loses why it was closed.
 4. **Use the user's words** as labels, in their language. Do not rename their concepts.
 5. **Report after each phase:** counts per type, open hotspots, assumptions you made.
 

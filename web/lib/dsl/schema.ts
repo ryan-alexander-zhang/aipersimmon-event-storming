@@ -17,6 +17,11 @@ export const propertiesSchema = z.object({
   state: z.enum(["open", "resolved"]).optional(),
   kind: z.enum(["conflict", "question", "risk"]).optional(),
   priority: z.enum(["low", "medium", "high"]).optional(),
+  // What closed the Hotspot, and when (us-00033). Kept apart from `description`,
+  // which holds the uncertainty itself and has to survive being answered.
+  // `resolvedAt` records a thing that happened, so reopening does not clear it.
+  resolution: z.string().optional(),
+  resolvedAt: z.string().optional(),
   // Structured rule expression (spec-00011); all optional and additive.
   // condition/execution/parameters are a Policy's; rule is a Constraint's.
   condition: z.string().optional(),

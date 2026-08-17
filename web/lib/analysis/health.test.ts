@@ -180,6 +180,28 @@ describe("analyzeModel", () => {
     });
   });
 
+  describe("unrecorded-resolution [us-00033-AC-5.1]", () => {
+    const resolved = (id: string, resolution?: string): ESNode => ({
+      ...node(id, "hotspot"),
+      data: { label: id, state: "resolved", ...(resolution ? { resolution } : {}) },
+    });
+
+    it("reports a resolved hotspot with nothing written down", () => {
+      const found = types([resolved("h1"), resolved("h2", "we chose per-item locks")], [], "unrecorded-resolution");
+      expect(found).toHaveLength(1);
+      expect(found[0].elementIds).toEqual(["h1"]);
+      expect(found[0].severity).toBe("warning");
+    });
+
+    it("treats a blank resolution as none", () => {
+      expect(types([resolved("h1", "   ")], [], "unrecorded-resolution")).toHaveLength(1);
+    });
+
+    it("leaves open hotspots alone — they are not expected to have one yet", () => {
+      expect(types([node("h1", "hotspot")], [], "unrecorded-resolution")).toHaveLength(0);
+    });
+  });
+
   it("scales to a few hundred elements without blowing up (spec-00007-XAC-2.1)", () => {
     // 299 command→event pairs plus one orphan event e0 (no producer): ~599 nodes.
     const nodes: ESNode[] = [node("e0", "domainEvent")];
