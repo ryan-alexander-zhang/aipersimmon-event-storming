@@ -1,0 +1,149 @@
+{
+  "version": "4.0",
+  "meta": {
+    "name": "Template - Order Fulfilment",
+    "level": "design",
+    "createdAt": "2026-08-17T00:00:00Z"
+  },
+  "contexts": [
+    { "id": "cat", "name": "Catalog", "order": 0, "classification": "supporting" },
+    { "id": "ord", "name": "Ordering", "order": 1, "classification": "core" },
+    { "id": "pay", "name": "Payment", "order": 2, "classification": "supporting" },
+    { "id": "shp", "name": "Shipping", "order": 3, "classification": "generic" }
+  ],
+  "contextRelationships": [
+    { "id": "cr-01", "source": "ord", "target": "pay", "type": "customerSupplier" },
+    { "id": "cr-02", "source": "ord", "target": "pay", "type": "publishedLanguage" },
+    { "id": "cr-03", "source": "cat", "target": "ord", "type": "conformist" },
+    { "id": "cr-04", "source": "ord", "target": "shp", "type": "sharedKernel" },
+    { "id": "cr-05", "source": "ord", "target": "shp", "type": "openHostService" },
+    { "id": "cr-06", "source": "cat", "target": "shp", "type": "acl" },
+    { "id": "cr-07", "source": "pay", "target": "cat", "type": "partnership" },
+    { "id": "cr-08", "source": "pay", "target": "shp", "type": "separateWays" }
+  ],
+  "nodes": [
+    { "id": "cat-merch", "type": "actor", "label": "Merchandiser", "context": "cat", "properties": {} },
+    { "id": "cat-c-publish", "type": "command", "label": "Publish Price", "context": "cat", "properties": {} },
+    { "id": "cat-ag-product", "type": "aggregate", "label": "Product", "context": "cat", "properties": {} },
+    { "id": "cat-e-priced", "type": "domainEvent", "label": "Price Published", "context": "cat", "order": 0, "properties": {} },
+
+    { "id": "ord-customer", "type": "actor", "label": "Customer", "context": "ord", "properties": {} },
+    { "id": "ord-rm-cart", "type": "readModel", "label": "Cart View", "context": "ord", "properties": { "description": "Line items and the current total the customer decides on." } },
+    { "id": "ord-c-place", "type": "command", "label": "Place Order", "context": "ord", "properties": {} },
+    {
+      "id": "ord-cons-stock",
+      "type": "constraint",
+      "label": "Item in stock",
+      "context": "ord",
+      "properties": {
+        "description": "We never sell what we cannot ship.",
+        "rule": "requested quantity <= available stock"
+      }
+    },
+    { "id": "ord-ag-order", "type": "aggregate", "label": "Order", "context": "ord", "properties": {} },
+    {
+      "id": "ord-e-placed",
+      "type": "domainEvent",
+      "label": "Order Placed",
+      "context": "ord",
+      "order": 1,
+      "properties": {
+        "pivotal": true,
+        "description": "The customer committed; everything downstream starts here."
+      }
+    },
+    {
+      "id": "ord-h-tax",
+      "type": "hotspot",
+      "label": "Which tax rules apply to cross-border orders?",
+      "context": "ord",
+      "properties": { "kind": "question", "priority": "high", "state": "open", "description": "Blocks the total shown at checkout." }
+    },
+    {
+      "id": "ord-op-reorder",
+      "type": "opportunity",
+      "label": "One-click reorder",
+      "context": "ord",
+      "properties": { "description": "Repeat customers could place a known order in one step." }
+    },
+
+    {
+      "id": "pay-p-charge",
+      "type": "policy",
+      "label": "Auto-Charge Policy",
+      "context": "pay",
+      "properties": {
+        "description": "When an order is placed, charge the card.",
+        "condition": "the customer has a verified payment method",
+        "execution": "automatic",
+        "parameters": [
+          { "name": "retryLimit", "value": "3" },
+          { "name": "backoff", "value": "1h" }
+        ]
+      }
+    },
+    { "id": "pay-c-charge", "type": "command", "label": "Charge Card", "context": "pay", "properties": {} },
+    { "id": "pay-ex-gateway", "type": "externalSystem", "label": "Payment Gateway", "context": "pay", "properties": {} },
+    {
+      "id": "pay-e-captured",
+      "type": "domainEvent",
+      "label": "Payment Captured",
+      "context": "pay",
+      "order": 2,
+      "properties": { "pivotal": true, "description": "One of two concurrent outcomes of a single charge." }
+    },
+    { "id": "pay-e-failed", "type": "domainEvent", "label": "Payment Failed", "context": "pay", "order": 2, "properties": {} },
+    {
+      "id": "pay-h-refund",
+      "type": "hotspot",
+      "label": "How long is the refund window?",
+      "context": "pay",
+      "properties": { "kind": "risk", "priority": "medium", "state": "resolved" }
+    },
+
+    {
+      "id": "shp-p-ship",
+      "type": "policy",
+      "label": "Ship on Payment Policy",
+      "context": "shp",
+      "properties": {
+        "description": "When payment is captured, a picker releases the shipment.",
+        "condition": "the address passed validation",
+        "execution": "manual"
+      }
+    },
+    { "id": "shp-c-ship", "type": "command", "label": "Ship Order", "context": "shp", "properties": {} },
+    { "id": "shp-e-shipped", "type": "domainEvent", "label": "Order Shipped", "context": "shp", "order": 3, "properties": {} },
+    { "id": "shp-rm-status", "type": "readModel", "label": "Order Status View", "context": "shp", "properties": {} },
+
+    { "id": "support", "type": "actor", "label": "Support Agent", "properties": { "description": "Ungrouped: belongs to no bounded context." } }
+  ],
+  "edges": [
+    { "id": "e-cat-01", "source": "cat-merch", "target": "cat-c-publish", "relation": "issues" },
+    { "id": "e-cat-02", "source": "cat-c-publish", "target": "cat-ag-product", "relation": "handledBy" },
+    { "id": "e-cat-03", "source": "cat-ag-product", "target": "cat-e-priced", "relation": "emits" },
+
+    { "id": "e-ord-01", "source": "ord-customer", "target": "ord-c-place", "relation": "issues" },
+    { "id": "e-ord-02", "source": "ord-c-place", "target": "ord-cons-stock", "relation": "constrainedBy" },
+    { "id": "e-ord-03", "source": "ord-c-place", "target": "ord-ag-order", "relation": "handledBy" },
+    { "id": "e-ord-04", "source": "ord-ag-order", "target": "ord-e-placed", "relation": "emits" },
+    { "id": "e-ord-05", "source": "cat-e-priced", "target": "ord-rm-cart", "relation": "updates" },
+    { "id": "e-ord-06", "source": "ord-rm-cart", "target": "ord-customer", "relation": "informs" },
+    { "id": "e-ord-07", "source": "ord-h-tax", "target": "ord-c-place", "relation": "annotates" },
+    { "id": "e-ord-08", "source": "ord-op-reorder", "target": "ord-c-place", "relation": "highlights" },
+
+    { "id": "e-pay-01", "source": "ord-e-placed", "target": "pay-p-charge", "relation": "triggers" },
+    { "id": "e-pay-02", "source": "pay-p-charge", "target": "pay-c-charge", "relation": "invokes" },
+    { "id": "e-pay-03", "source": "pay-c-charge", "target": "pay-ex-gateway", "relation": "handledBy" },
+    { "id": "e-pay-04", "source": "pay-ex-gateway", "target": "pay-e-captured", "relation": "emits" },
+    { "id": "e-pay-05", "source": "pay-ex-gateway", "target": "pay-e-failed", "relation": "emits" },
+    { "id": "e-pay-06", "source": "pay-h-refund", "target": "pay-e-failed", "relation": "annotates" },
+
+    { "id": "e-shp-01", "source": "pay-e-captured", "target": "shp-p-ship", "relation": "triggers" },
+    { "id": "e-shp-02", "source": "shp-p-ship", "target": "shp-c-ship", "relation": "invokes" },
+    { "id": "e-shp-03", "source": "shp-c-ship", "target": "shp-e-shipped", "relation": "produces" },
+    { "id": "e-shp-04", "source": "shp-e-shipped", "target": "shp-rm-status", "relation": "updates" },
+    { "id": "e-shp-05", "source": "shp-rm-status", "target": "ord-customer", "relation": "informs" },
+    { "id": "e-shp-06", "source": "shp-rm-status", "target": "support", "relation": "informs" }
+  ]
+}
