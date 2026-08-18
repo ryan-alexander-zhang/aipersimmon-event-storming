@@ -82,11 +82,17 @@ them happens.
 
 `dispatch: "parallel"` could state positively "I considered these and they all fire". A set
 can only say "these are alternatives"; silence covers both "they all fire" and "nobody
-thought about it". Model health therefore keeps *asking* rather than recording an answer,
-and it asks only where the method says there is a single moment: a Policy with several
-`invokes`, a Command with several `produces`. An Aggregate emitting many events is not one
-moment — it is a consistency boundary handling many Commands over the whole board — so
-nothing is asked, and nothing is markable, there.
+thought about it".
+
+**Model health therefore does not ask.** It was built to ask — a finding for a moment with
+several undeclared outcomes — and withdrawn the same day, when `ftgo`'s `Create Order Saga`
+(which invokes two Commands that both fire, in sequence) showed that the question has no
+answer the model can record. A finding that fires on correct models trains people to ignore
+model health, and a fan-out is legitimate often enough that flagging it is wrong by default.
+Health says only that a set of one member is not a set; the question — "do these all happen,
+or one instead of the others?" — belongs to the authoring interview, which is where the
+method puts it too. If the affirmation is ever wanted back, it returns as a second concept,
+knowingly.
 
 ### Rejected, again: a guard on the edge
 

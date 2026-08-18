@@ -38,15 +38,24 @@ so that a fork reads as a fork on a board that has no room left to draw one.
 - **us-00035-FR-5** (Ubiquitous) The system shall carry `alternativeSet` through export and
   import with the rest of the Model, and shall read a Model without it — every Model written
   before this story — without error.
-- **us-00035-FR-6** (Unwanted) If a single moment has several outcomes that are not declared
-  alternatives — a Policy invoking more than one Command, or a Command producing more than
-  one Domain Event — then the system shall raise it as a model-health finding.
 - **us-00035-FR-7** (Unwanted) If an alternative set has only one member, then the system
   shall raise it as a model-health finding, because one thing cannot happen instead of
   itself.
-- **us-00035-FR-8** (Ubiquitous) The system shall not evaluate a set or choose a branch, and
-  shall not ask about the outgoing edges of an Aggregate or External System, which are many
-  Commands' outcomes over the whole board rather than one moment.
+- **us-00035-FR-8** (Ubiquitous) The system shall not evaluate a set, choose a branch, or
+  infer one: a set is the Modeler's statement, and the system shall not raise a finding for a
+  moment whose several outcomes are undeclared, because a fan-out is often legitimately "all
+  of them".
+
+> **Amended 2026-08-18, after the first real model met it.** FR-6 originally required a
+> health finding for "a single moment with several outcomes and no alternative set", built
+> and shipped as `undeclared-alternatives`. It was withdrawn the same day: `ftgo`'s
+> `Create Order Saga` invokes `Create Ticket` **and** `Authorize Card` — both fire, in
+> sequence — and with `Policy.dispatch` gone there is no way to state that positively, so the
+> finding asked a question the model could not answer and nagged a correct example forever. A
+> finding that fires on correct models teaches people to ignore model health. The question
+> now lives in the authoring skill's interview (`reference/process.md`) instead, where it
+> belongs: ask the Modeler, do not flag the model. AC-4.1 / AC-4.2 / AC-4.3 were withdrawn
+> with it.
 
 ## Acceptance (GWT)
 
@@ -72,19 +81,6 @@ so that a fork reads as a fork on a board that has no room left to draw one.
   When the Modeler imports it
   Then it loads without error
   And nothing on it belongs to an alternative set
-- **us-00035-AC-4.1** (us-00035-FR-6)
-  Given a Policy invoking two Commands that are not in one alternative set
-  When model health is analysed
-  Then it is reported
-  And putting both Commands in one set clears the finding
-- **us-00035-AC-4.2** (us-00035-FR-6)
-  Given a Command producing two Domain Events that are not in one alternative set
-  When model health is analysed
-  Then it is reported
-- **us-00035-AC-4.3** (us-00035-FR-8)
-  Given an Aggregate emitting two Domain Events for two different Commands
-  When model health is analysed
-  Then nothing is reported about it, because that is not one moment
 - **us-00035-AC-5.1** (us-00035-FR-7)
   Given an alternative set with exactly one member
   When model health is analysed

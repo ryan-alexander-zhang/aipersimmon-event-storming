@@ -23,8 +23,9 @@ not to spawn agents. Read the mapping below as self-reported.
 
 ## Gate results
 
-- Unit: **353 passed** (`bun run test`). New/changed: 1 in `serialize.test.ts`, 8 in
-  `health.test.ts`; each was red before the implementation.
+- Unit: **347 passed** (`bun run test`). New/changed: 1 in `serialize.test.ts`, 3 in
+  `health.test.ts`; each was red before the implementation. (353 before FR-6 was withdrawn,
+  which removed 6.)
 - E2E: **93 passed, 1 failed** (`bunx playwright test`). The failure is the pre-existing
   `[issue-00028]` wheel-zoom budget, unrelated and confirmed pre-existing on a clean tree in
   issue-00036.
@@ -42,9 +43,7 @@ not to spawn agents. Read the mapping below as self-reported.
 | AC-2.1 (a mixed Command + Domain Event set is stored, not rejected) | unit serialize.test "round-trips an alternative set, across both member types" — `hold-outcome` spans a Command and an Event | pass |
 | AC-3.1 (the set survives export/import) | unit serialize.test same test: `fromModel(toModel(...))` keeps all four keys, export writes `properties.alternativeSet` | pass |
 | AC-3.2 (a Model from before this story imports clean) | unit serialize.test "imports a pre-spec v4.0 file without the rule fields unchanged", extended with `alternativeSet` undefined | pass |
-| AC-4.1 (a Policy with two undeclared outcomes is reported; declaring clears it) | unit health.test "reports a Policy invoking two Commands that are not declared alternatives", "clears once both Commands share one set", "still asks when the outcomes are in different sets"; e2e asserts the finding then its disappearance | pass |
-| AC-4.2 (a Command producing two undeclared events is reported) | unit health.test "reports a Command producing two Domain Events that are not declared alternatives" | pass |
-| AC-4.3 (an Aggregate emitting for two Commands is never asked) | unit health.test "says nothing about an Aggregate emitting for two Commands — not one moment" | pass |
+| AC-4.1 / AC-4.2 / AC-4.3 | **withdrawn** the same day — see the amendment note in us-00035 and the entry below | n/a |
 | AC-5.1 (a one-member set is reported) | unit health.test "reports a set with one member — nothing happens instead of itself", "says nothing once the set has two members"; e2e asserts the "one member" finding after clearing one side | pass |
 | FR-8 (nothing evaluates a set) | no test: a scope statement; the only code reading `alternativeSet` is the sticky chip and the two findings | n/a |
 
@@ -87,8 +86,14 @@ not to spawn agents. Read the mapping below as self-reported.
   claiming — their multi-event emitters are sequential steps — and were left alone. Three
   descriptions that called those pairs "concurrent outcomes" are corrected in the same edit;
   they were the exact confusion this story removes.
-- **One advisory survives on `ftgo`, and it is the design's cost, not a modelling error.**
-  `Create Order Saga` invokes `Create Ticket` *and* `Authorize Card` — both fire, in
-  sequence. Dropping `dispatch` removed the ability to state that positively, so
-  `undeclared-alternatives` keeps asking a question the model has no way to answer. Raised
-  for a decision rather than silenced by annotating a fork that does not exist.
+- **The `undeclared-alternatives` finding was built, shipped, and withdrawn the same day.**
+  `ftgo`'s `Create Order Saga` invokes `Create Ticket` *and* `Authorize Card` — both fire, in
+  sequence — and with `Policy.dispatch` gone the model cannot say so, so the finding nagged a
+  correct example with a question it had no way to answer. It was dropped rather than
+  silenced by annotating a fork that does not exist: a finding that fires on correct models
+  teaches people to ignore model health. `lone-alternative` stays, because a set of one is
+  wrong under any reading, and the question moved into the skill's interview
+  (`reference/process.md`, `reference/big-picture.md`, `reference/dsl.md` all now say plainly
+  that nothing warns about a missing set). Every example and the template are advisory-clean
+  on this axis afterwards: `ftgo` 3 warnings, `ride-hailing` 4, both only pre-existing
+  hotspot and reaction-cycle notes.

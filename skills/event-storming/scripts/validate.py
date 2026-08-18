@@ -224,14 +224,6 @@ def check_health(nodes, edges, level, ctx_ids):
                 warn(f"dangling command '{n['label']}': it produces no domain event")
             if not any(r in ("issues", "invokes") for _, r in inc[nid]):
                 warn(f"command '{n['label']}': nothing issues it and no policy invokes it")
-        for moment, relation in (("policy", "invokes"), ("command", "produces")):
-            if t != moment:
-                continue
-            outcomes = [tid for tid, r in out[nid] if r == relation]
-            sets = {nodes[o].get("properties", {}).get("alternativeSet") for o in outcomes}
-            if len(outcomes) > 1 and (None in sets or len(sets) > 1):
-                warn(f"{t} '{n['label']}': {len(outcomes)} outcomes with no alternative set "
-                     "- alternatives or all of them?")
         if t == "aggregate":
             c = sum(1 for _, r in inc[nid] if r == "handledBy")
             ev = sum(1 for _, r in out[nid] if r == "emits")

@@ -2410,7 +2410,7 @@ test("an External System issues a Command, as well as handling one [issue-00037,
   await expect(page.getByText("handledBy", { exact: true })).toBeVisible();
 });
 
-test("two events are marked as alternatives, and health asks when a moment has undeclared ones [us-00035-AC-1.1/1.2/4.1]", async ({
+test("commands are marked as alternatives, and a set of one is reported [us-00035-AC-1.1/1.2/5.1]", async ({
   page,
 }) => {
   await openBoard(page); // Design
@@ -2426,28 +2426,20 @@ test("two events are marked as alternatives, and health asks when a moment has u
   // Nothing declared yet: no member marker anywhere (us-00035-FR-4)
   await expect(nodes(page, "command").first()).not.toContainText("one of");
 
-  // One moment (a Policy firing) with two outcomes that are not declared alternatives.
-  const health = page.getByRole("button", { name: "Health", exact: true });
-  const finding = page.getByTestId("health-panel").getByTestId("health-finding");
-  await health.click();
-  await expect(finding.filter({ hasText: "alternatives" })).toBeVisible();
-  await health.click();
-
-  // Put both Commands in one set → each says it is one of several, and health is answered.
+  // Put both Commands in one set → each says it is one of several.
   for (const i of [0, 1]) {
     await nodes(page, "command").nth(i).click();
     await page.getByLabel("Alternative set").fill("route");
   }
   await expect(nodes(page, "command").first()).toContainText("one of");
   await expect(nodes(page, "command").nth(1)).toContainText("one of");
-  await health.click();
-  await expect(finding.filter({ hasText: "alternatives" })).toHaveCount(0);
-  await health.click();
 
-  // Clearing one member drops its marker, and leaves the other alone in its set (AC-1.2, AC-5.1)
+  // Clearing one member drops its marker and leaves the other alone in its set (AC-1.2, AC-5.1)
   await nodes(page, "command").first().click();
   await page.getByLabel("Alternative set").fill("");
   await expect(nodes(page, "command").first()).not.toContainText("one of");
-  await health.click();
-  await expect(finding.filter({ hasText: "one member" })).toBeVisible();
+  await page.getByRole("button", { name: "Health", exact: true }).click();
+  await expect(
+    page.getByTestId("health-panel").getByTestId("health-finding").filter({ hasText: "one member" }),
+  ).toBeVisible();
 });

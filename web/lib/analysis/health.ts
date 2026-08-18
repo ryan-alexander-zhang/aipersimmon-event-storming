@@ -15,7 +15,6 @@ export type SmellType =
   | "policy-cycle"
   | "unresolved-hotspots"
   | "unrecorded-resolution"
-  | "undeclared-alternatives"
   | "lone-alternative";
 
 export interface Finding {
@@ -161,36 +160,6 @@ export function analyzeModel(nodes: ESNode[], edges: ESEdge[]): Finding[] {
       severity: "warning",
       message: `Reaction cycle: ${cyc.map(label).join(" -> ")}`,
       elementIds: [...cyc],
-    });
-  }
-
-  // undeclared-alternatives: a single moment with several outcomes says nothing about
-  // whether they all happen or one happens instead of the others. A Policy (one rule
-  // firing) and a Command (one attempt) are moments; an Aggregate or External System is
-  // not — its outgoing edges are many Commands' outcomes over the whole board, so it is
-  // never asked (us-00035-FR-6/8). Advisory: "all of them" is often what is meant.
-  const MOMENTS: Array<[ElementType, RelationType]> = [
-    ["policy", "invokes"],
-    ["command", "produces"],
-  ];
-  const undeclared: ESNode[] = [];
-  for (const n of nodes) {
-    const relation = MOMENTS.find(([t]) => t === n.type)?.[1];
-    if (!relation) continue;
-    const outcomes = (outgoing.get(n.id) ?? [])
-      .filter((e) => e.data?.relation === relation)
-      .map((e) => byId.get(e.target)?.data.alternativeSet);
-    // declared only when every outcome sits in the same set
-    const declared = outcomes[0] !== undefined && outcomes.every((set) => set === outcomes[0]);
-    if (outcomes.length > 1 && !declared) undeclared.push(n);
-  }
-  if (undeclared.length > 0) {
-    findings.push({
-      id: "undeclared-alternatives",
-      type: "undeclared-alternatives",
-      severity: "info",
-      message: `${undeclared.length} element(s) with several outcomes and no alternative set — alternatives or all of them?`,
-      elementIds: undeclared.map((n) => n.id),
     });
   }
 

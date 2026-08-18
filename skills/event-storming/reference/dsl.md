@@ -100,7 +100,7 @@ A fork is not drawn on this board (the layout is banded and `order`-driven), so 
 - Only `domainEvent` and `command` can be in a set - the two types that represent something happening at a moment. Not an aggregate, not a policy, not a read model.
 - Membership is the key alone. It does not come from edges or from `order`, so it works at Big Picture where there are no commands, for a fact arriving from outside, and for a deadline elapsing.
 - Mixing the two types in one set is legal: `Confirm Booking` (command) and `Hold Expired` (event) are one fork.
-- A set needs at least two members; the validator warns about a set of one (usually a typo in the key).
+- A set needs at least two members; the validator warns about a set of one (usually a typo in the key). Nothing warns about a *missing* set - a moment with several outcomes is often legitimately "all of them" (saga steps), so declaring a fork is your statement, never an inference.
 - The key is a slug you choose, same style as node ids: `charge-outcome`, `review-route`.
 - Where a policy branches, the set goes on the **commands it invokes** and `condition` says which way it goes; the policy itself carries no marker.
 
