@@ -79,8 +79,16 @@ not to spawn agents. Read the mapping below as self-reported.
   event's description is corrected in the same edit. Verified by importing the template into
   the app: two `one of` chips titled `one of: charge-outcome`, and health reports only the
   template's deliberate open hotspot.
-- **Existing examples now raise the new advisory**: 6 findings in `examples/big.json`
-  (untracked, the user's own) and 1 in `ftgo` (`Create Order Saga` → approve / reject), 0 in
-  the other three, whose Commands carry no `produces` edges and whose Policies invoke one
-  Command each. Every one of those is a real fork, so the examples were left as they are
-  rather than quietly annotated.
+- **The shipped examples now carry their forks.** `ride-hailing`: the offer's three ways
+  (`Driver Accepted` / `Driver Declined` / `Match Timed Out`, the issue-00002 case) as
+  `dispatch-outcome`, and `Payment Captured` / `Payment Failed` as `charge-outcome`; `ftgo`:
+  `Card Authorized` / `Card Declined` as `card-authorization` and `Order Approved` /
+  `Order Rejected` as `order-approval`. `cargo-shipping` and `agile-pm` have no fork worth
+  claiming — their multi-event emitters are sequential steps — and were left alone. Three
+  descriptions that called those pairs "concurrent outcomes" are corrected in the same edit;
+  they were the exact confusion this story removes.
+- **One advisory survives on `ftgo`, and it is the design's cost, not a modelling error.**
+  `Create Order Saga` invokes `Create Ticket` *and* `Authorize Card` — both fire, in
+  sequence. Dropping `dispatch` removed the ability to state that positively, so
+  `undeclared-alternatives` keeps asking a question the model has no way to answer. Raised
+  for a decision rather than silenced by annotating a fork that does not exist.

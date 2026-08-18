@@ -1,0 +1,2864 @@
+{
+  "version": "4.0",
+  "meta": {
+    "name": "Event Storming",
+    "level": "design",
+    "createdAt": "2026-08-11T08:49:13.250Z"
+  },
+  "contexts": [
+    {
+      "id": "invc",
+      "name": "Invoicing",
+      "order": 0,
+      "classification": "core"
+    },
+    {
+      "id": "pay",
+      "name": "Payment",
+      "order": 1,
+      "classification": "core"
+    },
+    {
+      "id": "conn",
+      "name": "Connector",
+      "order": 2,
+      "classification": "core"
+    },
+    {
+      "id": "disp",
+      "name": "Dispute",
+      "order": 3,
+      "classification": "supporting"
+    },
+    {
+      "id": "ledg",
+      "name": "Ledger",
+      "order": 4,
+      "classification": "core"
+    },
+    {
+      "id": "recn",
+      "name": "Reconciliation",
+      "order": 5,
+      "classification": "supporting"
+    },
+    {
+      "id": "noti",
+      "name": "Notification",
+      "order": 6,
+      "classification": "generic"
+    }
+  ],
+  "contextRelationships": [
+    {
+      "id": "cr-01",
+      "source": "pay",
+      "target": "invc",
+      "type": "customerSupplier"
+    },
+    {
+      "id": "cr-02",
+      "source": "conn",
+      "target": "pay",
+      "type": "openHostService"
+    },
+    {
+      "id": "cr-03",
+      "source": "conn",
+      "target": "disp",
+      "type": "customerSupplier"
+    },
+    {
+      "id": "cr-04",
+      "source": "conn",
+      "target": "recn",
+      "type": "customerSupplier"
+    },
+    {
+      "id": "cr-05",
+      "source": "pay",
+      "target": "ledg",
+      "type": "publishedLanguage"
+    },
+    {
+      "id": "cr-06",
+      "source": "disp",
+      "target": "ledg",
+      "type": "publishedLanguage"
+    },
+    {
+      "id": "cr-07",
+      "source": "invc",
+      "target": "ledg",
+      "type": "publishedLanguage"
+    },
+    {
+      "id": "cr-08",
+      "source": "ledg",
+      "target": "recn",
+      "type": "publishedLanguage"
+    },
+    {
+      "id": "cr-09",
+      "source": "pay",
+      "target": "noti",
+      "type": "publishedLanguage"
+    },
+    {
+      "id": "cr-10",
+      "source": "invc",
+      "target": "noti",
+      "type": "publishedLanguage"
+    },
+    {
+      "id": "cr-11",
+      "source": "disp",
+      "target": "noti",
+      "type": "publishedLanguage"
+    },
+    {
+      "id": "cr-12",
+      "source": "pay",
+      "target": "recn",
+      "type": "publishedLanguage"
+    },
+    {
+      "id": "cr-13",
+      "source": "disp",
+      "target": "recn",
+      "type": "publishedLanguage"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "act-customer",
+      "type": "actor",
+      "label": "Customer",
+      "context": "pay",
+      "properties": {
+        "description": "The end user who binds Payment Methods, grants and revokes Mandates, and confirms Customer-Initiated Payments."
+      }
+    },
+    {
+      "id": "act-operator",
+      "type": "actor",
+      "label": "Operator",
+      "context": "disp",
+      "properties": {
+        "description": "Platform staff who onboard or suspend Payment Providers, answer Disputes in Provider dashboards, record outcomes where no webhook Capability exists, record Chargebacks where no dispute ingestion exists, resolve Discrepancies, and issue manual Refunds for support cases."
+      }
+    },
+    {
+      "id": "ext-billing",
+      "type": "externalSystem",
+      "label": "Billing System",
+      "properties": {
+        "description": "The upstream system that owns Customer and tenant master data; it decides what to charge for and when. It acts through the platform API by calling the Invoicing commands (Draft/Commit/Void Invoice) and Request Refund — the board grammar has no external-system→command edge, so its calls are stated on those commands."
+      }
+    },
+    {
+      "id": "ext-provider",
+      "type": "externalSystem",
+      "label": "Payment Provider",
+      "properties": {
+        "description": "CCBill, Manifest, NetBilling, Stripe — the external services that actually move money."
+      }
+    },
+    {
+      "id": "ext-delivery",
+      "type": "externalSystem",
+      "label": "Email/SMS Delivery Service",
+      "properties": {
+        "description": "The external Delivery Services that physically deliver Notifications on each Notification Channel; Send Notification is handled by them."
+      }
+    },
+    {
+      "id": "conn-e-onboarded",
+      "type": "domainEvent",
+      "label": "Provider Onboarded",
+      "context": "conn",
+      "order": 0,
+      "properties": {
+        "description": "The Operator integrates a new Payment Provider: its Connector is registered, its Capabilities declared in the Capability Matrix, its settlement currencies declared (they drive Account Provisioning, decision-00008), and its Merchant Model declared (decision-00006)."
+      }
+    },
+    {
+      "id": "pay-e-bound",
+      "type": "domainEvent",
+      "label": "Payment Method Bound",
+      "context": "pay",
+      "order": 1,
+      "properties": {
+        "description": "A Customer's credential is saved as a Payment Method bound to exactly one Payment Provider, pending verification; raw card data stays with the Provider or vault. Switching Providers requires a new Binding."
+      }
+    },
+    {
+      "id": "pay-e-verified",
+      "type": "domainEvent",
+      "label": "Payment Method Verified",
+      "context": "pay",
+      "order": 2,
+      "properties": {
+        "description": "The platform confirmed the bound credential is valid and belongs to the Customer — zero-amount verification where the Provider supports it, otherwise a Verification Charge collected against an internal Verification Invoice and immediately refunded. Only a verified Payment Method is chargeable. Alternate outcome to Payment Method Verification Failed.",
+        "pivotal": true
+      }
+    },
+    {
+      "id": "pay-e-verifyfailed",
+      "type": "domainEvent",
+      "label": "Payment Method Verification Failed",
+      "context": "pay",
+      "order": 2,
+      "properties": {
+        "description": "The credential could not be verified (declined zero-amount authorization or failed Verification Charge); the method stays unverified and unusable, and the Customer is informed. Alternate outcome to Payment Method Verified."
+      }
+    },
+    {
+      "id": "pay-e-mandate",
+      "type": "domainEvent",
+      "label": "Mandate Granted",
+      "context": "pay",
+      "order": 3,
+      "properties": {
+        "description": "The Customer consents to off-session Automatic Charges against the saved Payment Method; consent evidence (timestamp, IP, user agent) is captured and kept."
+      }
+    },
+    {
+      "id": "invc-e-drafted",
+      "type": "domainEvent",
+      "label": "Invoice Drafted",
+      "context": "invc",
+      "order": 4,
+      "properties": {
+        "description": "The Billing System creates a draft Invoice with typed Line Items, a currency, and an optional due date, within one tenant; drafts are excluded from collection and balance."
+      }
+    },
+    {
+      "id": "invc-e-committed",
+      "type": "domainEvent",
+      "label": "Invoice Committed",
+      "context": "invc",
+      "order": 5,
+      "properties": {
+        "description": "The Billing System commits the Invoice; only now does it become collectible and may the Charge Policy fire.",
+        "pivotal": true
+      }
+    },
+    {
+      "id": "pay-e-started",
+      "type": "domainEvent",
+      "label": "Payment Started",
+      "context": "pay",
+      "order": 6,
+      "properties": {
+        "description": "A PURCHASE Payment Operation starts — Customer-Initiated, or an Automatic Charge fired by the Charge Policy. Recurs per Operation: the first opens the Payment; each Dunning step or Customer retry starts a further PURCHASE Operation on the same open Payment."
+      }
+    },
+    {
+      "id": "pay-e-attemptstarted",
+      "type": "domainEvent",
+      "label": "Payment Attempt Started",
+      "context": "pay",
+      "order": 7,
+      "properties": {
+        "description": "A new append-only Payment Attempt is recorded BEFORE the Provider is called (a crash mid-call must leave a row to reconcile); it carries the Connector and the platform's own attempt reference sent with the request — correlation never depends on the Provider's transaction id existing."
+      }
+    },
+    {
+      "id": "pay-e-actionrequired",
+      "type": "domainEvent",
+      "label": "Customer Action Required",
+      "context": "pay",
+      "order": 8,
+      "properties": {
+        "description": "Collection paused on the Customer — a redirect to a Provider-hosted payment page or a 3DS/SCA challenge, per the Connector's declared flow shape. Resumes on completion, or ends in Payment Attempt Expired. Customer-Initiated only."
+      }
+    },
+    {
+      "id": "conn-e-result",
+      "type": "domainEvent",
+      "label": "Provider Result Received",
+      "context": "conn",
+      "order": 9,
+      "properties": {
+        "description": "The normalized outcome of a Payment Provider interaction arrived — via webhook, or by status polling. Recurs per attempt, and resolves the Attempt-status UNKNOWN state (a timeout or lost webhook is never a failure and never retried — status synchronization re-queries until this event resolves it; webhooks alone are not trusted: they get lost, delayed, reordered)."
+      }
+    },
+    {
+      "id": "pay-e-attemptfailed",
+      "type": "domainEvent",
+      "label": "Payment Attempt Failed",
+      "context": "pay",
+      "order": 10,
+      "properties": {
+        "description": "One attempt definitively failed (e.g. soft decline); a Technical Retry may add a new Payment Attempt within the same Payment Operation — PURCHASE or REFUND — on the same Payment Provider."
+      }
+    },
+    {
+      "id": "pay-e-succeeded",
+      "type": "domainEvent",
+      "label": "Payment Succeeded",
+      "context": "pay",
+      "order": 11,
+      "properties": {
+        "description": "The money movement for the Invoice is confirmed: the winning Payment Attempt aggregates into its PURCHASE Operation, which aggregates into the Payment.",
+        "pivotal": true
+      }
+    },
+    {
+      "id": "ledg-e-booked",
+      "type": "domainEvent",
+      "label": "Journal Entry Booked",
+      "context": "ledg",
+      "order": 12,
+      "properties": {
+        "description": "A balanced Journal Entry records the movement, always within a single currency (no implicit conversion); recurs for every economic event — payment, refund, chargeback, fee, reinstatement, write-off, reconciliation correction.",
+        "pivotal": true
+      }
+    },
+    {
+      "id": "invc-e-paid",
+      "type": "domainEvent",
+      "label": "Invoice Paid",
+      "context": "invc",
+      "order": 13,
+      "properties": {
+        "description": "The Invoice is settled in full."
+      }
+    },
+    {
+      "id": "noti-e-sent",
+      "type": "domainEvent",
+      "label": "Notification Sent",
+      "context": "noti",
+      "order": 14,
+      "properties": {
+        "description": "A message is delivered over a Notification Channel (email, SMS); recurs for receipts, dunning notices, and dispute deadline alerts."
+      }
+    },
+    {
+      "id": "pay-e-expired",
+      "type": "domainEvent",
+      "label": "Payment Attempt Expired",
+      "context": "pay",
+      "order": 15,
+      "properties": {
+        "description": "The Customer abandoned a redirect or 3DS flow; expiry is an attempt-level outcome, declared only after it is confirmed (status query, or converged Unknown), never assumed from silence. No money moved; the Operation closes via Operation Failure and the Invoice remains collectible."
+      }
+    },
+    {
+      "id": "pay-e-failed",
+      "type": "domainEvent",
+      "label": "Payment Operation Failed",
+      "context": "pay",
+      "order": 16,
+      "properties": {
+        "description": "A PURCHASE Payment Operation closed without collecting — attempts exhausted, unretryable, or its checkout expired. The Payment stays open: Dunning (for an Automatic Charge) or the Customer (for a Customer-Initiated Payment) may start a new PURCHASE Operation; a Payment closes only when its Invoice is paid, voided, or written off."
+      }
+    },
+    {
+      "id": "invc-e-dunning",
+      "type": "domainEvent",
+      "label": "Dunning Started",
+      "context": "invc",
+      "order": 17,
+      "properties": {
+        "description": "A failed Automatic Charge sends the unpaid Invoice into Dunning: new PURCHASE Operations on the same Payment per schedule, plus Customer Notifications. Dunning ends when the Invoice is paid, voided, or written off (Dunning Termination); it pauses if the Mandate is revoked or the Payment Method deactivated (Dunning Pause). A failed Customer-Initiated Payment does not enter Dunning."
+      }
+    },
+    {
+      "id": "invc-e-writtenoff",
+      "type": "domainEvent",
+      "label": "Invoice Written Off",
+      "context": "invc",
+      "order": 18,
+      "properties": {
+        "description": "Dunning ended without collection; the Invoice is closed as uncollectible and the write-off is booked in the Ledger. Alternate ending to Invoice Voided — one Invoice reaches at most one of them."
+      }
+    },
+    {
+      "id": "invc-e-voided",
+      "type": "domainEvent",
+      "label": "Invoice Voided",
+      "context": "invc",
+      "order": 18,
+      "properties": {
+        "description": "The Billing System voids an uncollected Invoice; a paid Invoice can never be voided. Alternate ending to Invoice Written Off."
+      }
+    },
+    {
+      "id": "invc-e-dunningended",
+      "type": "domainEvent",
+      "label": "Dunning Ended",
+      "context": "invc",
+      "order": 19,
+      "properties": {
+        "description": "The Dunning process closed and scheduled re-collections were cancelled — because the Invoice was paid, voided, or written off. Counterpart to Dunning Started."
+      }
+    },
+    {
+      "id": "pay-e-closed",
+      "type": "domainEvent",
+      "label": "Payment Closed",
+      "context": "pay",
+      "order": 20,
+      "properties": {
+        "description": "The Payment's collection concluded because its Invoice was paid, voided, or written off — never merely because attempts failed (decision-00002 rule 6). No further PURCHASE Operations may start; REFUND Operations remain possible against the collected amount (within headroom), and Disputes still attach."
+      }
+    },
+    {
+      "id": "pay-e-refundrequested",
+      "type": "domainEvent",
+      "label": "Refund Requested",
+      "context": "pay",
+      "order": 21,
+      "properties": {
+        "description": "The Billing System (via API, for product reasons) or the Operator (manual, for support cases) asks to return collected money; a REFUND Payment Operation begins, capped by the refundable headroom (captured − refunded − pending refunds − disputed)."
+      }
+    },
+    {
+      "id": "pay-e-refunded",
+      "type": "domainEvent",
+      "label": "Refund Completed",
+      "context": "pay",
+      "order": 22,
+      "properties": {
+        "description": "Collected money is returned to the Customer through the same Payment Provider; booked in the Ledger. Alternate outcome to Refund Failed."
+      }
+    },
+    {
+      "id": "pay-e-refundfailed",
+      "type": "domainEvent",
+      "label": "Refund Failed",
+      "context": "pay",
+      "order": 22,
+      "properties": {
+        "description": "The REFUND Operation closed without returning money (expired card, original charge too old, insufficient Provider balance — after any Technical Retries); the outcome is reported back to the requester (API response) and surfaces in Payment Status; the money stays collected. Alternate outcome to Refund Completed."
+      }
+    },
+    {
+      "id": "disp-e-opened",
+      "type": "domainEvent",
+      "label": "Dispute Opened",
+      "context": "disp",
+      "order": 23,
+      "properties": {
+        "description": "The Customer challenged a collected Payment via their bank or the Provider.",
+        "pivotal": true
+      }
+    },
+    {
+      "id": "disp-e-evidencedue",
+      "type": "domainEvent",
+      "label": "Dispute Evidence Due",
+      "context": "disp",
+      "order": 24,
+      "properties": {
+        "description": "The Provider's evidence deadline is known (usually with the opening webhook); where the Provider requires a response, the Operator must act before it — this deadline drives the Operator's deadline alerts."
+      }
+    },
+    {
+      "id": "disp-e-chargeback",
+      "type": "domainEvent",
+      "label": "Chargeback Received",
+      "context": "disp",
+      "order": 25,
+      "properties": {
+        "description": "The funds of a collected Payment are contested and taken as the result of a Dispute; refundable headroom is cut in both Merchant Models. The booking shape — immediate clawback vs payout deduction, and whether a per-event fee exists — follows the Provider's declarations (decision-00006). Typically as soon as the Dispute opens — exact timing varies by Payment Provider. Emitted by the Provider, or produced by the Operator's Record Chargeback where no dispute ingestion exists."
+      }
+    },
+    {
+      "id": "disp-e-responded",
+      "type": "domainEvent",
+      "label": "Dispute Responded",
+      "context": "disp",
+      "order": 26,
+      "properties": {
+        "description": "Evidence was submitted — manually in the Provider dashboard in the first scope, and only where the Provider requires a response (a Capability); the Operator records the fact in the platform."
+      }
+    },
+    {
+      "id": "disp-e-outcome",
+      "type": "domainEvent",
+      "label": "Dispute Outcome Recorded",
+      "context": "disp",
+      "order": 27,
+      "properties": {
+        "description": "Won or lost — ingested from Provider webhooks/reports where that Capability exists, otherwise recorded by the Operator. A lost Dispute finalizes the already-booked Chargeback (no separate booking) and permanently reduces the Payment's refundable headroom."
+      }
+    },
+    {
+      "id": "disp-e-reinstated",
+      "type": "domainEvent",
+      "label": "Disputed Funds Reinstated",
+      "context": "disp",
+      "order": 28,
+      "properties": {
+        "description": "A won Dispute returns the taken funds; booked as the reversal of the model-selected Chargeback entry (clawback returned, or payout deduction re-credited — decision-00006). Emitted by the Provider, or produced by Record Dispute Outcome on a manually recorded win where a Chargeback was booked — the Dispute context emits at most one Reinstated per Dispute across the two paths. Whether the Provider also returns a per-event dispute fee varies per Provider — a separate booking when a provider fact carries it; on the manual path a returned fee surfaces via the Provider Report and Reconciliation, not via this event."
+      }
+    },
+    {
+      "id": "recn-e-ingested",
+      "type": "domainEvent",
+      "label": "Provider Report Ingested",
+      "context": "recn",
+      "order": 29,
+      "properties": {
+        "description": "A Provider Report (transaction statement) is imported for matching against Payments and the Ledger."
+      }
+    },
+    {
+      "id": "recn-e-discrepancy",
+      "type": "domainEvent",
+      "label": "Discrepancy Found",
+      "context": "recn",
+      "order": 30,
+      "properties": {
+        "description": "A mismatch surfaced for resolution — never silently corrected. Three sources: a Provider Report line disagreeing with platform records, a provider fact correlating to nothing (Unmatched Fact Escalation), or a provider-initiated operation breaching the cross-operation invariants (recorded anyway; the excess is the Discrepancy)."
+      }
+    },
+    {
+      "id": "recn-e-resolved",
+      "type": "domainEvent",
+      "label": "Discrepancy Resolved",
+      "context": "recn",
+      "order": 31,
+      "properties": {
+        "description": "The Discrepancy's cause is identified and any correction is booked as a new Journal Entry — history is never edited."
+      }
+    },
+    {
+      "id": "conn-e-suspended",
+      "type": "domainEvent",
+      "label": "Provider Suspended",
+      "context": "conn",
+      "order": 32,
+      "properties": {
+        "description": "The Operator disables a degraded or misbehaving Payment Provider; Charge Policy, Pay Invoice, and Refund Execution stop targeting it (their guards check it), and its methods show unavailable at checkout. In-flight Payment Attempts still converge."
+      }
+    },
+    {
+      "id": "pay-e-mandaterevoked",
+      "type": "domainEvent",
+      "label": "Mandate Revoked",
+      "context": "pay",
+      "order": 33,
+      "properties": {
+        "description": "The Customer withdraws consent for Automatic Charges. New Automatic Charges are blocked locally at once; Provider-side revocation of every stored Charge Path executes asynchronously with retries; any charge that slips through afterwards surfaces as a Discrepancy in Reconciliation."
+      }
+    },
+    {
+      "id": "pay-e-methoddeactivated",
+      "type": "domainEvent",
+      "label": "Payment Method Deactivated",
+      "context": "pay",
+      "order": 34,
+      "properties": {
+        "description": "A Payment Method expires or is removed; Dunning and Automatic Charges must never target a deactivated method."
+      }
+    },
+    {
+      "id": "invc-e-dunningpaused",
+      "type": "domainEvent",
+      "label": "Dunning Paused",
+      "context": "invc",
+      "order": 35,
+      "properties": {
+        "description": "Scheduled re-collections froze because the Mandate was revoked or the Payment Method deactivated. Paused still counts as running: payment or void of the Invoice ends it via Dunning Termination; if no Charge Path returns within the pause timeout (a Deadline), Dunning Exhaustion writes the Invoice off. Resume on a newly verified path: design pass."
+      }
+    },
+    {
+      "id": "conn-c-onboard",
+      "type": "command",
+      "label": "Onboard Provider",
+      "context": "conn",
+      "properties": {
+        "description": "Register a new Connector, declare its Capabilities in the Capability Matrix, its settlement currencies, and its Merchant Model (Platform-as-Merchant or Provider-as-Merchant, from the commercial contract — no default, undeclared blocks onboarding completion, per decision-00006). Issued by the Operator."
+      }
+    },
+    {
+      "id": "conn-c-suspendprov",
+      "type": "command",
+      "label": "Suspend Provider",
+      "context": "conn",
+      "properties": {
+        "description": "Disable a degraded or misbehaving Provider. Issued by the Operator; in-flight attempts still converge."
+      }
+    },
+    {
+      "id": "pay-c-bind",
+      "type": "command",
+      "label": "Bind Payment Method",
+      "context": "pay",
+      "properties": {
+        "description": "Save a Customer credential as a Payment Method at one Provider, pending verification. Issued by the Customer; the save itself is a Provider interaction."
+      }
+    },
+    {
+      "id": "pay-c-verify",
+      "type": "command",
+      "label": "Verify Payment Method",
+      "context": "pay",
+      "properties": {
+        "description": "Verify per the Capability-declared strategy: a zero-amount authorization at the Provider (a verification call, not a Payment Operation — rule 5 untouched), or a Verification Charge — an internal Verification Invoice collected and refunded through the ordinary Collection and Refund machinery (re-entry drawn as description, a named simplification). A declined credential produces Verification Failed."
+      }
+    },
+    {
+      "id": "pay-c-grantmandate",
+      "type": "command",
+      "label": "Grant Mandate",
+      "context": "pay",
+      "properties": {
+        "description": "Record the Customer's consent for off-session Automatic Charges, capturing the consent evidence triple (timestamp, IP, user agent). Issued by the Customer."
+      }
+    },
+    {
+      "id": "pay-c-revokemandate",
+      "type": "command",
+      "label": "Revoke Mandate",
+      "context": "pay",
+      "properties": {
+        "description": "Withdraw consent for Automatic Charges. Issued by the Customer (or via API); blocks new Automatic Charges locally at once."
+      }
+    },
+    {
+      "id": "pay-c-deactivatemethod",
+      "type": "command",
+      "label": "Deactivate Payment Method",
+      "context": "pay",
+      "properties": {
+        "description": "Remove a Payment Method — issued by the Customer, or fired on card expiry (a Deadline; see the named Deadline assumption)."
+      }
+    },
+    {
+      "id": "conn-c-revokeprovider",
+      "type": "command",
+      "label": "Revoke at Provider",
+      "context": "conn",
+      "properties": {
+        "description": "Asynchronously revoke every stored Charge Path at the Provider (mandate id, network token). Confirmation handling and the retry schedule are a small persisted process (design pass); it does not flow through Attempt Resolution — a revocation is not a Payment Attempt."
+      }
+    },
+    {
+      "id": "pay-c-autocharge",
+      "type": "command",
+      "label": "Start Automatic Charge",
+      "context": "pay",
+      "properties": {
+        "description": "Begin off-session collection of a committed Invoice against the Customer's Mandate-backed Payment Method."
+      }
+    },
+    {
+      "id": "pay-c-payinvoice",
+      "type": "command",
+      "label": "Pay Invoice",
+      "context": "pay",
+      "properties": {
+        "description": "The Customer actively pays a committed Invoice with a verified Payment Method (Customer-Initiated Payment). Guard: the method's Provider is not suspended."
+      }
+    },
+    {
+      "id": "pay-c-executeattempt",
+      "type": "command",
+      "label": "Execute Payment Attempt",
+      "context": "pay",
+      "properties": {
+        "description": "Create the next append-only Payment Attempt for the current Payment Operation (PURCHASE or REFUND)."
+      }
+    },
+    {
+      "id": "pay-c-resolveattempt",
+      "type": "command",
+      "label": "Resolve Payment Attempt",
+      "context": "pay",
+      "properties": {
+        "description": "Apply the normalized Provider result to its Payment Attempt: a successful attempt completes its Operation (Payment Succeeded / Refund Completed, per kind); a definitive failure is Payment Attempt Failed (a Technical Retry may follow, for REFUND Operations too); abandonment is Payment Attempt Expired. Idempotent — terminal outcomes never regress."
+      }
+    },
+    {
+      "id": "pay-c-failoperation",
+      "type": "command",
+      "label": "Fail Payment Operation",
+      "context": "pay",
+      "properties": {
+        "description": "Close a Payment Operation that will not complete — attempts exhausted, unretryable, or expired. A failed PURCHASE leaves the Payment open (Payment Operation Failed); a failed REFUND leaves the money collected (Refund Failed)."
+      }
+    },
+    {
+      "id": "pay-c-closepayment",
+      "type": "command",
+      "label": "Close Payment",
+      "context": "pay",
+      "properties": {
+        "description": "Conclude the Payment's collection when its Invoice ended (paid, voided, or written off); further PURCHASE Operations are refused, REFUND Operations remain allowed."
+      }
+    },
+    {
+      "id": "pay-c-requestrefund",
+      "type": "command",
+      "label": "Request Refund",
+      "context": "pay",
+      "properties": {
+        "description": "Ask to return collected money — issued by the Operator for support cases, or called by the Billing System through the platform API; capped by the refundable headroom."
+      }
+    },
+    {
+      "id": "conn-c-submit",
+      "type": "command",
+      "label": "Submit to Provider",
+      "context": "conn",
+      "properties": {
+        "description": "Translate the attempt into the bound Provider's API call, per the Connector's declared flow shape. Redirect/3DS shapes produce Customer Action Required; on direct-API shapes the next fact is the Provider's result. Writes the Attempt's Submitted state in the Payment aggregate while executing the Provider interaction (dual handledBy)."
+      }
+    },
+    {
+      "id": "conn-c-syncstatus",
+      "type": "command",
+      "label": "Synchronize Attempt Status",
+      "context": "conn",
+      "properties": {
+        "description": "Recover an attempt's outcome per the Provider's Capabilities: single-transaction status query where supported, else matching the next Provider Report, else parking for manual review. Correlates by the platform's attempt reference. Also issuable manually by the Operator (resolving a Discrepancy or a parked attempt). Writes the Attempt's Unknown-convergence state — including Parked on schedule exhaustion — in the Payment aggregate while executing the Provider query (dual handledBy)."
+      }
+    },
+    {
+      "id": "invc-c-draft",
+      "type": "command",
+      "label": "Draft Invoice",
+      "context": "invc",
+      "properties": {
+        "description": "Create a draft Invoice with typed Line Items, a currency, and an optional due date. Called by the Billing System through the platform API (or by the platform itself for Verification Invoices)."
+      }
+    },
+    {
+      "id": "invc-c-commit",
+      "type": "command",
+      "label": "Commit Invoice",
+      "context": "invc",
+      "properties": {
+        "description": "Make a draft Invoice collectible. Called by the Billing System through the platform API; only a draft can be committed."
+      }
+    },
+    {
+      "id": "invc-c-void",
+      "type": "command",
+      "label": "Void Invoice",
+      "context": "invc",
+      "properties": {
+        "description": "Cancel an uncollected Invoice. Called by the Billing System through the platform API; guard: a paid Invoice can never be voided."
+      }
+    },
+    {
+      "id": "invc-c-startdunning",
+      "type": "command",
+      "label": "Start Dunning",
+      "context": "invc",
+      "properties": {
+        "description": "Open the Dunning process for an unpaid Invoice whose Automatic Charge failed."
+      }
+    },
+    {
+      "id": "invc-c-writeoff",
+      "type": "command",
+      "label": "Write Off Invoice",
+      "context": "invc",
+      "properties": {
+        "description": "Close an uncollectible Invoice after Dunning is exhausted (last step failed, or pause timeout elapsed)."
+      }
+    },
+    {
+      "id": "invc-c-stopdunning",
+      "type": "command",
+      "label": "Stop Dunning",
+      "context": "invc",
+      "properties": {
+        "description": "Close the running Dunning process for an Invoice that no longer needs collection; scheduled re-collections are cancelled."
+      }
+    },
+    {
+      "id": "invc-c-pausedunning",
+      "type": "command",
+      "label": "Pause Dunning",
+      "context": "invc",
+      "properties": {
+        "description": "Freeze the running Dunning process's scheduled re-collections when no Charge Path remains (Mandate revoked or method deactivated). Idempotent — a second pause trigger is a no-op."
+      }
+    },
+    {
+      "id": "invc-c-applypayment",
+      "type": "command",
+      "label": "Apply Payment to Invoice",
+      "context": "invc",
+      "properties": {
+        "description": "Settle the Invoice with the succeeded Payment."
+      }
+    },
+    {
+      "id": "disp-c-markresponded",
+      "type": "command",
+      "label": "Mark Dispute Responded",
+      "context": "disp",
+      "properties": {
+        "description": "Record that evidence was submitted in the Provider dashboard. Issued by the Operator after the manual submission."
+      }
+    },
+    {
+      "id": "disp-c-recordoutcome",
+      "type": "command",
+      "label": "Record Dispute Outcome",
+      "context": "disp",
+      "properties": {
+        "description": "Record won/lost for a Provider without outcome webhooks. Issued by the Operator; idempotent against a webhook-ingested outcome (a design-pass Constraint). A won outcome with a previously booked Chargeback also produces Disputed Funds Reinstated; the Constraint suppresses the second Reinstated event in either direction (Dispute-context dedup — at most one Reinstated per Dispute), so Ledger Booking's per-source-event key is never tested across paths. Guard: where funds were taken but no chargeback was ever ingested, Record Chargeback must precede a lost outcome — lost finalizes a booked Chargeback and books nothing itself."
+      }
+    },
+    {
+      "id": "recn-c-match",
+      "type": "command",
+      "label": "Match Report Lines",
+      "context": "recn",
+      "properties": {
+        "description": "Match a Provider Report's lines against Payments and the Ledger; every mismatch becomes a Discrepancy."
+      }
+    },
+    {
+      "id": "recn-c-resolve",
+      "type": "command",
+      "label": "Resolve Discrepancy",
+      "context": "recn",
+      "properties": {
+        "description": "Close a Discrepancy: heal the source context first (manual status re-query, outcome entry, chargeback recording via Record Chargeback); only a genuine economic difference books a correction Journal Entry referencing the Discrepancy. Issued by the Operator, per decision-00004."
+      }
+    },
+    {
+      "id": "ledg-c-book",
+      "type": "command",
+      "label": "Book Journal Entry",
+      "context": "ledg",
+      "properties": {
+        "description": "Record one balanced Journal Entry for an economic event; idempotent per (source event, economic fact kind)."
+      }
+    },
+    {
+      "id": "noti-c-send",
+      "type": "command",
+      "label": "Send Notification",
+      "context": "noti",
+      "properties": {
+        "description": "Deliver a Notification via a Delivery Service — to the Customer (receipts, dunning notices) or, for dispute evidence deadlines, to the Operator as an operational alert."
+      }
+    },
+    {
+      "id": "pay-p-verification",
+      "type": "policy",
+      "label": "Verification Strategy",
+      "context": "pay",
+      "properties": {
+        "description": "Every bound Payment Method is verified before becoming chargeable, by the Capability-declared strategy; a declined credential fails verification.",
+        "condition": "zero-amount verification where the Provider supports it; otherwise Verification Charge (internal Verification Invoice, collected then refunded)",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "invc-p-chargepolicy",
+      "type": "policy",
+      "label": "Charge Policy",
+      "context": "invc",
+      "properties": {
+        "description": "Decides when a committed Invoice is charged automatically. Timing is set per Invoice by the Billing System, with a tenant default.",
+        "condition": "an active, verified Payment Method with an active Mandate exists, its Provider is not suspended and declares the automaticCharge Capability, and the Invoice's charge timing is reached",
+        "execution": "automatic",
+        "parameters": [
+          {
+            "name": "timing",
+            "value": "per Invoice: on-commit | on-due-date (tenant default: on-commit)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pay-p-execute",
+      "type": "policy",
+      "label": "Collection Execution",
+      "context": "pay",
+      "properties": {
+        "description": "Drives a started PURCHASE Operation: creates its first Payment Attempt.",
+        "condition": "no attempt of the Operation is Pending or Unknown",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "conn-p-dispatch",
+      "type": "policy",
+      "label": "Provider Dispatch",
+      "context": "conn",
+      "properties": {
+        "description": "Every recorded attempt is submitted to its bound Provider.",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "conn-p-statussync",
+      "type": "policy",
+      "label": "Status Synchronization",
+      "context": "conn",
+      "properties": {
+        "description": "Recovers the truth for attempts without a definitive outcome (UNKNOWN/Pending) via the Capability-declared recovery path: status query where supported, else awaiting the webhook, else the next Provider Report, else manual review. Runs regardless of webhook Capability. Exhaustion behavior (park for manual review) is an assumption to confirm.",
+        "condition": "no definitive Provider result within the timeout",
+        "execution": "automatic",
+        "parameters": [
+          {
+            "name": "schedule",
+            "value": "5m, 1h, 1d ×5 (per tenant; Kill Bill default)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pay-p-resolve",
+      "type": "policy",
+      "label": "Attempt Resolution",
+      "context": "pay",
+      "properties": {
+        "description": "Every correlated Provider result resolves its attempt — the single write path for webhook, poll, and status-sync results alike; idempotent, terminal outcomes never regress. A result that correlates to nothing is never force-matched (it escalates via Unmatched Fact Escalation).",
+        "condition": "the result correlates to a Payment Attempt (platform attempt reference primary, Provider transaction id secondary)",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "pay-p-retry",
+      "type": "policy",
+      "label": "Technical Retry",
+      "context": "pay",
+      "properties": {
+        "description": "A definitively failed attempt may be retried within the same Operation — PURCHASE or REFUND — on the same Provider.",
+        "condition": "failure is definitive and classified retryable (error-code table), retries remain, the Provider is not suspended, and no attempt of the Operation is Pending or Unknown",
+        "execution": "automatic",
+        "parameters": [
+          {
+            "name": "maxAttempts",
+            "value": "3 (example placeholder, not a decision)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pay-p-opfail",
+      "type": "policy",
+      "label": "Operation Failure",
+      "context": "pay",
+      "properties": {
+        "description": "When an attempt's outcome is final for the Operation, the Operation closes — a failed PURCHASE leaves the Payment open; a failed REFUND leaves the money collected.",
+        "condition": "failure not retryable, maxAttempts consumed, or the attempt expired",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "pay-p-close",
+      "type": "policy",
+      "label": "Payment Closure",
+      "context": "pay",
+      "properties": {
+        "description": "The Payment reacts to its Invoice's ending: paid, voided, or written off concludes collection (decision-00002 rule 6); REFUND Operations remain possible.",
+        "condition": "an open Payment exists for the Invoice",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "pay-p-refundexec",
+      "type": "policy",
+      "label": "Refund Execution",
+      "context": "pay",
+      "properties": {
+        "description": "A requested Refund runs through the same attempt machinery as collection: Execute → Dispatch → Result → Resolution, on the original Provider.",
+        "condition": "refundable headroom holds (captured − refunded − pending refunds − disputed), the Provider is not suspended, and no attempt of the Operation is Pending or Unknown",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "invc-p-dunningstart",
+      "type": "policy",
+      "label": "Dunning Trigger",
+      "context": "invc",
+      "properties": {
+        "description": "Only failed Automatic Charges enter Dunning; a failed Dunning step never re-opens Dunning.",
+        "condition": "the failed PURCHASE Operation was an Automatic Charge, the Invoice is unpaid, and Dunning is not already running (paused counts as running) for it",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "invc-p-dunningschedule",
+      "type": "policy",
+      "label": "Dunning Schedule",
+      "context": "invc",
+      "properties": {
+        "description": "Re-collects per escalation schedule: each step starts a NEW PURCHASE Operation on the same open Payment and sends a dunning notice. The process is a Process Manager persisting each step, the Operation id it started, and its Deadlines.",
+        "condition": "re-collection eligibility re-checked per step: Mandate active, Payment Method active, Provider not suspended",
+        "execution": "automatic",
+        "parameters": [
+          {
+            "name": "schedule",
+            "value": "day 3, 8, 15 (example placeholder, not a decision)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "invc-p-dunningexhausted",
+      "type": "policy",
+      "label": "Dunning Exhaustion",
+      "context": "invc",
+      "properties": {
+        "description": "When the Dunning process's last scheduled step fails — or a paused Dunning's pause timeout elapses without a new Charge Path — the Invoice is written off. Exhaustion is decided from the process's own persisted state (step, Operation id, Deadlines), never guessed from bare failure events.",
+        "condition": "the failed Operation is this Dunning's current step and it was the last scheduled step — or the pause timeout elapsed (a Deadline)",
+        "execution": "automatic",
+        "parameters": [
+          {
+            "name": "pauseTimeout",
+            "value": "30d (example placeholder, not a decision)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "invc-p-dunningterminate",
+      "type": "policy",
+      "label": "Dunning Termination",
+      "context": "invc",
+      "properties": {
+        "description": "Dunning never outlives its Invoice: payment, void, or write-off stops the process and cancels scheduled re-collections — no re-collection may ever target an ended Invoice.",
+        "condition": "Dunning is running (paused included) for the Invoice",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "invc-p-dunningpause",
+      "type": "policy",
+      "label": "Dunning Pause",
+      "context": "invc",
+      "properties": {
+        "description": "When the Charge Path disappears, Dunning must not keep charging.",
+        "condition": "Dunning is running and the revoked Mandate / deactivated Method was its Charge Path",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "pay-p-revocationcascade",
+      "type": "policy",
+      "label": "Revocation Cascade",
+      "context": "pay",
+      "properties": {
+        "description": "A revoked Mandate must die everywhere: local block is immediate; Provider-side revocation of every stored Charge Path runs asynchronously as a small persisted process with retries (design pass — the Hyperswitch revoke-cascade gap, deliberately not inherited). Any charge slipping through later surfaces as a Discrepancy.",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "disp-p-deadline",
+      "type": "policy",
+      "label": "Evidence Deadline Alerts",
+      "context": "disp",
+      "properties": {
+        "description": "The evidence deadline drives escalating Operator alerts — missing it loses the Dispute by default.",
+        "condition": "the Provider requires a response (Capability) and the Dispute is not yet responded",
+        "execution": "automatic",
+        "parameters": [
+          {
+            "name": "reminders",
+            "value": "on receipt, 7d, 3d, 1d before deadline (example placeholder, not a decision)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ledg-p-booking",
+      "type": "policy",
+      "label": "Ledger Booking",
+      "context": "ledg",
+      "properties": {
+        "description": "Every economic fact books exactly one Journal Entry, idempotent per source event and fact kind (a Chargeback can carry two facts: the funds movement and, where declared, a per-event fee); a Discrepancy Resolved books only when a correction entry is required. Delivery is guaranteed-eventual via transactional outbox and booking may follow Invoice Paid, per decision-00003.",
+        "condition": "for Chargeback Received only: the chargeback is attached to a Dispute (an unattachable chargeback escalates via Unmatched Fact Escalation instead and books only on Discrepancy resolution), the funds-entry template is selected by the Provider's Merchant Model (Platform-as-Merchant: immediate clawback; Provider-as-Merchant: payout-deduction entry), and a fee entry books only where the Provider's declared fee shape is per-event (decision-00006). Disputed Funds Reinstated reverses the model-selected Chargeback entry. All other triggering events book unconditionally.",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "recn-p-match",
+      "type": "policy",
+      "label": "Report Matching",
+      "context": "recn",
+      "properties": {
+        "description": "Every ingested Provider Report is matched line-by-line; mismatches surface as Discrepancies, never silently corrected.",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "invc-p-settle",
+      "type": "policy",
+      "label": "Invoice Settlement",
+      "context": "invc",
+      "properties": {
+        "description": "A succeeded Payment settles its Invoice.",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "noti-p-notify",
+      "type": "policy",
+      "label": "Collection Notifications",
+      "context": "noti",
+      "properties": {
+        "description": "Receipts on success; the opening dunning notice when Dunning starts (per-step notices come from the Dunning Schedule).",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "pay-rm-checkout",
+      "type": "readModel",
+      "label": "Checkout Session",
+      "context": "pay",
+      "properties": {
+        "description": "What the Customer needs to finish a paused payment: redirect URL / 3DS challenge state, expiry countdown; cleared when the Provider result resolves the attempt. The Customer completes the action on the Provider's page — outside the platform's command surface; the resume signal is Provider Result Received."
+      }
+    },
+    {
+      "id": "pay-rm-methods",
+      "type": "readModel",
+      "label": "Saved Payment Methods",
+      "context": "pay",
+      "properties": {
+        "description": "The Customer's Payment Methods with verification status; methods at a suspended Provider are shown unavailable."
+      }
+    },
+    {
+      "id": "invc-rm-unpaid",
+      "type": "readModel",
+      "label": "Unpaid Invoices",
+      "context": "invc",
+      "properties": {
+        "description": "Committed, unsettled Invoices with balance and dunning state — what the Customer owes; cleared on payment, void, or write-off."
+      }
+    },
+    {
+      "id": "pay-rm-status",
+      "type": "readModel",
+      "label": "Payment Status",
+      "context": "pay",
+      "properties": {
+        "description": "The projected state of a Payment from its ACTIVE Operation/Attempt (Hyperswitch's projection principle): processing while an attempt is active — including during a Technical Retry — then success, operation failure, or the refund outcome. Attempt-level failures never surface directly. Informs the Customer and the Operator."
+      }
+    },
+    {
+      "id": "conn-rm-capmatrix",
+      "type": "readModel",
+      "label": "Capability Matrix",
+      "context": "conn",
+      "properties": {
+        "description": "Declared Capabilities and Merchant Model per Provider — what the Operator consults when onboarding, suspending, or diagnosing, and what verification, charging, recovery, dispute, and booking policies branch on."
+      }
+    },
+    {
+      "id": "disp-rm-open",
+      "type": "readModel",
+      "label": "Open Disputes",
+      "context": "disp",
+      "properties": {
+        "description": "Disputes awaiting action, with evidence deadlines and current stage — the Operator's dispute worklist. A manually recorded chargeback (Record Chargeback) enters the worklist at chargeback stage, awaiting outcome."
+      }
+    },
+    {
+      "id": "recn-rm-open",
+      "type": "readModel",
+      "label": "Open Discrepancies",
+      "context": "recn",
+      "properties": {
+        "description": "Unresolved Discrepancies with cause categories (assigned by the Operator at resolution) — the reconciliation worklist; the category taxonomy drives later automation."
+      }
+    },
+    {
+      "id": "hot-mandate",
+      "type": "hotspot",
+      "label": "Mandate capture varies per provider",
+      "context": "pay",
+      "properties": {
+        "description": "Whether Provider-as-Merchant Providers own parts of the consent UX must be verified per Connector before the Mandate model is fixed. Verified 2026-08-11 (reference-00004/5/6/7): all four launch Providers leave consent rendering to the platform (one exception: NetBilling classic ACH uses a NetBilling-hosted assent widget), and none offers a real mandate-revocation primitive — Manifest cannot remove a stored card, NetBilling vault deletion does not invalidate the COF anchor, CCBill payment tokens have no delete endpoint, and Stripe's detach semantics are unconfirmed (whether detach voids the mandate is an open Stripe question). Revoke at Provider is therefore best-effort on every Connector; the platform's own charge guard is the invariant. Still open: the per-provider Merchant Model declarations (decision-00006 pre-draws the booking fork; the contractual answers for CCBill, NetBilling, and Manifest are pending — onboarding blocks until each is declared), and dispute-response duty per provider (Stripe alone offers API evidence submission — recorded, unused in first scope).",
+        "state": "open",
+        "kind": "risk",
+        "priority": "medium"
+      }
+    },
+    {
+      "id": "hot-outcome",
+      "type": "hotspot",
+      "label": "Manual outcome entry can drift",
+      "context": "disp",
+      "properties": {
+        "description": "Where a Provider lacks outcome webhooks, the Operator records Dispute outcomes by hand — needs an operational checklist so the Ledger never silently drifts.",
+        "state": "open",
+        "kind": "risk",
+        "priority": "medium"
+      }
+    },
+    {
+      "id": "opp-onboard",
+      "type": "opportunity",
+      "label": "New provider = connector + capabilities only",
+      "context": "conn",
+      "properties": {
+        "description": "The platform promise: integrating a new Payment Provider touches one Connector and its Capability declaration — never the core."
+      }
+    },
+    {
+      "id": "pay-e-provrefund",
+      "type": "domainEvent",
+      "label": "Provider-Initiated Refund Reported",
+      "context": "pay",
+      "order": 21,
+      "properties": {
+        "description": "The Provider refunded a collected Payment on its own initiative — no platform command exists (e.g. a CCBill Admin-portal refund; Manifest's auto_refund_on_fraud would be one but is configured off per decision-00005). Alternate to Refund Requested as the way a refund episode begins. The Connector emits this event only after correlating the raw provider fact to a known Payment AND classifying it unambiguously as a refund; a fact that is uncorrelatable or unclassifiable stays a Provider Result Received and escalates via Unmatched Fact Escalation."
+      }
+    },
+    {
+      "id": "pay-p-provinitiated",
+      "type": "policy",
+      "label": "Provider-Initiated Operation Ingestion",
+      "context": "pay",
+      "properties": {
+        "description": "A provider fact that moves money without a platform command creates the Operation record retroactively instead of resolving one — upward aggregation is preserved by appending, never by mutating Payment state directly.",
+        "condition": "the provider fact correlates to a known Payment and reports a money movement no platform-initiated Operation commanded",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "pay-c-recordprovrefund",
+      "type": "command",
+      "label": "Record Provider-Initiated Refund",
+      "context": "pay",
+      "properties": {
+        "description": "Create a REFUND Operation and its already-resolved Attempt from the provider fact (append-only; the Attempt carries the Provider's own reference). Recorded even beyond refundable headroom — the excess raises a Discrepancy; decision-00002 rule 2's invariant guards platform-initiated Operations only (ruled 2026-08-11)."
+      }
+    },
+    {
+      "id": "recn-p-unmatched",
+      "type": "policy",
+      "label": "Unmatched Fact Escalation",
+      "context": "recn",
+      "properties": {
+        "description": "A provider fact that cannot be attached to anything is a Discrepancy, not a guess — Attempt Resolution never force-matches. Covers chargeback events without a transaction link (NetBilling batch items) and results ambiguous between refund and chargeback (Manifest 'reversed').",
+        "condition": "the fact correlates to no Payment Attempt or Dispute under the Connector's matching rules, or correlates but cannot be classified (refund vs chargeback), and is not a provider-initiated operation the Payment context ingests (currently: refunds only); an Operator-recorded chargeback arrives attached to its Dispute and never escalates",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "recn-c-recordunmatched",
+      "type": "command",
+      "label": "Record Unmatched Provider Fact",
+      "context": "recn",
+      "properties": {
+        "description": "Surface an uncorrelatable provider fact as a Discrepancy carrying the raw fact and the failed matching rules; the Operator resolves source-first per decision-00004."
+      }
+    },
+    {
+      "id": "disp-c-recordchargeback",
+      "type": "command",
+      "label": "Record Chargeback",
+      "context": "disp",
+      "properties": {
+        "description": "Record a chargeback the Operator confirmed for a Provider without the dispute-ingestion Capability (Manifest, per reference-00004) — or one whose chargeback event was missed and surfaced via Reconciliation (the re-ingestion case, decision-00004). Establishes the Dispute record when none exists (attached by construction; it enters Open Disputes at chargeback stage). Idempotent against a later provider-emitted or report-line chargeback; if a report line later contradicts the recording (the fact was a refund after all), Report Matching surfaces it as a Discrepancy against the booked entry and the unwind runs source-first per decision-00004. Typically issued as the source-first resolution of an ambiguous-reversed Discrepancy — the confirmed fact re-enters through the normal path and books the Merchant-Model-selected entry; the Discrepancy is then closed via Resolve Discrepancy, which books no correction entry."
+      }
+    },
+    {
+      "id": "pay-ag-payment",
+      "type": "aggregate",
+      "label": "Payment",
+      "context": "pay",
+      "properties": {
+        "description": "One aggregate across all three layers (decision-00007): the Payment with its Payment Operations and their Payment Attempts. Owns the cross-operation invariants (refunded ≤ captured ≤ authorized ≤ requested, on accepting platform-initiated Operations) and the double-charge guard (no new Attempt while any is Pending/Unknown) transactionally. Status is a projection from Operations (decision-00002). State machines: see the design-level section."
+      }
+    },
+    {
+      "id": "pay-ag-method",
+      "type": "aggregate",
+      "label": "Payment Method",
+      "context": "pay",
+      "properties": {
+        "description": "A Customer's saved credential, bound to exactly one Provider. Lifecycle: bound → verified / verification-failed → deactivated; card-updater changes mutate it in place. Raw credentials never enter the platform."
+      }
+    },
+    {
+      "id": "pay-ag-mandate",
+      "type": "aggregate",
+      "label": "Mandate",
+      "context": "pay",
+      "properties": {
+        "description": "The Customer's consent to charge a Payment Method: granted → revoked. Platform-recorded (for most Providers the only mandate that exists); revocation cascades best-effort to the Provider while the platform charge guard enforces it."
+      }
+    },
+    {
+      "id": "invc-ag-invoice",
+      "type": "aggregate",
+      "label": "Invoice",
+      "context": "invc",
+      "properties": {
+        "description": "Typed Line Items; draft → committed → paid / voided / written off. Committed is immutable (void-and-recreate); paid is never voided."
+      }
+    },
+    {
+      "id": "invc-ag-dunning",
+      "type": "aggregate",
+      "label": "Dunning",
+      "context": "invc",
+      "properties": {
+        "description": "The recovery Process Manager, aggregate-shaped (decision-00001, decision-00007): persisted steps, the Operation id each step started, and its Deadlines. Paused counts as running; pause timeout exhausts to write-off."
+      }
+    },
+    {
+      "id": "conn-ag-connector",
+      "type": "aggregate",
+      "label": "Connector",
+      "context": "conn",
+      "properties": {
+        "description": "Per-Provider integration record: declared Capabilities, Merchant Model, and fee shape (no defaults for the Merchant Model — undeclared blocks onboarding, decision-00006). Suspension state guards new Operations."
+      }
+    },
+    {
+      "id": "disp-ag-dispute",
+      "type": "aggregate",
+      "label": "Dispute",
+      "context": "disp",
+      "properties": {
+        "description": "One Customer challenge: opened → evidence due → responded → outcome (won/lost), with its Chargeback and funds reinstatement inside. For a Provider with no dispute surface, entered at chargeback stage by the Operator. Emits at most one Reinstated across webhook and manual paths; outcome recording idempotent across both."
+      }
+    },
+    {
+      "id": "ledg-ag-entry",
+      "type": "aggregate",
+      "label": "Journal Entry",
+      "context": "ledg",
+      "properties": {
+        "description": "Atomic, immutable, balanced set of Postings — at least two lines, balanced within one currency; idempotent per (source event, economic fact kind); carries source reference, effective date and posted date (decision-00008). Corrections are reversing entries, never edits."
+      }
+    },
+    {
+      "id": "ledg-ag-account",
+      "type": "aggregate",
+      "label": "Ledger Account",
+      "context": "ledg",
+      "properties": {
+        "description": "Typed chart-of-accounts entry: accounting type (asset/liability/revenue/expense/contra), normal balance side, one currency. Opened per Provider per settlement currency at onboarding (decision-00008); never deleted. Balances are projections over postings, never state."
+      }
+    },
+    {
+      "id": "recn-ag-report",
+      "type": "aggregate",
+      "label": "Provider Report",
+      "context": "recn",
+      "properties": {
+        "description": "One ingested Provider statement: its lines and their matching state against Payments and the Ledger."
+      }
+    },
+    {
+      "id": "recn-ag-discrepancy",
+      "type": "aggregate",
+      "label": "Discrepancy",
+      "context": "recn",
+      "properties": {
+        "description": "One surfaced mismatch: open → resolved, carrying the raw fact and failed matching rules; resolution is source-first, correction entries last resort (reversing where a wrong entry exists; originating, referencing the Discrepancy, for a never-booked fact) (decision-00004)."
+      }
+    },
+    {
+      "id": "noti-ag-notification",
+      "type": "aggregate",
+      "label": "Notification",
+      "context": "noti",
+      "properties": {
+        "description": "One notification with per-channel delivery state (email, SMS first)."
+      }
+    },
+    {
+      "id": "cons-gateway",
+      "type": "constraint",
+      "label": "Gateway mode only",
+      "context": "conn",
+      "properties": {
+        "description": "Every charge is platform-initiated; Connectors create one-shot provider objects — provider rebill/subscription engines are never used (decision-00005)."
+      }
+    },
+    {
+      "id": "cons-merchmodel",
+      "type": "constraint",
+      "label": "Merchant Model declared",
+      "context": "conn",
+      "properties": {
+        "description": "Onboarding cannot complete without the contract-sourced Merchant Model and fee-shape declarations — no default exists (decision-00006)."
+      }
+    },
+    {
+      "id": "cons-chargeable",
+      "type": "constraint",
+      "label": "Verified, active method only",
+      "context": "pay",
+      "properties": {
+        "description": "A charge requires a verified, active Payment Method."
+      }
+    },
+    {
+      "id": "cons-collectible",
+      "type": "constraint",
+      "label": "Committed Invoice only",
+      "context": "invc",
+      "properties": {
+        "description": "Only a committed Invoice is collectible."
+      }
+    },
+    {
+      "id": "cons-immutable",
+      "type": "constraint",
+      "label": "Draft-only commit; committed immutable",
+      "context": "invc",
+      "properties": {
+        "description": "Only a draft can be committed; after commit, no mutation — no mutation command exists by design, and the only correction path is void (uncollected only) and recreate."
+      }
+    },
+    {
+      "id": "cons-paidnovoid",
+      "type": "constraint",
+      "label": "Paid Invoice never voided",
+      "context": "invc",
+      "properties": {
+        "description": "Void is rejected once the Invoice is paid."
+      }
+    },
+    {
+      "id": "cons-closednop",
+      "type": "constraint",
+      "label": "Closed Payment: no PURCHASE",
+      "context": "pay",
+      "properties": {
+        "description": "After Payment Closed, collection is concluded — no new PURCHASE Operations (REFUND remains possible within headroom; decision-00002 rule 6)."
+      }
+    },
+    {
+      "id": "cons-headroom",
+      "type": "constraint",
+      "label": "Refund within headroom",
+      "context": "pay",
+      "properties": {
+        "description": "A platform-initiated Refund is capped by refundable headroom = captured − refunded − pending refunds − disputed. Provider-initiated facts are exempt: recorded, excess surfaces as a Discrepancy (decision-00002 rule 2 scope)."
+      }
+    },
+    {
+      "id": "cons-suspended",
+      "type": "constraint",
+      "label": "No new Operations on suspended Provider",
+      "context": "pay",
+      "properties": {
+        "description": "Pay Invoice, Automatic Charge, and Refund are all rejected against a suspended Provider; in-flight attempts still converge."
+      }
+    },
+    {
+      "id": "cons-noregress",
+      "type": "constraint",
+      "label": "Terminal outcomes never regress",
+      "context": "pay",
+      "properties": {
+        "description": "A Succeeded/Failed/Expired Attempt never changes outcome; late provider facts are idempotent no-ops or escalate as Discrepancies."
+      }
+    },
+    {
+      "id": "cons-doublecharge",
+      "type": "constraint",
+      "label": "One in-flight Attempt per Operation",
+      "context": "pay",
+      "properties": {
+        "description": "Execute Payment Attempt is blocked while any Attempt of the Operation is Pending or Unknown (decision-00002 rules 3–4 — the double-charge guard)."
+      }
+    },
+    {
+      "id": "cons-entryrules",
+      "type": "constraint",
+      "label": "Journal Entry rules",
+      "context": "ledg",
+      "properties": {
+        "description": "Balanced within one currency; idempotent per (source event, economic fact kind); immutable — corrections are reversing entries (decision-00008)."
+      }
+    },
+    {
+      "id": "cons-disputeidem",
+      "type": "constraint",
+      "label": "Dispute recording idempotent and ordered",
+      "context": "disp",
+      "properties": {
+        "description": "Outcome and chargeback recording are idempotent across webhook and Operator paths; where funds were taken and nothing was ingested, Record Chargeback precedes a lost outcome; at most one Reinstated per Dispute."
+      }
+    },
+    {
+      "id": "ledg-p-provision",
+      "type": "policy",
+      "label": "Account Provisioning",
+      "context": "ledg",
+      "properties": {
+        "description": "A newly onboarded Provider gets its chart-of-accounts entries — the per-Provider per-settlement-currency receivable/cash accounts the booking templates post to (decision-00006, decision-00008).",
+        "condition": "the Provider has no open Ledger Account for a declared settlement currency",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "ledg-c-openaccount",
+      "type": "command",
+      "label": "Open Ledger Account",
+      "context": "ledg",
+      "properties": {
+        "description": "Open a typed chart-of-accounts entry (accounting type, normal balance side, one currency). Accounts are never deleted."
+      }
+    },
+    {
+      "id": "ledg-e-accountopened",
+      "type": "domainEvent",
+      "label": "Ledger Account Opened",
+      "context": "ledg",
+      "properties": {
+        "description": "A typed Ledger Account exists and postings may reference it. Provisioned at Provider onboarding (Setup episode); a design-level supporting event, deliberately outside the ordered narrative backbone. Manual chart additions are design-pass detail."
+      }
+    },
+    {
+      "id": "cons-mandate",
+      "type": "constraint",
+      "label": "Active Mandate for Automatic Charges",
+      "context": "pay",
+      "properties": {
+        "description": "An Automatic Charge requires an active Mandate. Customer-Initiated Payments do not — the Customer's presence is the consent."
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "ed-01",
+      "source": "invc-c-draft",
+      "target": "invc-e-drafted",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-02",
+      "source": "invc-c-commit",
+      "target": "invc-e-committed",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-03",
+      "source": "invc-c-void",
+      "target": "invc-e-voided",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-04",
+      "source": "pay-c-requestrefund",
+      "target": "pay-e-refundrequested",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-05",
+      "source": "ext-provider",
+      "target": "conn-e-result",
+      "relation": "emits"
+    },
+    {
+      "id": "ed-06",
+      "source": "ext-provider",
+      "target": "disp-e-opened",
+      "relation": "emits"
+    },
+    {
+      "id": "ed-07",
+      "source": "ext-provider",
+      "target": "disp-e-chargeback",
+      "relation": "emits"
+    },
+    {
+      "id": "ed-08",
+      "source": "ext-provider",
+      "target": "disp-e-evidencedue",
+      "relation": "emits"
+    },
+    {
+      "id": "ed-09",
+      "source": "ext-provider",
+      "target": "recn-e-ingested",
+      "relation": "emits"
+    },
+    {
+      "id": "ed-10",
+      "source": "hot-mandate",
+      "target": "pay-e-mandate",
+      "relation": "annotates"
+    },
+    {
+      "id": "ed-14",
+      "source": "hot-outcome",
+      "target": "disp-e-outcome",
+      "relation": "annotates"
+    },
+    {
+      "id": "ed-16",
+      "source": "opp-onboard",
+      "target": "conn-e-onboarded",
+      "relation": "highlights"
+    },
+    {
+      "id": "ed-17",
+      "source": "act-customer",
+      "target": "pay-c-payinvoice",
+      "relation": "issues"
+    },
+    {
+      "id": "ed-18",
+      "source": "pay-c-payinvoice",
+      "target": "pay-e-started",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-19",
+      "source": "pay-c-autocharge",
+      "target": "pay-e-started",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-20",
+      "source": "pay-c-executeattempt",
+      "target": "pay-e-attemptstarted",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-21",
+      "source": "conn-c-submit",
+      "target": "pay-e-actionrequired",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-22",
+      "source": "conn-c-syncstatus",
+      "target": "conn-e-result",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-23",
+      "source": "invc-c-startdunning",
+      "target": "invc-e-dunning",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-24",
+      "source": "invc-c-writeoff",
+      "target": "invc-e-writtenoff",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-25",
+      "source": "invc-c-applypayment",
+      "target": "invc-e-paid",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-26",
+      "source": "ledg-c-book",
+      "target": "ledg-e-booked",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-27",
+      "source": "noti-c-send",
+      "target": "noti-e-sent",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-28",
+      "source": "invc-e-committed",
+      "target": "invc-p-chargepolicy",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-29",
+      "source": "invc-p-chargepolicy",
+      "target": "pay-c-autocharge",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-30",
+      "source": "pay-e-started",
+      "target": "pay-p-execute",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-31",
+      "source": "pay-p-execute",
+      "target": "pay-c-executeattempt",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-32",
+      "source": "pay-e-attemptstarted",
+      "target": "conn-p-dispatch",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-33",
+      "source": "conn-p-dispatch",
+      "target": "conn-c-submit",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-34",
+      "source": "pay-e-attemptstarted",
+      "target": "conn-p-statussync",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-35",
+      "source": "conn-p-statussync",
+      "target": "conn-c-syncstatus",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-36",
+      "source": "pay-e-attemptfailed",
+      "target": "pay-p-retry",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-37",
+      "source": "pay-p-retry",
+      "target": "pay-c-executeattempt",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-38",
+      "source": "pay-e-failed",
+      "target": "invc-p-dunningstart",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-39",
+      "source": "invc-p-dunningstart",
+      "target": "invc-c-startdunning",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-40",
+      "source": "invc-e-dunning",
+      "target": "invc-p-dunningschedule",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-41",
+      "source": "invc-p-dunningschedule",
+      "target": "pay-c-autocharge",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-42",
+      "source": "pay-e-failed",
+      "target": "invc-p-dunningexhausted",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-43",
+      "source": "invc-p-dunningexhausted",
+      "target": "invc-c-writeoff",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-44",
+      "source": "pay-e-succeeded",
+      "target": "ledg-p-booking",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-45",
+      "source": "ledg-p-booking",
+      "target": "ledg-c-book",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-46",
+      "source": "pay-e-succeeded",
+      "target": "invc-p-settle",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-47",
+      "source": "invc-p-settle",
+      "target": "invc-c-applypayment",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-48",
+      "source": "pay-e-succeeded",
+      "target": "noti-p-notify",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-49",
+      "source": "invc-e-dunning",
+      "target": "noti-p-notify",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-50",
+      "source": "noti-p-notify",
+      "target": "noti-c-send",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-51",
+      "source": "pay-e-actionrequired",
+      "target": "pay-rm-checkout",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-52",
+      "source": "pay-rm-checkout",
+      "target": "act-customer",
+      "relation": "informs"
+    },
+    {
+      "id": "ed-53",
+      "source": "pay-e-verified",
+      "target": "pay-rm-methods",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-54",
+      "source": "pay-e-methoddeactivated",
+      "target": "pay-rm-methods",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-55",
+      "source": "pay-rm-methods",
+      "target": "act-customer",
+      "relation": "informs"
+    },
+    {
+      "id": "ed-56",
+      "source": "invc-e-committed",
+      "target": "invc-rm-unpaid",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-57",
+      "source": "invc-e-paid",
+      "target": "invc-rm-unpaid",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-58",
+      "source": "invc-rm-unpaid",
+      "target": "act-customer",
+      "relation": "informs"
+    },
+    {
+      "id": "ed-59",
+      "source": "pay-e-succeeded",
+      "target": "pay-rm-status",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-60",
+      "source": "pay-e-attemptstarted",
+      "target": "pay-rm-status",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-61",
+      "source": "pay-rm-status",
+      "target": "act-customer",
+      "relation": "informs"
+    },
+    {
+      "id": "ed-62",
+      "source": "conn-e-onboarded",
+      "target": "conn-rm-capmatrix",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-63",
+      "source": "conn-e-suspended",
+      "target": "conn-rm-capmatrix",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-64",
+      "source": "conn-rm-capmatrix",
+      "target": "act-operator",
+      "relation": "informs"
+    },
+    {
+      "id": "ed-65",
+      "source": "conn-e-result",
+      "target": "pay-p-resolve",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-66",
+      "source": "pay-p-resolve",
+      "target": "pay-c-resolveattempt",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-67",
+      "source": "pay-c-resolveattempt",
+      "target": "pay-e-succeeded",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-68",
+      "source": "pay-c-resolveattempt",
+      "target": "pay-e-attemptfailed",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-69",
+      "source": "pay-c-resolveattempt",
+      "target": "pay-e-expired",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-70",
+      "source": "pay-e-attemptfailed",
+      "target": "pay-p-opfail",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-71",
+      "source": "pay-p-opfail",
+      "target": "pay-c-failoperation",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-72",
+      "source": "pay-c-failoperation",
+      "target": "pay-e-failed",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-73",
+      "source": "invc-e-writtenoff",
+      "target": "ledg-p-booking",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-74",
+      "source": "invc-e-dunning",
+      "target": "invc-rm-unpaid",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-75",
+      "source": "pay-e-failed",
+      "target": "pay-rm-status",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-77",
+      "source": "noti-c-send",
+      "target": "ext-delivery",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-78",
+      "source": "invc-e-paid",
+      "target": "invc-p-dunningterminate",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-79",
+      "source": "invc-e-voided",
+      "target": "invc-p-dunningterminate",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-80",
+      "source": "invc-p-dunningterminate",
+      "target": "invc-c-stopdunning",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-81",
+      "source": "invc-c-stopdunning",
+      "target": "invc-e-dunningended",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-82",
+      "source": "invc-e-writtenoff",
+      "target": "invc-p-dunningterminate",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-83",
+      "source": "invc-e-paid",
+      "target": "pay-p-close",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-84",
+      "source": "invc-e-voided",
+      "target": "pay-p-close",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-85",
+      "source": "invc-e-writtenoff",
+      "target": "pay-p-close",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-86",
+      "source": "pay-p-close",
+      "target": "pay-c-closepayment",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-87",
+      "source": "pay-c-closepayment",
+      "target": "pay-e-closed",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-88",
+      "source": "invc-p-dunningschedule",
+      "target": "noti-c-send",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-89",
+      "source": "pay-e-expired",
+      "target": "pay-p-opfail",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-90",
+      "source": "conn-e-result",
+      "target": "pay-rm-checkout",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-91",
+      "source": "invc-e-voided",
+      "target": "invc-rm-unpaid",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-92",
+      "source": "invc-e-writtenoff",
+      "target": "invc-rm-unpaid",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-93",
+      "source": "invc-e-dunningended",
+      "target": "invc-rm-unpaid",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-94",
+      "source": "conn-c-submit",
+      "target": "ext-provider",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-95",
+      "source": "act-operator",
+      "target": "pay-c-requestrefund",
+      "relation": "issues"
+    },
+    {
+      "id": "ed-97",
+      "source": "act-operator",
+      "target": "conn-c-onboard",
+      "relation": "issues"
+    },
+    {
+      "id": "ed-98",
+      "source": "conn-c-onboard",
+      "target": "conn-e-onboarded",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-99",
+      "source": "act-customer",
+      "target": "pay-c-bind",
+      "relation": "issues"
+    },
+    {
+      "id": "ed-100",
+      "source": "pay-c-bind",
+      "target": "pay-e-bound",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-101",
+      "source": "pay-e-bound",
+      "target": "pay-p-verification",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-102",
+      "source": "pay-p-verification",
+      "target": "pay-c-verify",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-103",
+      "source": "pay-c-verify",
+      "target": "pay-e-verified",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-104",
+      "source": "act-customer",
+      "target": "pay-c-grantmandate",
+      "relation": "issues"
+    },
+    {
+      "id": "ed-105",
+      "source": "pay-c-grantmandate",
+      "target": "pay-e-mandate",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-106",
+      "source": "pay-e-refundrequested",
+      "target": "pay-p-refundexec",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-107",
+      "source": "pay-p-refundexec",
+      "target": "pay-c-executeattempt",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-108",
+      "source": "pay-c-resolveattempt",
+      "target": "pay-e-refunded",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-109",
+      "source": "pay-c-failoperation",
+      "target": "pay-e-refundfailed",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-110",
+      "source": "pay-e-refunded",
+      "target": "ledg-p-booking",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-111",
+      "source": "disp-e-chargeback",
+      "target": "ledg-p-booking",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-112",
+      "source": "disp-e-reinstated",
+      "target": "ledg-p-booking",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-113",
+      "source": "ext-provider",
+      "target": "disp-e-outcome",
+      "relation": "emits"
+    },
+    {
+      "id": "ed-114",
+      "source": "ext-provider",
+      "target": "disp-e-reinstated",
+      "relation": "emits"
+    },
+    {
+      "id": "ed-115",
+      "source": "disp-e-evidencedue",
+      "target": "disp-p-deadline",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-116",
+      "source": "disp-p-deadline",
+      "target": "noti-c-send",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-117",
+      "source": "act-operator",
+      "target": "disp-c-markresponded",
+      "relation": "issues"
+    },
+    {
+      "id": "ed-118",
+      "source": "disp-c-markresponded",
+      "target": "disp-e-responded",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-119",
+      "source": "act-operator",
+      "target": "disp-c-recordoutcome",
+      "relation": "issues"
+    },
+    {
+      "id": "ed-120",
+      "source": "disp-c-recordoutcome",
+      "target": "disp-e-outcome",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-121",
+      "source": "recn-e-ingested",
+      "target": "recn-p-match",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-122",
+      "source": "recn-p-match",
+      "target": "recn-c-match",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-123",
+      "source": "recn-c-match",
+      "target": "recn-e-discrepancy",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-124",
+      "source": "act-operator",
+      "target": "recn-c-resolve",
+      "relation": "issues"
+    },
+    {
+      "id": "ed-125",
+      "source": "recn-c-resolve",
+      "target": "recn-e-resolved",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-126",
+      "source": "recn-e-resolved",
+      "target": "ledg-p-booking",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-127",
+      "source": "disp-e-opened",
+      "target": "disp-rm-open",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-128",
+      "source": "disp-e-evidencedue",
+      "target": "disp-rm-open",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-129",
+      "source": "disp-e-responded",
+      "target": "disp-rm-open",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-130",
+      "source": "disp-e-outcome",
+      "target": "disp-rm-open",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-131",
+      "source": "disp-rm-open",
+      "target": "act-operator",
+      "relation": "informs"
+    },
+    {
+      "id": "ed-132",
+      "source": "recn-e-discrepancy",
+      "target": "recn-rm-open",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-133",
+      "source": "recn-e-resolved",
+      "target": "recn-rm-open",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-134",
+      "source": "recn-rm-open",
+      "target": "act-operator",
+      "relation": "informs"
+    },
+    {
+      "id": "ed-135",
+      "source": "act-operator",
+      "target": "conn-c-suspendprov",
+      "relation": "issues"
+    },
+    {
+      "id": "ed-136",
+      "source": "conn-c-suspendprov",
+      "target": "conn-e-suspended",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-137",
+      "source": "act-customer",
+      "target": "pay-c-revokemandate",
+      "relation": "issues"
+    },
+    {
+      "id": "ed-138",
+      "source": "pay-c-revokemandate",
+      "target": "pay-e-mandaterevoked",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-139",
+      "source": "act-customer",
+      "target": "pay-c-deactivatemethod",
+      "relation": "issues"
+    },
+    {
+      "id": "ed-140",
+      "source": "pay-c-deactivatemethod",
+      "target": "pay-e-methoddeactivated",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-141",
+      "source": "pay-e-mandaterevoked",
+      "target": "pay-p-revocationcascade",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-142",
+      "source": "pay-p-revocationcascade",
+      "target": "conn-c-revokeprovider",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-143",
+      "source": "conn-c-revokeprovider",
+      "target": "ext-provider",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-144",
+      "source": "pay-e-mandaterevoked",
+      "target": "invc-p-dunningpause",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-145",
+      "source": "pay-e-methoddeactivated",
+      "target": "invc-p-dunningpause",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-146",
+      "source": "invc-p-dunningpause",
+      "target": "invc-c-pausedunning",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-147",
+      "source": "invc-c-pausedunning",
+      "target": "invc-e-dunningpaused",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-148",
+      "source": "invc-e-dunningpaused",
+      "target": "invc-rm-unpaid",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-149",
+      "source": "pay-c-verify",
+      "target": "pay-e-verifyfailed",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-150",
+      "source": "pay-e-verifyfailed",
+      "target": "pay-rm-methods",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-151",
+      "source": "pay-c-verify",
+      "target": "ext-provider",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-152",
+      "source": "conn-e-suspended",
+      "target": "pay-rm-methods",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-153",
+      "source": "pay-e-refunded",
+      "target": "pay-rm-status",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-154",
+      "source": "pay-e-refundfailed",
+      "target": "pay-rm-status",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-155",
+      "source": "pay-rm-status",
+      "target": "act-operator",
+      "relation": "informs"
+    },
+    {
+      "id": "ed-156",
+      "source": "act-operator",
+      "target": "conn-c-syncstatus",
+      "relation": "issues"
+    },
+    {
+      "id": "ed-157",
+      "source": "pay-c-bind",
+      "target": "ext-provider",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-158",
+      "source": "ext-provider",
+      "target": "pay-e-provrefund",
+      "relation": "emits"
+    },
+    {
+      "id": "ed-159",
+      "source": "pay-e-provrefund",
+      "target": "pay-p-provinitiated",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-160",
+      "source": "pay-p-provinitiated",
+      "target": "pay-c-recordprovrefund",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-161",
+      "source": "pay-c-recordprovrefund",
+      "target": "pay-e-refunded",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-162",
+      "source": "conn-e-result",
+      "target": "recn-p-unmatched",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-163",
+      "source": "disp-e-chargeback",
+      "target": "recn-p-unmatched",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-164",
+      "source": "recn-p-unmatched",
+      "target": "recn-c-recordunmatched",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-165",
+      "source": "recn-c-recordunmatched",
+      "target": "recn-e-discrepancy",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-166",
+      "source": "pay-c-recordprovrefund",
+      "target": "recn-e-discrepancy",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-167",
+      "source": "act-operator",
+      "target": "disp-c-recordchargeback",
+      "relation": "issues"
+    },
+    {
+      "id": "ed-168",
+      "source": "disp-c-recordchargeback",
+      "target": "disp-e-chargeback",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-169",
+      "source": "disp-c-recordoutcome",
+      "target": "disp-e-reinstated",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-170",
+      "source": "disp-e-chargeback",
+      "target": "disp-rm-open",
+      "relation": "updates"
+    },
+    {
+      "id": "ed-171",
+      "source": "conn-c-onboard",
+      "target": "conn-ag-connector",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-172",
+      "source": "conn-c-suspendprov",
+      "target": "conn-ag-connector",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-173",
+      "source": "conn-c-syncstatus",
+      "target": "ext-provider",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-174",
+      "source": "disp-c-markresponded",
+      "target": "disp-ag-dispute",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-175",
+      "source": "disp-c-recordoutcome",
+      "target": "disp-ag-dispute",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-176",
+      "source": "disp-c-recordchargeback",
+      "target": "disp-ag-dispute",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-177",
+      "source": "invc-c-draft",
+      "target": "invc-ag-invoice",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-178",
+      "source": "invc-c-commit",
+      "target": "invc-ag-invoice",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-179",
+      "source": "invc-c-void",
+      "target": "invc-ag-invoice",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-180",
+      "source": "invc-c-writeoff",
+      "target": "invc-ag-invoice",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-181",
+      "source": "invc-c-applypayment",
+      "target": "invc-ag-invoice",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-182",
+      "source": "invc-c-startdunning",
+      "target": "invc-ag-dunning",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-183",
+      "source": "invc-c-stopdunning",
+      "target": "invc-ag-dunning",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-184",
+      "source": "invc-c-pausedunning",
+      "target": "invc-ag-dunning",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-185",
+      "source": "ledg-c-book",
+      "target": "ledg-ag-entry",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-186",
+      "source": "pay-c-grantmandate",
+      "target": "pay-ag-mandate",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-187",
+      "source": "pay-c-revokemandate",
+      "target": "pay-ag-mandate",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-188",
+      "source": "pay-c-deactivatemethod",
+      "target": "pay-ag-method",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-189",
+      "source": "pay-c-bind",
+      "target": "pay-ag-method",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-190",
+      "source": "pay-c-verify",
+      "target": "pay-ag-method",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-191",
+      "source": "pay-c-autocharge",
+      "target": "pay-ag-payment",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-192",
+      "source": "pay-c-payinvoice",
+      "target": "pay-ag-payment",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-193",
+      "source": "pay-c-executeattempt",
+      "target": "pay-ag-payment",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-194",
+      "source": "pay-c-resolveattempt",
+      "target": "pay-ag-payment",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-195",
+      "source": "pay-c-failoperation",
+      "target": "pay-ag-payment",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-196",
+      "source": "pay-c-closepayment",
+      "target": "pay-ag-payment",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-197",
+      "source": "pay-c-requestrefund",
+      "target": "pay-ag-payment",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-198",
+      "source": "pay-c-recordprovrefund",
+      "target": "pay-ag-payment",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-199",
+      "source": "recn-c-match",
+      "target": "recn-ag-report",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-200",
+      "source": "recn-c-resolve",
+      "target": "recn-ag-discrepancy",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-201",
+      "source": "recn-c-recordunmatched",
+      "target": "recn-ag-discrepancy",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-202",
+      "source": "noti-c-send",
+      "target": "noti-ag-notification",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-203",
+      "source": "conn-e-onboarded",
+      "target": "ledg-p-provision",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-204",
+      "source": "ledg-p-provision",
+      "target": "ledg-c-openaccount",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-205",
+      "source": "ledg-c-openaccount",
+      "target": "ledg-e-accountopened",
+      "relation": "produces"
+    },
+    {
+      "id": "ed-206",
+      "source": "ledg-c-openaccount",
+      "target": "ledg-ag-account",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-207",
+      "source": "conn-c-submit",
+      "target": "cons-gateway",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-208",
+      "source": "conn-c-onboard",
+      "target": "cons-merchmodel",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-209",
+      "source": "pay-c-autocharge",
+      "target": "cons-chargeable",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-210",
+      "source": "pay-c-payinvoice",
+      "target": "cons-chargeable",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-211",
+      "source": "pay-c-payinvoice",
+      "target": "cons-collectible",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-212",
+      "source": "pay-c-autocharge",
+      "target": "cons-collectible",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-213",
+      "source": "invc-c-commit",
+      "target": "cons-immutable",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-214",
+      "source": "invc-c-void",
+      "target": "cons-paidnovoid",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-215",
+      "source": "pay-c-payinvoice",
+      "target": "cons-closednop",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-216",
+      "source": "pay-c-autocharge",
+      "target": "cons-closednop",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-217",
+      "source": "pay-c-requestrefund",
+      "target": "cons-headroom",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-218",
+      "source": "pay-c-payinvoice",
+      "target": "cons-suspended",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-219",
+      "source": "pay-c-autocharge",
+      "target": "cons-suspended",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-220",
+      "source": "pay-c-requestrefund",
+      "target": "cons-suspended",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-221",
+      "source": "pay-c-resolveattempt",
+      "target": "cons-noregress",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-222",
+      "source": "pay-c-executeattempt",
+      "target": "cons-doublecharge",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-223",
+      "source": "ledg-c-book",
+      "target": "cons-entryrules",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-224",
+      "source": "disp-c-recordoutcome",
+      "target": "cons-disputeidem",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-225",
+      "source": "disp-c-recordchargeback",
+      "target": "cons-disputeidem",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-226",
+      "source": "pay-c-autocharge",
+      "target": "cons-mandate",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-227",
+      "source": "conn-c-submit",
+      "target": "pay-ag-payment",
+      "relation": "handledBy"
+    },
+    {
+      "id": "ed-228",
+      "source": "conn-c-syncstatus",
+      "target": "pay-ag-payment",
+      "relation": "handledBy"
+    }
+  ]
+}
