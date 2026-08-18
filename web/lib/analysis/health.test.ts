@@ -202,6 +202,39 @@ describe("analyzeModel", () => {
     });
   });
 
+  describe("undeclared-branch [us-00034-AC-4.1/4.2]", () => {
+    // A Policy invoking several Commands reads as "all of them"; `dispatch` is what
+    // says they are alternatives. Without it the model cannot say which it means.
+    const branching = (id: string, dispatch?: "parallel" | "exclusive") => ({
+      nodes: [
+        { ...node(id, "policy"), data: { label: id, ...(dispatch ? { dispatch } : {}) } },
+        node(`${id}-a`, "command"),
+        node(`${id}-b`, "command"),
+      ],
+      edges: [edge(id, `${id}-a`, "invokes"), edge(id, `${id}-b`, "invokes")],
+    });
+
+    it("reports a Policy invoking two Commands with no dispatch", () => {
+      const { nodes, edges } = branching("p1");
+      const found = types(nodes, edges, "undeclared-branch");
+      expect(found).toHaveLength(1);
+      expect(found[0].elementIds).toEqual(["p1"]);
+      expect(found[0].severity).toBe("info");
+    });
+
+    it("says nothing once the Policy declares its dispatch, either way", () => {
+      for (const dispatch of ["exclusive", "parallel"] as const) {
+        const { nodes, edges } = branching("p1", dispatch);
+        expect(types(nodes, edges, "undeclared-branch")).toHaveLength(0);
+      }
+    });
+
+    it("leaves a Policy invoking one Command alone — one command cannot be ambiguous", () => {
+      const nodes = [node("p1", "policy"), node("c1", "command")];
+      expect(types(nodes, [edge("p1", "c1", "invokes")], "undeclared-branch")).toHaveLength(0);
+    });
+  });
+
   it("scales to a few hundred elements without blowing up (spec-00007-XAC-2.1)", () => {
     // 299 command→event pairs plus one orphan event e0 (no producer): ~599 nodes.
     const nodes: ESNode[] = [node("e0", "domainEvent")];

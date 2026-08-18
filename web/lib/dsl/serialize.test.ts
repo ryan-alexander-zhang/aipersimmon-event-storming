@@ -129,6 +129,30 @@ describe("serialize v2 (T2/RT1)", () => {
     expect(out.nodes[0].properties.execution).toBe("manual");
   });
 
+  it("round-trips a Policy's dispatch [us-00034-AC-3.1]", () => {
+    const nodes: ESNode[] = [
+      {
+        id: "p1",
+        type: "policy",
+        position: { x: 0, y: 0 },
+        data: {
+          label: "Review or approve",
+          condition: "amount over the review threshold",
+          parameters: [{ name: "reviewThreshold", value: "10000" }],
+          dispatch: "exclusive",
+        },
+      },
+    ];
+    const back = fromModel(toModel(nodes, [], [], META));
+    expect(back.nodes[0].data).toMatchObject({
+      condition: "amount over the review threshold",
+      parameters: [{ name: "reviewThreshold", value: "10000" }],
+      dispatch: "exclusive",
+    });
+    const out = JSON.parse(exportJSON(nodes, [], [], META));
+    expect(out.nodes[0].properties.dispatch).toBe("exclusive");
+  });
+
   it("omits absent rule fields on export [us-00026-AC-4.1]", () => {
     const nodes: ESNode[] = [
       { id: "p1", type: "policy", position: { x: 0, y: 0 }, data: { label: "P" } },
@@ -138,6 +162,8 @@ describe("serialize v2 (T2/RT1)", () => {
     expect(out.nodes[0].properties.execution).toBeUndefined();
     expect(out.nodes[0].properties.parameters).toBeUndefined();
     expect(out.nodes[0].properties.rule).toBeUndefined();
+    // absent dispatch means parallel; it is never written out (us-00034-AC-2.1)
+    expect(out.nodes[0].properties.dispatch).toBeUndefined();
   });
 
   it("imports a pre-spec v4.0 file without the rule fields unchanged [spec-00011-XAC-1.1]", () => {
@@ -157,6 +183,7 @@ describe("serialize v2 (T2/RT1)", () => {
       const back = fromModel(result.model);
       expect(back.nodes[0].data.condition).toBeUndefined();
       expect(back.nodes[0].data.execution).toBeUndefined();
+      expect(back.nodes[0].data.dispatch).toBeUndefined(); // us-00034-AC-3.2
       expect(back.nodes[1].data.rule).toBeUndefined();
     }
   });

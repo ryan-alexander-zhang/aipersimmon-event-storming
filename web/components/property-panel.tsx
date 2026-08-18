@@ -354,6 +354,27 @@ export function PropertyPanel() {
               <option value="manual">Manual</option>
             </select>
           </label>
+          {/* Whether the invoked Commands all happen or exactly one does — the branch
+              itself; the Condition above says which way it goes (decision-00012). */}
+          <label className="block text-xs font-medium text-zinc-600">
+            Dispatch
+            <select
+              className={field}
+              value={node.data.dispatch ?? ""}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  dispatch: (e.target.value || undefined) as
+                    | "parallel"
+                    | "exclusive"
+                    | undefined,
+                })
+              }
+            >
+              <option value="">—</option>
+              <option value="parallel">Parallel — all of them</option>
+              <option value="exclusive">Exclusive — one of them</option>
+            </select>
+          </label>
           <div className="text-xs font-medium text-zinc-600">
             Parameters
             <div className="mt-1 flex flex-col gap-1">

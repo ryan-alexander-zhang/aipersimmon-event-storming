@@ -47,10 +47,12 @@ CTX_RELS = GRAMMAR["contextRelations"]
 PROPS = {"description": None, "pivotal": {"domainEvent"}, "state": {"hotspot"},
          "kind": {"hotspot"}, "priority": {"hotspot"}, "resolution": {"hotspot"},
          "resolvedAt": {"hotspot"}, "condition": {"policy"},
-         "execution": {"policy"}, "parameters": {"policy"}, "rule": {"constraint"}}
+         "execution": {"policy"}, "parameters": {"policy"}, "dispatch": {"policy"},
+         "rule": {"constraint"}}
 
 ENUMS = {"state": ["open", "resolved"], "kind": ["conflict", "question", "risk"],
-         "priority": ["low", "medium", "high"], "execution": ["automatic", "manual"]}
+         "priority": ["low", "medium", "high"], "execution": ["automatic", "manual"],
+         "dispatch": ["parallel", "exclusive"]}
 
 # An aggregate over these is doing too much (matches the editor's health check).
 AGG_MAX_COMMANDS = 5
@@ -231,6 +233,10 @@ def check_health(nodes, edges, level, ctx_ids):
                 warn(f"policy '{n['label']}': no domain event triggers it")
             if not any(r == "invokes" for _, r in out[nid]):
                 warn(f"policy '{n['label']}': it invokes no command")
+            invoked = sum(1 for _, r in out[nid] if r == "invokes")
+            if invoked > 1 and not n.get("properties", {}).get("dispatch"):
+                warn(f"policy '{n['label']}': invokes {invoked} commands with no dispatch "
+                     "- alternatives (exclusive) or all of them (parallel)?")
             if "execution" not in n.get("properties", {}):
                 warn(f"policy '{n['label']}': no execution - automatic or manual?")
 

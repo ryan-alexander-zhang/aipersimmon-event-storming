@@ -40,9 +40,16 @@ _Avoid_: aggregate, validation, guard.
 **Policy**:
 A reaction rule of the form "when X happens, do Y" that connects a Domain Event
 to a Command. The lilac sticky. Carries optional **condition** (the guard "if"),
-**execution** (automatic or manual), and **parameters** (named thresholds)
-(spec-00011).
+**execution** (automatic or manual), **parameters** (named thresholds), and
+**dispatch** (spec-00011).
 _Avoid_: rule, reactor, saga.
+
+**Dispatch**:
+Whether the Commands a Policy invokes all happen (**parallel**) or exactly one of
+them does (**exclusive**) — the Policy is then the branch point, and its condition
+says which way. Absent means parallel. It records what the branch is; nothing
+evaluates it (decision-00012).
+_Avoid_: gateway, branch, XOR, fan-out.
 
 **Read Model**:
 The information an Actor needs to decide on a Command. The green sticky.

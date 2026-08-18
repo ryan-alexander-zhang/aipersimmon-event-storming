@@ -28,11 +28,15 @@ Scope decided (single-user, no backend, option B only): add **optional**
 attributes, edited in the property panel, persisted as additive DSL fields.
 No new element, no new relation, no grammar change, no rule evaluation.
 
+US34 adds a fifth optional attribute, `dispatch`, under the same terms: an attribute on
+Policy, no new element and no new relation (decision-00012).
+
 **Deferred (recorded here, not built)**: a full Given-When-Then rule editor
 (idea-00002 option C); a **Process/Saga** element for multi-step orchestration
 (option D); model-health findings over the new fields (e.g. a manual Policy with
 no deciding Actor, or `parameters` without a `condition`) — a natural follow-up,
-but out of this spec.
+but out of this spec, except the one US34 needs for its own ambiguity
+(us-00034-FR-4: more than one invoked Command and no `dispatch`).
 
 ## 2. User Stories
 
@@ -40,6 +44,7 @@ but out of this spec.
 | --- | --- | --- | --- |
 | US26 | [us-00026-policy-rule-detail](../us/us-00026-policy-rule-detail.md) | active | Policy carries condition / execution (auto·manual) / named parameters |
 | US27 | [us-00027-constraint-rule](../us/us-00027-constraint-rule.md) | active | Constraint carries its invariant rule, distinct from description |
+| US34 | [us-00034-policy-branch-dispatch](../us/us-00034-policy-branch-dispatch.md) | resolved | Policy says whether the Commands it invokes are alternatives (`dispatch`) |
 
 ## 3. Cross-cutting requirements
 

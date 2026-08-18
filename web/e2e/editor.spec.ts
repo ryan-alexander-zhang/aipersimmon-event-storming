@@ -2409,3 +2409,37 @@ test("an External System issues a Command, as well as handling one [issue-00037,
   await expect(nodes(page, "command")).toHaveCount(2);
   await expect(page.getByText("handledBy", { exact: true })).toBeVisible();
 });
+
+test("a Policy marks its two Commands as alternatives, and health asks when it does not [us-00034-AC-1.1/1.2/4.1]", async ({
+  page,
+}) => {
+  await openBoard(page); // Design
+  await palette(page, "Policy"); // created and selected
+  await page.getByLabel("Condition").fill("order amount over the review threshold");
+  await slice(page, "+ Command (invokes)");
+  await nodes(page, "policy").click();
+  await slice(page, "+ Command (invokes)");
+  await expect(nodes(page, "command")).toHaveCount(2);
+  // Nothing set yet: the sticky claims nothing about the two commands (us-00034-AC-2.1)
+  await expect(nodes(page, "policy")).not.toContainText("one of");
+
+  // Two invoked Commands and nothing saying whether both happen: health asks for it.
+  const health = page.getByRole("button", { name: "Health", exact: true });
+  const finding = page.getByTestId("health-panel").getByTestId("health-finding");
+  await health.click();
+  await expect(finding.filter({ hasText: "alternatives" })).toBeVisible();
+  await health.click();
+
+  // Declaring the branch answers it, and the sticky says so.
+  await nodes(page, "policy").click();
+  await page.getByLabel("Dispatch").selectOption("exclusive");
+  await expect(nodes(page, "policy")).toContainText("one of");
+  await health.click();
+  await expect(finding.filter({ hasText: "alternatives" })).toHaveCount(0);
+  await health.click();
+
+  // Back to parallel → the marker goes (us-00034-AC-1.2)
+  await nodes(page, "policy").click();
+  await page.getByLabel("Dispatch").selectOption("parallel");
+  await expect(nodes(page, "policy")).not.toContainText("one of");
+});

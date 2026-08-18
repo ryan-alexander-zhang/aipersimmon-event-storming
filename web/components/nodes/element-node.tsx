@@ -178,11 +178,20 @@ function ElementNodeInner({ id, type, data, selected }: NodeProps<ESNode>) {
           )}
         </div>
       )}
-      {type === "policy" && data.execution && (
+      {type === "policy" && (data.execution || data.dispatch === "exclusive") && (
         <div className="mt-1 flex flex-wrap gap-1">
-          <span className="rounded bg-white/50 px-1 text-[9px] font-semibold uppercase tracking-wide">
-            {data.execution}
-          </span>
+          {data.execution && (
+            <span className="rounded bg-white/50 px-1 text-[9px] font-semibold uppercase tracking-wide">
+              {data.execution}
+            </span>
+          )}
+          {/* Only `exclusive` is marked: parallel is what an unmarked Policy already
+              means, so saying it would be noise (us-00034-AC-2.1). */}
+          {data.dispatch === "exclusive" && (
+            <span className="rounded bg-white/50 px-1 text-[9px] font-semibold uppercase tracking-wide">
+              one of
+            </span>
+          )}
         </div>
       )}
     </div>

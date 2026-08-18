@@ -45,7 +45,7 @@ validator will say so.
 | `command` | an intent, present tense | |
 | `actor` | person or role issuing a command | |
 | `readModel` | the information an actor needs to decide | |
-| `policy` | "when X happened, do Y" | carries `condition`, `execution`, `parameters` |
+| `policy` | "when X happened, do Y" | carries `condition`, `execution`, `parameters`, `dispatch` |
 | `aggregate` | consistency boundary handling a command | design output |
 | `constraint` | precondition that must hold to run a command | design input; carries `rule` |
 | `externalSystem` | outside system, black box | can issue and handle commands, and emit events |
@@ -68,6 +68,7 @@ validator will say so.
 | `condition` | string | the guard, no "if": `"retry attempts < maxRetries"` | `policy` |
 | `execution` | enum | `automatic` \| `manual` | `policy` |
 | `parameters` | array | `[{ "name": "maxRetries", "value": "3" }]`, both strings | `policy` |
+| `dispatch` | enum | `parallel` (all invoked commands) \| `exclusive` (exactly one) | `policy` |
 | `rule` | string | the invariant itself: `"total <= credit limit"` | `constraint` |
 
 Policy full form:
@@ -83,6 +84,8 @@ Policy full form:
 ```
 
 `description` is the prose "when X, do Y". `condition` is the guard only. `parameters` are the named numbers inside the condition or description - name every threshold, timeout, limit and retry count you hear.
+
+`dispatch` is only about the commands this policy invokes: `exclusive` = exactly one of them happens (the policy is a branch point and `condition` says which way), `parallel` = they all happen. Absent means parallel, so set it whenever a policy invokes more than one command.
 
 Constraint full form:
 
@@ -102,7 +105,7 @@ Hotspot full form:
 
 - `order` is an integer on `domainEvent` only. Never put `order` on other types.
 - It is one global sequence across all contexts, starting at 0. Contexts do not restart it.
-- Equal `order` = concurrent events (parallel outcomes, e.g. `Payment Captured` / `Payment Failed`).
+- Equal `order` = events at the same point on the timeline: either genuinely concurrent, or mutually exclusive outcomes of one step (`Payment Captured` / `Payment Failed`). The DSL does not yet distinguish the two - only a policy's `dispatch` says "one of these" (decision-00012).
 - Gaps are allowed but keep it dense; renumber when you insert events.
 - Every `domainEvent` should have an `order`.
 

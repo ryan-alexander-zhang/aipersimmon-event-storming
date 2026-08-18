@@ -14,7 +14,8 @@ export type SmellType =
   | "overloaded-aggregate"
   | "policy-cycle"
   | "unresolved-hotspots"
-  | "unrecorded-resolution";
+  | "unrecorded-resolution"
+  | "undeclared-branch";
 
 export interface Finding {
   id: string;
@@ -159,6 +160,26 @@ export function analyzeModel(nodes: ESNode[], edges: ESEdge[]): Finding[] {
       severity: "warning",
       message: `Reaction cycle: ${cyc.map(label).join(" -> ")}`,
       elementIds: [...cyc],
+    });
+  }
+
+  // undeclared-branch: a Policy invoking several Commands says nothing about whether
+  // they all happen or only one does. Every relation in this DSL reads as "and", so the
+  // model currently claims "all of them" — advisory, because that is often what is
+  // meant; `dispatch` is how the Modeler settles it either way (us-00034-FR-4).
+  const undeclared = nodes.filter(
+    (n) =>
+      n.type === "policy" &&
+      !n.data.dispatch &&
+      (outgoing.get(n.id) ?? []).filter((e) => e.data?.relation === "invokes").length > 1,
+  );
+  if (undeclared.length > 0) {
+    findings.push({
+      id: "undeclared-branch",
+      type: "undeclared-branch",
+      severity: "info",
+      message: `${undeclared.length} policy(s) invoking several commands with no dispatch — alternatives or all of them?`,
+      elementIds: undeclared.map((p) => p.id),
     });
   }
 
