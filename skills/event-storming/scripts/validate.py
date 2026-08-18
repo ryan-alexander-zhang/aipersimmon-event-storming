@@ -47,12 +47,13 @@ CTX_RELS = GRAMMAR["contextRelations"]
 PROPS = {"description": None, "pivotal": {"domainEvent"}, "state": {"hotspot"},
          "kind": {"hotspot"}, "priority": {"hotspot"}, "resolution": {"hotspot"},
          "resolvedAt": {"hotspot"}, "condition": {"policy"},
-         "execution": {"policy"}, "parameters": {"policy"}, "dispatch": {"policy"},
-         "rule": {"constraint"}}
+         "execution": {"policy"}, "parameters": {"policy"}, "rule": {"constraint"},
+         # members of one alternative set happen instead of each other; only the two
+         # element types that represent something happening can belong to one
+         "alternativeSet": {"domainEvent", "command"}}
 
 ENUMS = {"state": ["open", "resolved"], "kind": ["conflict", "question", "risk"],
-         "priority": ["low", "medium", "high"], "execution": ["automatic", "manual"],
-         "dispatch": ["parallel", "exclusive"]}
+         "priority": ["low", "medium", "high"], "execution": ["automatic", "manual"]}
 
 # An aggregate over these is doing too much (matches the editor's health check).
 AGG_MAX_COMMANDS = 5
@@ -223,6 +224,14 @@ def check_health(nodes, edges, level, ctx_ids):
                 warn(f"dangling command '{n['label']}': it produces no domain event")
             if not any(r in ("issues", "invokes") for _, r in inc[nid]):
                 warn(f"command '{n['label']}': nothing issues it and no policy invokes it")
+        for moment, relation in (("policy", "invokes"), ("command", "produces")):
+            if t != moment:
+                continue
+            outcomes = [tid for tid, r in out[nid] if r == relation]
+            sets = {nodes[o].get("properties", {}).get("alternativeSet") for o in outcomes}
+            if len(outcomes) > 1 and (None in sets or len(sets) > 1):
+                warn(f"{t} '{n['label']}': {len(outcomes)} outcomes with no alternative set "
+                     "- alternatives or all of them?")
         if t == "aggregate":
             c = sum(1 for _, r in inc[nid] if r == "handledBy")
             ev = sum(1 for _, r in out[nid] if r == "emits")
@@ -233,12 +242,18 @@ def check_health(nodes, edges, level, ctx_ids):
                 warn(f"policy '{n['label']}': no domain event triggers it")
             if not any(r == "invokes" for _, r in out[nid]):
                 warn(f"policy '{n['label']}': it invokes no command")
-            invoked = sum(1 for _, r in out[nid] if r == "invokes")
-            if invoked > 1 and not n.get("properties", {}).get("dispatch"):
-                warn(f"policy '{n['label']}': invokes {invoked} commands with no dispatch "
-                     "- alternatives (exclusive) or all of them (parallel)?")
             if "execution" not in n.get("properties", {}):
                 warn(f"policy '{n['label']}': no execution - automatic or manual?")
+
+    sets = defaultdict(list)
+    for nid, n in nodes.items():
+        key = n.get("properties", {}).get("alternativeSet")
+        if key:
+            sets[key].append(n["label"])
+    for key, members in sets.items():
+        if len(members) < 2:
+            warn(f"alternative set '{key}': only '{members[0]}' is in it - nothing happens "
+                 "instead of itself")
 
     open_hs = [n for n in nodes.values()
                if n["type"] == "hotspot" and n.get("properties", {}).get("state") != "resolved"]

@@ -220,6 +220,23 @@ export function PropertyPanel() {
         />
       </label>
 
+      {/* An Alternative Set is the fork this board has no room to draw: members happen
+          instead of each other. Only the two elements that represent something happening
+          at a moment can belong to one (decision-00013). */}
+      {(node.type === "domainEvent" || node.type === "command") && (
+        <label className="mt-3 block text-xs font-medium text-zinc-600">
+          Alternative set
+          <input
+            className={field}
+            placeholder="shared key, e.g. charge-outcome"
+            value={node.data.alternativeSet ?? ""}
+            onChange={(e) =>
+              updateNodeData(node.id, { alternativeSet: e.target.value.trim() || undefined })
+            }
+          />
+        </label>
+      )}
+
       {isHotspot && (
         <div className="mt-3 flex flex-col gap-2">
           <label className="flex items-center gap-2 text-sm text-zinc-700">
@@ -352,27 +369,6 @@ export function PropertyPanel() {
               <option value="">—</option>
               <option value="automatic">Automatic</option>
               <option value="manual">Manual</option>
-            </select>
-          </label>
-          {/* Whether the invoked Commands all happen or exactly one does — the branch
-              itself; the Condition above says which way it goes (decision-00012). */}
-          <label className="block text-xs font-medium text-zinc-600">
-            Dispatch
-            <select
-              className={field}
-              value={node.data.dispatch ?? ""}
-              onChange={(e) =>
-                updateNodeData(node.id, {
-                  dispatch: (e.target.value || undefined) as
-                    | "parallel"
-                    | "exclusive"
-                    | undefined,
-                })
-              }
-            >
-              <option value="">—</option>
-              <option value="parallel">Parallel — all of them</option>
-              <option value="exclusive">Exclusive — one of them</option>
             </select>
           </label>
           <div className="text-xs font-medium text-zinc-600">

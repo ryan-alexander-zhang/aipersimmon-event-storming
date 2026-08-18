@@ -6,6 +6,13 @@ status: active
 parent: us-00034-policy-branch-dispatch
 ---
 
+> **The mechanism recorded here was replaced the next day** by
+> [us-00035](../us/us-00035-alternative-sets.md) /
+> [decision-00013](../decision/decision-00013-alternative-sets-recover-the-fork-the-layout-removed.md):
+> `Policy.dispatch` was removed in favour of a named alternative set over the outcomes,
+> because a Domain Event's fork often has no element to carry a marker. This record stands
+> as evidence of what shipped and passed at the time.
+
 # Acceptance record: a Policy says whether its Commands are alternatives
 
 Acceptance evidence for [us-00034](../us/us-00034-policy-branch-dispatch.md) under

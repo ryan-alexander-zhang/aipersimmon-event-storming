@@ -35,6 +35,8 @@ Ask about the unhappy path explicitly - it is the part people forget.
 
 Almost none. Only these are legal here:
 - `externalSystem --emits--> domainEvent`
+
+Two events that are the two ways one moment can go (`Payment Captured` / `Payment Declined`) are alternatives even here, where there are no commands to hang that on: give them the same `alternativeSet` key. See `reference/dsl.md`.
 - `hotspot --annotates--> <any node>`
 - `opportunity --highlights--> <any node>`
 

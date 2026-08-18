@@ -202,36 +202,86 @@ describe("analyzeModel", () => {
     });
   });
 
-  describe("undeclared-branch [us-00034-AC-4.1/4.2]", () => {
-    // A Policy invoking several Commands reads as "all of them"; `dispatch` is what
-    // says they are alternatives. Without it the model cannot say which it means.
-    const branching = (id: string, dispatch?: "parallel" | "exclusive") => ({
-      nodes: [
-        { ...node(id, "policy"), data: { label: id, ...(dispatch ? { dispatch } : {}) } },
-        node(`${id}-a`, "command"),
-        node(`${id}-b`, "command"),
-      ],
-      edges: [edge(id, `${id}-a`, "invokes"), edge(id, `${id}-b`, "invokes")],
+  describe("undeclared-alternatives [us-00035-AC-4.1/4.2/4.3]", () => {
+    // A single moment with several outcomes reads as "all of them"; an alternative set is
+    // what says they happen instead of each other. Only a Policy (one rule firing) and a
+    // Command (one attempt) are moments — an Aggregate is a boundary handling many
+    // Commands over the whole board, so it is never asked (us-00035-FR-8).
+    const inSet = (id: string, type: ElementType, set?: string): ESNode => ({
+      ...node(id, type),
+      data: { label: id, ...(set ? { alternativeSet: set } : {}) },
     });
 
-    it("reports a Policy invoking two Commands with no dispatch", () => {
-      const { nodes, edges } = branching("p1");
-      const found = types(nodes, edges, "undeclared-branch");
+    it("reports a Policy invoking two Commands that are not declared alternatives", () => {
+      const nodes = [node("p1", "policy"), node("c1", "command"), node("c2", "command")];
+      const edges = [edge("p1", "c1", "invokes"), edge("p1", "c2", "invokes")];
+      const found = types(nodes, edges, "undeclared-alternatives");
       expect(found).toHaveLength(1);
       expect(found[0].elementIds).toEqual(["p1"]);
       expect(found[0].severity).toBe("info");
     });
 
-    it("says nothing once the Policy declares its dispatch, either way", () => {
-      for (const dispatch of ["exclusive", "parallel"] as const) {
-        const { nodes, edges } = branching("p1", dispatch);
-        expect(types(nodes, edges, "undeclared-branch")).toHaveLength(0);
-      }
+    it("clears once both Commands share one set", () => {
+      const nodes = [node("p1", "policy"), inSet("c1", "command", "route"), inSet("c2", "command", "route")];
+      const edges = [edge("p1", "c1", "invokes"), edge("p1", "c2", "invokes")];
+      expect(types(nodes, edges, "undeclared-alternatives")).toHaveLength(0);
     });
 
-    it("leaves a Policy invoking one Command alone — one command cannot be ambiguous", () => {
+    it("still asks when the outcomes are in different sets", () => {
+      const nodes = [node("p1", "policy"), inSet("c1", "command", "route"), inSet("c2", "command", "other")];
+      const edges = [edge("p1", "c1", "invokes"), edge("p1", "c2", "invokes")];
+      expect(types(nodes, edges, "undeclared-alternatives")).toHaveLength(1);
+    });
+
+    it("reports a Command producing two Domain Events that are not declared alternatives", () => {
+      const nodes = [node("c1", "command"), node("e1", "domainEvent"), node("e2", "domainEvent")];
+      const edges = [edge("c1", "e1", "produces"), edge("c1", "e2", "produces")];
+      const found = types(nodes, edges, "undeclared-alternatives");
+      expect(found).toHaveLength(1);
+      expect(found[0].elementIds).toEqual(["c1"]);
+    });
+
+    it("says nothing about an Aggregate emitting for two Commands — not one moment", () => {
+      const nodes = [
+        node("c1", "command"),
+        node("c2", "command"),
+        node("ag", "aggregate"),
+        node("e1", "domainEvent"),
+        node("e2", "domainEvent"),
+      ];
+      const edges = [
+        edge("c1", "ag", "handledBy"),
+        edge("c2", "ag", "handledBy"),
+        edge("ag", "e1", "emits"),
+        edge("ag", "e2", "emits"),
+      ];
+      expect(types(nodes, edges, "undeclared-alternatives")).toHaveLength(0);
+    });
+
+    it("leaves one outcome alone — a single outcome cannot be ambiguous", () => {
       const nodes = [node("p1", "policy"), node("c1", "command")];
-      expect(types(nodes, [edge("p1", "c1", "invokes")], "undeclared-branch")).toHaveLength(0);
+      expect(types(nodes, [edge("p1", "c1", "invokes")], "undeclared-alternatives")).toHaveLength(0);
+    });
+  });
+
+  describe("lone-alternative [us-00035-AC-5.1]", () => {
+    it("reports a set with one member — nothing happens instead of itself", () => {
+      const only: ESNode = {
+        ...node("e1", "domainEvent"),
+        data: { label: "e1", alternativeSet: "charge-outcome" },
+      };
+      const found = types([only], [], "lone-alternative");
+      expect(found).toHaveLength(1);
+      expect(found[0].elementIds).toEqual(["e1"]);
+      expect(found[0].message).toContain("charge-outcome");
+    });
+
+    it("says nothing once the set has two members", () => {
+      const member = (id: string): ESNode => ({
+        ...node(id, "domainEvent"),
+        data: { label: id, alternativeSet: "charge-outcome" },
+      });
+      expect(types([member("e1"), member("e2")], [], "lone-alternative")).toHaveLength(0);
     });
   });
 

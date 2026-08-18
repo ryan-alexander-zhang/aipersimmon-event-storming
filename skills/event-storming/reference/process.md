@@ -11,7 +11,7 @@ Work event by event, in `order`. For each event ask the four questions:
 1. **What command caused it?** Add `command --produces--> domainEvent`. If an outside system caused it instead: `command --handledBy--> externalSystem --emits--> domainEvent`, or just the external system emitting it.
 2. **Who issues that command?** A person or role -> `actor --issues--> command`. An outside system asking us to act (a provider callback we may still refuse) -> `externalSystem --issues--> command`. Nobody -> it is automatic, so a policy invokes it (step 4).
 3. **What does the actor need to know first?** -> `readModel`, wired `domainEvent --updates--> readModel --informs--> actor`.
-4. **What reacts to this event automatically?** -> `policy`, wired `domainEvent --triggers--> policy --invokes--> command`. If the reaction goes different ways depending on a condition, that one policy is the branch point: give it the `condition`, wire an `invokes` to each command, and set `dispatch: "exclusive"` so the commands read as alternatives instead of all firing. Two genuinely different rules are still two policies.
+4. **What reacts to this event automatically?** -> `policy`, wired `domainEvent --triggers--> policy --invokes--> command`. If the reaction goes different ways depending on a condition, that one policy is the branch point: give it the `condition`, wire an `invokes` to each command, and put those commands in one `alternativeSet` so they read as alternatives instead of all firing. Two genuinely different rules are still two policies.
 
 Then raise `meta.level` to `"process"`, validate, run the gate.
 
@@ -35,7 +35,7 @@ Ask for the numbers. "Retry a few times" is not an answer: how many, how long be
 - How long do we wait? How many times do we retry? What is the limit?
 - Is this reaction automatic, or does someone have to click it?
 - Does this reaction always do the same thing, or does it go different ways? What decides which way?
-- Which command can fail, and what event does the failure produce?
+- Which command can fail, and what event does the failure produce? Is that failure event an alternative to the success one, or can both happen?
 
 ## Gate
 
@@ -43,6 +43,6 @@ Ask for the numbers. "Retry a few times" is not an answer: how many, how long be
 - [ ] Every `command` has an `issues` from an actor or an external system, or an `invokes` from a policy.
 - [ ] Every actor decision that needs data has a read model informing it.
 - [ ] Every policy has `execution`, plus `condition` and `parameters` where they exist.
-- [ ] Every policy invoking more than one command has `dispatch` - `exclusive` when the commands are alternatives, `parallel` when they all fire (the validator warns when it is missing).
+- [ ] Wherever one moment has several outcomes - a policy invoking several commands, a command producing several events - the outcomes that are alternatives share an `alternativeSet` (the validator warns when nothing says which it is).
 - [ ] Reaction loops are intentional (the validator flags policy cycles - confirm each one is a real retry loop with a bound).
 - [ ] Validator clean.

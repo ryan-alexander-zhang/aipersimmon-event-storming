@@ -40,15 +40,20 @@ _Avoid_: aggregate, validation, guard.
 **Policy**:
 A reaction rule of the form "when X happens, do Y" that connects a Domain Event
 to a Command. The lilac sticky. Carries optional **condition** (the guard "if"),
-**execution** (automatic or manual), **parameters** (named thresholds), and
-**dispatch** (spec-00011).
+**execution** (automatic or manual), and **parameters** (named thresholds)
+(spec-00011).
 _Avoid_: rule, reactor, saga.
 
-**Dispatch**:
-Whether the Commands a Policy invokes all happen (**parallel**) or exactly one of
-them does (**exclusive**) — the Policy is then the branch point, and its condition
-says which way. Absent means parallel. It records what the branch is; nothing
-evaluates it (decision-00012).
+**Alternative Set**:
+A named set whose members happen instead of each other — at most one of them
+happens. Only a Domain Event or a Command can belong to one: they are the two
+elements that represent something happening at a moment. Membership is the shared
+key alone, never derived from edges or from timeline order, so a fork can be
+recorded where the moment itself is not on the board — at Big Picture, for a fact
+arriving from outside, for a deadline elapsing. A set may mix the two types
+("either the customer confirms or the hold expires"). It records what the fork is;
+nothing evaluates it (decision-00013).
+_Avoid_: branch, gateway, XOR, dispatch, exclusive group.
 _Avoid_: gateway, branch, XOR, fan-out.
 
 **Read Model**:

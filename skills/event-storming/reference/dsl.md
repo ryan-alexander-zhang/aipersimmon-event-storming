@@ -12,6 +12,7 @@ validator will say so.
 - Node properties per type (all special parameters)
 - Timeline order
 - Relations (edge rules)
+- Alternative sets (things that happen instead of each other)
 - Contexts and context relationships
 - Level gating
 - Id and label conventions
@@ -45,7 +46,7 @@ validator will say so.
 | `command` | an intent, present tense | |
 | `actor` | person or role issuing a command | |
 | `readModel` | the information an actor needs to decide | |
-| `policy` | "when X happened, do Y" | carries `condition`, `execution`, `parameters`, `dispatch` |
+| `policy` | "when X happened, do Y" | carries `condition`, `execution`, `parameters` |
 | `aggregate` | consistency boundary handling a command | design output |
 | `constraint` | precondition that must hold to run a command | design input; carries `rule` |
 | `externalSystem` | outside system, black box | can issue and handle commands, and emit events |
@@ -68,7 +69,7 @@ validator will say so.
 | `condition` | string | the guard, no "if": `"retry attempts < maxRetries"` | `policy` |
 | `execution` | enum | `automatic` \| `manual` | `policy` |
 | `parameters` | array | `[{ "name": "maxRetries", "value": "3" }]`, both strings | `policy` |
-| `dispatch` | enum | `parallel` (all invoked commands) \| `exclusive` (exactly one) | `policy` |
+| `alternativeSet` | string | shared key; members happen instead of each other, at most one of them does | `domainEvent`, `command` |
 | `rule` | string | the invariant itself: `"total <= credit limit"` | `constraint` |
 
 Policy full form:
@@ -85,7 +86,23 @@ Policy full form:
 
 `description` is the prose "when X, do Y". `condition` is the guard only. `parameters` are the named numbers inside the condition or description - name every threshold, timeout, limit and retry count you hear.
 
-`dispatch` is only about the commands this policy invokes: `exclusive` = exactly one of them happens (the policy is a branch point and `condition` says which way), `parallel` = they all happen. Absent means parallel, so set it whenever a policy invokes more than one command.
+## Alternative sets - things that happen instead of each other
+
+A fork is not drawn on this board (the layout is banded and `order`-driven), so it is written down: give each outcome the same `alternativeSet` key and at most one of them happens.
+
+```json
+{ "id": "pay-e-captured", "type": "domainEvent", "label": "Payment Captured", "order": 4,
+  "properties": { "alternativeSet": "charge-outcome" } }
+{ "id": "pay-e-declined", "type": "domainEvent", "label": "Payment Declined", "order": 4,
+  "properties": { "alternativeSet": "charge-outcome" } }
+```
+
+- Only `domainEvent` and `command` can be in a set - the two types that represent something happening at a moment. Not an aggregate, not a policy, not a read model.
+- Membership is the key alone. It does not come from edges or from `order`, so it works at Big Picture where there are no commands, for a fact arriving from outside, and for a deadline elapsing.
+- Mixing the two types in one set is legal: `Confirm Booking` (command) and `Hold Expired` (event) are one fork.
+- A set needs at least two members; the validator warns about a set of one (usually a typo in the key).
+- The key is a slug you choose, same style as node ids: `charge-outcome`, `review-route`.
+- Where a policy branches, the set goes on the **commands it invokes** and `condition` says which way it goes; the policy itself carries no marker.
 
 Constraint full form:
 
@@ -105,7 +122,7 @@ Hotspot full form:
 
 - `order` is an integer on `domainEvent` only. Never put `order` on other types.
 - It is one global sequence across all contexts, starting at 0. Contexts do not restart it.
-- Equal `order` = events at the same point on the timeline: either genuinely concurrent, or mutually exclusive outcomes of one step (`Payment Captured` / `Payment Failed`). The DSL does not yet distinguish the two - only a policy's `dispatch` says "one of these" (decision-00012).
+- Equal `order` = events at the same point on the timeline. It says nothing about exclusivity: genuinely concurrent events and mutually exclusive outcomes both sit there. An `alternativeSet` is what says "one of these" (see below), and its members may even sit at different `order` values when one branch resolves later.
 - Gaps are allowed but keep it dense; renumber when you insert events.
 - Every `domainEvent` should have an `order`.
 

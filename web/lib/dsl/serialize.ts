@@ -49,7 +49,9 @@ export function toModel(
         ...(n.data.resolvedAt !== undefined ? { resolvedAt: n.data.resolvedAt } : {}),
         ...(n.data.condition !== undefined ? { condition: n.data.condition } : {}),
         ...(n.data.execution !== undefined ? { execution: n.data.execution } : {}),
-        ...(n.data.dispatch !== undefined ? { dispatch: n.data.dispatch } : {}),
+        ...(n.data.alternativeSet !== undefined
+          ? { alternativeSet: n.data.alternativeSet }
+          : {}),
         ...(n.data.parameters !== undefined ? { parameters: n.data.parameters } : {}),
         ...(n.data.rule !== undefined ? { rule: n.data.rule } : {}),
       },
@@ -95,7 +97,9 @@ export function fromModel(model: Model): {
         ...(n.properties.resolvedAt !== undefined ? { resolvedAt: n.properties.resolvedAt } : {}),
         ...(n.properties.condition !== undefined ? { condition: n.properties.condition } : {}),
         ...(n.properties.execution !== undefined ? { execution: n.properties.execution } : {}),
-        ...(n.properties.dispatch !== undefined ? { dispatch: n.properties.dispatch } : {}),
+        ...(n.properties.alternativeSet !== undefined
+          ? { alternativeSet: n.properties.alternativeSet }
+          : {}),
         ...(n.properties.parameters !== undefined ? { parameters: n.properties.parameters } : {}),
         ...(n.properties.rule !== undefined ? { rule: n.properties.rule } : {}),
       },

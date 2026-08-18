@@ -2410,7 +2410,7 @@ test("an External System issues a Command, as well as handling one [issue-00037,
   await expect(page.getByText("handledBy", { exact: true })).toBeVisible();
 });
 
-test("a Policy marks its two Commands as alternatives, and health asks when it does not [us-00034-AC-1.1/1.2/4.1]", async ({
+test("two events are marked as alternatives, and health asks when a moment has undeclared ones [us-00035-AC-1.1/1.2/4.1]", async ({
   page,
 }) => {
   await openBoard(page); // Design
@@ -2420,26 +2420,34 @@ test("a Policy marks its two Commands as alternatives, and health asks when it d
   await nodes(page, "policy").click();
   await slice(page, "+ Command (invokes)");
   await expect(nodes(page, "command")).toHaveCount(2);
-  // Nothing set yet: the sticky claims nothing about the two commands (us-00034-AC-2.1)
-  await expect(nodes(page, "policy")).not.toContainText("one of");
+  // This board has no timeline (no Domain Event), so the free-tiled bands sit off-screen:
+  // frame them before clicking stickies.
+  await page.locator(".react-flow__controls-fitview").click();
+  // Nothing declared yet: no member marker anywhere (us-00035-FR-4)
+  await expect(nodes(page, "command").first()).not.toContainText("one of");
 
-  // Two invoked Commands and nothing saying whether both happen: health asks for it.
+  // One moment (a Policy firing) with two outcomes that are not declared alternatives.
   const health = page.getByRole("button", { name: "Health", exact: true });
   const finding = page.getByTestId("health-panel").getByTestId("health-finding");
   await health.click();
   await expect(finding.filter({ hasText: "alternatives" })).toBeVisible();
   await health.click();
 
-  // Declaring the branch answers it, and the sticky says so.
-  await nodes(page, "policy").click();
-  await page.getByLabel("Dispatch").selectOption("exclusive");
-  await expect(nodes(page, "policy")).toContainText("one of");
+  // Put both Commands in one set → each says it is one of several, and health is answered.
+  for (const i of [0, 1]) {
+    await nodes(page, "command").nth(i).click();
+    await page.getByLabel("Alternative set").fill("route");
+  }
+  await expect(nodes(page, "command").first()).toContainText("one of");
+  await expect(nodes(page, "command").nth(1)).toContainText("one of");
   await health.click();
   await expect(finding.filter({ hasText: "alternatives" })).toHaveCount(0);
   await health.click();
 
-  // Back to parallel → the marker goes (us-00034-AC-1.2)
-  await nodes(page, "policy").click();
-  await page.getByLabel("Dispatch").selectOption("parallel");
-  await expect(nodes(page, "policy")).not.toContainText("one of");
+  // Clearing one member drops its marker, and leaves the other alone in its set (AC-1.2, AC-5.1)
+  await nodes(page, "command").first().click();
+  await page.getByLabel("Alternative set").fill("");
+  await expect(nodes(page, "command").first()).not.toContainText("one of");
+  await health.click();
+  await expect(finding.filter({ hasText: "one member" })).toBeVisible();
 });

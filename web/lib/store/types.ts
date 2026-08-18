@@ -21,7 +21,7 @@ export type ESNodeData = {
   // parameters, Constraint's rule. All optional.
   condition?: string;
   execution?: "automatic" | "manual";
-  dispatch?: "parallel" | "exclusive";
+  alternativeSet?: string;
   parameters?: { name: string; value: string }[];
   rule?: string;
   // bounded context membership; timeline index (Domain Events carry order).

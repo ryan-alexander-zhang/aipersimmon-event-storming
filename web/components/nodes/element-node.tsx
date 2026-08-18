@@ -178,20 +178,24 @@ function ElementNodeInner({ id, type, data, selected }: NodeProps<ESNode>) {
           )}
         </div>
       )}
-      {type === "policy" && (data.execution || data.dispatch === "exclusive") && (
+      {type === "policy" && data.execution && (
         <div className="mt-1 flex flex-wrap gap-1">
-          {data.execution && (
-            <span className="rounded bg-white/50 px-1 text-[9px] font-semibold uppercase tracking-wide">
-              {data.execution}
-            </span>
-          )}
-          {/* Only `exclusive` is marked: parallel is what an unmarked Policy already
-              means, so saying it would be noise (us-00034-AC-2.1). */}
-          {data.dispatch === "exclusive" && (
-            <span className="rounded bg-white/50 px-1 text-[9px] font-semibold uppercase tracking-wide">
-              one of
-            </span>
-          )}
+          <span className="rounded bg-white/50 px-1 text-[9px] font-semibold uppercase tracking-wide">
+            {data.execution}
+          </span>
+        </div>
+      )}
+      {/* Membership of an Alternative Set: this happens instead of its siblings. The set's
+          key is the tooltip rather than the chip — the chip has one line to say what it
+          means, and the sticky has a height ceiling (issue-00036). */}
+      {data.alternativeSet && (
+        <div className="mt-1 flex flex-wrap gap-1">
+          <span
+            title={`one of: ${data.alternativeSet}`}
+            className="rounded bg-white/50 px-1 text-[9px] font-semibold uppercase tracking-wide"
+          >
+            one of
+          </span>
         </div>
       )}
     </div>

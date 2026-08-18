@@ -2,9 +2,15 @@
 id: decision-00012-branching-as-policy-dispatch-not-edge-guards
 type: decision
 role: main
-status: active
+status: archived
 parent: spec-00011-structured-rule-expression
 ---
+
+> **Superseded by [decision-00013](decision-00013-alternative-sets-recover-the-fork-the-layout-removed.md).**
+> Its rejection of edge guards stands and is restated there. Its carrier was wrong: a
+> Domain Event's fork often has no element to hang a marker on (Big Picture has no
+> Commands; an outside fact has no Aggregate; a timeout has nothing), so exclusivity is a
+> named set over the outcomes instead, and `Policy.dispatch` was removed. Kept for history.
 
 # Branching is an exclusivity marker on the Policy, not a guard on the edge
 

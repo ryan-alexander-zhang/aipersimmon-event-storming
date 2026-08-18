@@ -26,10 +26,12 @@ export const propertiesSchema = z.object({
   // condition/execution/parameters are a Policy's; rule is a Constraint's.
   condition: z.string().optional(),
   execution: z.enum(["automatic", "manual"]).optional(),
-  // Whether the Commands a Policy invokes all happen or exactly one does — the
-  // exclusivity a branch needs, on the element rather than on the edges
-  // (decision-00012). Absent = parallel, so every earlier model keeps its meaning.
-  dispatch: z.enum(["parallel", "exclusive"]).optional(),
+  // Members of one Alternative Set happen instead of each other — at most one of them
+  // does. Legal on Domain Event and Command only: they are the two elements that
+  // represent something happening at a moment. Membership is this key alone, never
+  // derived from edges or `order`, so a fork survives where the moment has no element
+  // on the board at all — Big Picture, an outside fact, a deadline (decision-00013).
+  alternativeSet: z.string().min(1).optional(),
   parameters: z.array(z.object({ name: z.string(), value: z.string() })).optional(),
   rule: z.string().optional(),
 });

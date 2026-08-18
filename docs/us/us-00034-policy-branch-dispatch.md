@@ -2,9 +2,17 @@
 id: us-00034-policy-branch-dispatch
 type: us
 role: main
-status: resolved
+status: archived
 parent: spec-00011-structured-rule-expression
 ---
+
+> **Superseded by [us-00035](us-00035-alternative-sets.md)** per
+> [decision-00013](../decision/decision-00013-alternative-sets-recover-the-fork-the-layout-removed.md).
+> It shipped `Policy.dispatch`, which was then removed: a Domain Event's fork often has no
+> element to carry a marker, so exclusivity became a named set over the outcomes, and a
+> Policy's branch is the set over the Commands it invokes. Kept for history; the acceptance
+> evidence in [record-00024](../record/record-00024-policy-branch-dispatch-acceptance.md)
+> describes the mechanism as it was.
 
 # User Story: a Policy says whether its Commands are alternatives
 
