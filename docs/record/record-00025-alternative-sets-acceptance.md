@@ -72,6 +72,13 @@ not to spawn agents. Read the mapping below as self-reported.
 - **Per-type legality is enforced in the panel and the skill, not in Zod.** `propertiesSchema`
   is flat, exactly as it already is for `condition` / `rule` / `execution`; the property panel
   offers the field on Domain Event and Command only.
+- **The skill's `template.json` demonstrates it**, on the case that motivated the design:
+  `Payment Captured` / `Payment Failed` share `alternativeSet: "charge-outcome"`, and their
+  moment — the gateway's response — is an External System `emits`, so no element-anchored
+  marker could have carried it. The stale wording "one of two *concurrent* outcomes" in that
+  event's description is corrected in the same edit. Verified by importing the template into
+  the app: two `one of` chips titled `one of: charge-outcome`, and health reports only the
+  template's deliberate open hotspot.
 - **Existing examples now raise the new advisory**: 6 findings in `examples/big.json`
   (untracked, the user's own) and 1 in `ftgo` (`Create Order Saga` → approve / reject), 0 in
   the other three, whose Commands carry no `produces` edges and whose Policies invoke one

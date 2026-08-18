@@ -90,9 +90,13 @@
       "label": "Payment Captured",
       "context": "pay",
       "order": 2,
-      "properties": { "pivotal": true, "description": "One of two concurrent outcomes of a single charge." }
+      "properties": {
+        "pivotal": true,
+        "description": "One of the two ways a single charge can go - the gateway captures it or it fails.",
+        "alternativeSet": "charge-outcome"
+      }
     },
-    { "id": "pay-e-failed", "type": "domainEvent", "label": "Payment Failed", "context": "pay", "order": 2, "properties": {} },
+    { "id": "pay-e-failed", "type": "domainEvent", "label": "Payment Failed", "context": "pay", "order": 2, "properties": { "alternativeSet": "charge-outcome" } },
     {
       "id": "pay-h-refund",
       "type": "hotspot",

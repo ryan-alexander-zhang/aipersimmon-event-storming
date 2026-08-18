@@ -51,7 +51,7 @@ Grill on: gaps in the story, unhappy paths, who acts, what triggers what, exact 
 
 ## Gates (the user confirms, not you)
 
-- **Big Picture**: events past tense, ordered, story has no gap, pivotal events marked, every unknown captured as a hotspot.
+- **Big Picture**: events past tense, ordered, story has no gap, pivotal events marked, alternative outcomes of one moment share an `alternativeSet`, every unknown captured as a hotspot.
 - **Process**: every event has a producing command or external system; every command has an issuing actor or external system, or an invoking policy; every actor decision has a read model.
 - **Design**: every command is handled by an aggregate or external system; every rule that can block a command is a constraint; every policy has `condition`, `execution`, and `parameters` where they exist.
 - **Context Map**: every context classified; every cross-context seam typed.
