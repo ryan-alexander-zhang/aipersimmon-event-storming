@@ -74,8 +74,16 @@ frame-length guards stayed green throughout.
 
 | guard | before | after | threshold |
 | --- | --- | --- | --- |
-| `a wheel zoom does not re-render the board on every tick` | 5.1ms/tick | 1.8ms/tick | < 3ms |
+| `a wheel zoom does not re-render the board on every tick` | 5.1ms/tick | 1.8ms/tick | < 3ms (**superseded**, see below) |
 | `hover inside a committed scope costs nothing` | 5.8ms/hover-out | 0.24ms/hover-out | < 2ms |
+
+> **The wheel guard's threshold was rewritten by
+> [issue-00038](issue-00038-a-per-event-budget-in-milliseconds-cannot-hold-across-machines.md).**
+> The numbers above are this machine's; an absolute millisecond budget cannot separate the
+> two states on another one — 5.1ms/tick *before* the fix here is lower than the cost
+> *after* it on a slower machine. The guard now compares the wheel tick against a
+> board-free event measured in the same trace (`< 8x`), which holds anywhere. The
+> measurements above stand as the record of the original fix.
 
 Both run on the existing 160-node synthetic board via `openLargeBoard` and read
 `EventDispatch` durations from a CDP `devtools.timeline` trace.

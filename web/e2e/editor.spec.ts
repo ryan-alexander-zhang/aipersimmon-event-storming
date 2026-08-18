@@ -1782,17 +1782,20 @@ async function eventCost(page: Page, gesture: () => Promise<void>) {
   await done;
   await client.detach();
 
-  const totals: Record<string, { ms: number; n: number }> = {};
+  const per: Record<string, number[]> = {};
   for (const e of events) {
     if (e.ph !== "X" || e.name !== "EventDispatch" || !e.dur) continue;
     const type = e.args?.data?.type ?? "?";
-    (totals[type] ??= { ms: 0, n: 0 });
-    totals[type].ms += e.dur / 1000;
-    totals[type].n += 1;
+    (per[type] ??= []).push(e.dur / 1000);
   }
   return (type: string) => {
-    const t = totals[type];
-    return t && t.n >= 5 ? { avg: t.ms / t.n, n: t.n } : null;
+    const ms = (per[type] ?? []).sort((a, b) => a - b);
+    // The median, not the mean: a handful of ticks land on a frame that also does layout
+    // or GC, which drags the mean far above what an event actually costs (issue-00038 —
+    // measured here, 20 ticks: median 4.4ms, mean 7.8ms, max 17ms).
+    return ms.length >= 5
+      ? { median: ms[Math.floor(ms.length / 2)], avg: ms.reduce((a, b) => a + b, 0) / ms.length, n: ms.length }
+      : null;
   };
 }
 
@@ -1808,13 +1811,26 @@ test("a wheel zoom does not re-render the board on every tick [issue-00028]", as
       await page.mouse.wheel(0, -25);
       await page.waitForTimeout(30);
     }
+    // A yardstick from the same trace on the same machine: mousedown does no board work,
+    // so it measures this machine's fixed per-event overhead (issue-00038).
+    for (let i = 0; i < 6; i++) {
+      await page.mouse.down();
+      await page.mouse.up();
+      await page.waitForTimeout(40);
+    }
   });
   const wheel = cost("wheel");
-  expect(wheel).not.toBeNull();
-  // Reading the raw zoom in the board component re-rendered the whole tree per tick,
-  // for a semantic-zoom band that only changes at a threshold. Measured on this board:
-  // 5.1ms per tick before, 1.8ms after.
-  expect(wheel!.avg).toBeLessThan(3);
+  const plain = cost("mousedown");
+  expect(wheel && plain).toBeTruthy();
+  // Reading the raw zoom in the board component re-rendered the whole tree per tick, for a
+  // semantic-zoom band that only changes at a threshold. The cost is *relative*: an absolute
+  // budget cannot hold across machines — the pre-fix cost on the machine this was written on
+  // (5.1ms) is below the post-fix cost on a slower one (issue-00038). Normalised against a
+  // board-free event, the two states separate wherever it runs: measured ~4x healthy versus
+  // ~24x with the regression reintroduced.
+  expect(wheel!.median / plain!.median).toBeLessThan(8);
+  // …and a floor in absolute terms, in case the yardstick itself inflates.
+  expect(wheel!.median).toBeLessThan(15);
 });
 
 test("hover inside a committed scope costs nothing [issue-00028]", async ({ page }) => {
