@@ -538,6 +538,27 @@
       }
     },
     {
+      "id": "pay-e-methodexpired",
+      "type": "domainEvent",
+      "label": "Payment Method Expired",
+      "context": "pay",
+      "order": 33,
+      "properties": {
+        "temporal": true,
+        "description": "The card's expiry date passed — the outside world's calendar, not a timer this platform runs, so the event is temporal (a Deadline). It fires Deactivate Payment Method via Method Expiry."
+      }
+    },
+    {
+      "id": "pay-p-methodexpiry",
+      "type": "policy",
+      "label": "Method Expiry",
+      "context": "pay",
+      "properties": {
+        "description": "When a Payment Method's card expires, deactivate the method.",
+        "execution": "automatic"
+      }
+    },
+    {
       "id": "pay-e-mandaterevoked",
       "type": "domainEvent",
       "label": "Mandate Revoked",
@@ -627,7 +648,7 @@
       "label": "Deactivate Payment Method",
       "context": "pay",
       "properties": {
-        "description": "Remove a Payment Method — issued by the Customer, or fired on card expiry (a Deadline; see the named Deadline assumption)."
+        "description": "Remove a Payment Method — issued by the Customer, or invoked by Method Expiry on card expiry (a Deadline; the temporal event Payment Method Expired)."
       }
     },
     {
@@ -2859,6 +2880,24 @@
       "source": "conn-c-syncstatus",
       "target": "pay-ag-payment",
       "relation": "handledBy"
+    },
+    {
+      "id": "ed-229",
+      "source": "pay-e-methodexpired",
+      "target": "pay-p-methodexpiry",
+      "relation": "triggers"
+    },
+    {
+      "id": "ed-230",
+      "source": "pay-p-methodexpiry",
+      "target": "pay-c-deactivatemethod",
+      "relation": "invokes"
+    },
+    {
+      "id": "ed-231",
+      "source": "invc-e-dunningpaused",
+      "target": "invc-p-dunningexhausted",
+      "relation": "triggers"
     }
   ]
 }
