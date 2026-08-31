@@ -28,7 +28,7 @@ Build one model file the editor can import. Interview first, write second, valid
 - [ ] 4 Context Map  -> gate
 ```
 
-Stop at the level the user asked for. Never skip a phase: a Design board needs a Process pass first. The Context Map can run any time after phase 1.
+Stop at the level the user asked for. Big Picture always runs first - every level needs its ordered event spine, and the method makes a completed Big Picture Design's one prerequisite. Process and Design are otherwise independent formats: when the user asked for Design directly, run phases 2 and 3 as one combined pass - both gates still pass, in order, before `meta.level` rises. The Context Map can run any time after phase 1.
 
 ## Rules
 

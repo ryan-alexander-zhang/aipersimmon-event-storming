@@ -4,6 +4,8 @@ Goal: name the consistency boundary that owns each command, and the rules that c
 
 Adds: `aggregate` (the design output) and `constraint` (the design input). Keep everything from phases 1 and 2.
 
+Asked for Design straight after Big Picture? Run phase 2 (`reference/process.md`) in this same pass - the grammar is cumulative and both gates still apply; only the ceremony of a separate round is skipped.
+
 ## Steps
 
 Work command by command:
