@@ -10,7 +10,7 @@ import {
   ELEMENT_BAND,
   ELEMENT_DEFINITIONS,
 } from "@/lib/eventstorming/elements";
-import { contextTint, SUBDOMAIN_STYLE } from "@/lib/eventstorming/context-color";
+import { contextTint, MUD_STYLE, SUBDOMAIN_STYLE } from "@/lib/eventstorming/context-color";
 import { LEVEL_TYPES } from "@/lib/eventstorming/levels";
 import { computeBandTops } from "@/lib/layout/layout";
 import { useESStore } from "@/lib/store/store";
@@ -57,6 +57,7 @@ export function BoardChrome({
   const addNode = useESStore((s) => s.addNode);
   const renameContext = useESStore((s) => s.renameContext);
   const setContextClassification = useESStore((s) => s.setContextClassification);
+  const setContextBigBallOfMud = useESStore((s) => s.setContextBigBallOfMud);
   const removeContext = useESStore((s) => s.removeContext);
   const setSelected = useESStore((s) => s.setSelected);
   const focusedContext = useESStore((s) => s.focusedContext);
@@ -184,6 +185,14 @@ export function BoardChrome({
                           {badge.label}
                         </span>
                       )}
+                      {c.bigBallOfMud && (
+                        <span
+                          className="shrink-0 rounded border px-1 text-[9px] font-semibold uppercase tracking-wide"
+                          style={{ color: MUD_STYLE.color, borderColor: MUD_STYLE.color }}
+                        >
+                          {MUD_STYLE.label}
+                        </span>
+                      )}
                       {/* Primary action stays one-click and visible: adding a
                           Domain Event is the only per-context creation entry. */}
                       <button
@@ -287,6 +296,19 @@ export function BoardChrome({
                       {menuCtx.classification === k && <Check size={13} className="ml-auto" />}
                     </button>
                   ))}
+                  <div className="my-1 border-t border-zinc-100" />
+                  <button
+                    type="button"
+                    className={MENU_ITEM}
+                    onClick={() => {
+                      setContextBigBallOfMud(menuCtx.id, menuCtx.bigBallOfMud ? undefined : true);
+                      setMenu(null);
+                    }}
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ background: MUD_STYLE.color }} />
+                    {MUD_STYLE.label}
+                    {menuCtx.bigBallOfMud && <Check size={13} className="ml-auto" />}
+                  </button>
                   <div className="my-1 border-t border-zinc-100" />
                   <button
                     type="button"

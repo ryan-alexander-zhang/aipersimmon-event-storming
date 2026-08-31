@@ -250,6 +250,14 @@ describe("store v2 (RT3)", () => {
     expect(get().contexts.find((c) => c.id === a)?.classification).toBeUndefined();
   });
 
+  it("marks and clears a context as a Big Ball of Mud [decision-00015]", () => {
+    const a = get().addContext("Legacy ERP");
+    get().setContextBigBallOfMud(a, true);
+    expect(get().contexts.find((c) => c.id === a)?.bigBallOfMud).toBe(true);
+    get().setContextBigBallOfMud(a, undefined); // clear
+    expect(get().contexts.find((c) => c.id === a)?.bigBallOfMud).toBeUndefined();
+  });
+
   it("adds, retypes, and removes a context relationship [us-00020-AC-2.1/3.1/4.1]", () => {
     const a = get().addContext("Ordering");
     const b = get().addContext("Payment");

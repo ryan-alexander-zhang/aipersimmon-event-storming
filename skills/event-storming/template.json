@@ -6,7 +6,7 @@
     "createdAt": "2026-08-17T00:00:00Z"
   },
   "contexts": [
-    { "id": "cat", "name": "Catalog", "order": 0, "classification": "supporting" },
+    { "id": "cat", "name": "Catalog", "order": 0, "classification": "supporting", "bigBallOfMud": true },
     { "id": "ord", "name": "Ordering", "order": 1, "classification": "core" },
     { "id": "pay", "name": "Payment", "order": 2, "classification": "supporting" },
     { "id": "shp", "name": "Shipping", "order": 3, "classification": "generic" }

@@ -98,6 +98,9 @@ def check_contexts(model):
         cls = c.get("classification")
         if cls is not None and cls not in ("core", "supporting", "generic"):
             err(f"context {cid}: classification '{cls}' - use core|supporting|generic")
+        bbm = c.get("bigBallOfMud")
+        if bbm is not None and not isinstance(bbm, bool):
+            err(f"context {cid}: bigBallOfMud must be true or false")
     return ids
 
 

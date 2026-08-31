@@ -46,6 +46,10 @@ export const contextSchema = z.object({
   name: z.string(),
   order: z.number(),
   classification: z.enum(["core", "supporting", "generic"]).optional(),
+  // Evans's Big Ball of Mud: the boundary is drawn around a recognised mess so its
+  // model is not let propagate. A designation of the context itself, not a
+  // relationship; orthogonal to classification (decision-00015).
+  bigBallOfMud: z.boolean().optional(),
 });
 
 export const nodeSchema = z.object({

@@ -7,7 +7,7 @@ Runs any time after phase 1. It never changes the timeline; it only fills `conte
 ## Steps
 
 1. **Cut the contexts.** Group the board where the language changes meaning, the owner changes, the pace of change differs, or the data can be stale without harm. One team can own several contexts; one context should not be owned by several teams.
-2. **Classify each one** with `classification`.
+2. **Classify each one** with `classification`. A context whose model is a recognised mess gets `bigBallOfMud: true` on top - the point of the mark is to not let that model propagate; its downstreams usually defend with `acl`.
 3. **Find the seams.** Every edge that crosses a context is a seam. Each pair of contexts with at least one seam needs a relationship.
 4. **Type each relationship.** `source` = upstream (the one that sets the terms), `target` = downstream. One pair may carry several.
 5. Validate, run the gate.
@@ -49,6 +49,7 @@ Picking between the near ones:
 - Is this something we sell, something we need, or something we could buy?
 - What is the contract between these two - an API, events, a shared database, a spreadsheet?
 - Would we accept their data as-is, or translate it first?
+- Which of these models is a mess we must contain rather than fix? (-> `bigBallOfMud`, downstream `acl`)
 
 ## Gate
 

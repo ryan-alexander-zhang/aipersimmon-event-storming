@@ -205,6 +205,8 @@ export interface ESState {
     id: string,
     classification: "core" | "supporting" | "generic" | undefined,
   ) => void;
+  /** Mark (or clear, with undefined) a Bounded Context as a Big Ball of Mud (decision-00015). */
+  setContextBigBallOfMud: (id: string, bigBallOfMud: true | undefined) => void;
   /** Add a directed relationship source→target (default Customer/Supplier); returns its id. */
   addContextRelationship: (source: string, target: string) => string;
   /** Change a context relationship's type. */
@@ -441,6 +443,9 @@ const initializer: StateCreator<ESState> = (set, get) => ({
 
   setContextClassification: (id, classification) =>
     set({ contexts: get().contexts.map((c) => (c.id === id ? { ...c, classification } : c)) }),
+
+  setContextBigBallOfMud: (id, bigBallOfMud) =>
+    set({ contexts: get().contexts.map((c) => (c.id === id ? { ...c, bigBallOfMud } : c)) }),
 
   addContextRelationship: (source, target) => {
     const id = nanoid();

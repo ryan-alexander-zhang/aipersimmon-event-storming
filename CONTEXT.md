@@ -130,6 +130,14 @@ differentiating), or **generic** (a solved problem, buy or outsource). An option
 attribute on a Bounded Context; classification is not identity.
 _Avoid_: domain, module, tier.
 
+**Big Ball of Mud**:
+Evans's designation for a Bounded Context whose model is a recognised mess: the
+boundary is drawn to contain it and marked `bigBallOfMud`, so the lousy model is
+not let propagate. A mark on the context itself — never a Context Relationship —
+and orthogonal to its Subdomain; downstreams typically defend with an
+Anticorruption Layer (decision-00015).
+_Avoid_: legacy (unqualified), mud (as a relationship type), bad context.
+
 **Ungrouped**:
 The state of an element that belongs to no Bounded Context. Ungrouped elements are
 collected in a single soft group on the board and can be assigned to a context

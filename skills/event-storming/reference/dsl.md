@@ -181,6 +181,7 @@ Edges cross contexts freely - that is how seams show up.
 
 - `contexts[].order` sets left-to-right reading order of the map, starting at 0.
 - `classification` is `core` | `supporting` | `generic`, optional.
+- `bigBallOfMud` is an optional boolean on a context: Evans's designation for a model that is a recognised mess - draw the boundary, mark it, do not let its model propagate. It marks the context itself, never a relationship; downstreams usually defend with `acl`. Orthogonal to `classification`.
 - `nodes[].context` is optional; a node without it is Ungrouped. Any `context` you use should be declared in `contexts`.
 - `contextRelationships[].type` is one of `partnership`, `sharedKernel`, `customerSupplier`, `conformist`, `acl`, `openHostService`, `publishedLanguage`, `separateWays`. `source` = upstream, `target` = downstream. One pair may carry several. See `reference/context-map.md` for when to use which.
 

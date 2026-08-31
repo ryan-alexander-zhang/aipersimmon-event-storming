@@ -43,6 +43,13 @@ describe("DSL model schema (v2)", () => {
     expect(parsed.nodes[2].properties.temporal).toBe(true);
   });
 
+  it("keeps a context's Big Ball of Mud mark on import [decision-00015]", () => {
+    const model = validModel() as { contexts: Array<Record<string, unknown>> };
+    model.contexts[0].bigBallOfMud = true;
+    const parsed = modelSchema.parse(model) as Model;
+    expect(parsed.contexts[0].bigBallOfMud).toBe(true);
+  });
+
   it("accepts the new updates relation", () => {
     const model = validModel() as { edges: Array<Record<string, unknown>> };
     model.edges.push({ id: "r2", source: "e1", target: "rm1", relation: "updates" });

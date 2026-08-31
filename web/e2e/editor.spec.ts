@@ -1148,6 +1148,30 @@ test("classifies a Bounded Context and shows the badge; export carries it [us-00
   await expect(badge).toHaveCount(0);
 });
 
+test("marks a context as a Big Ball of Mud and shows it on the Context Map [decision-00015]", async ({
+  page,
+}) => {
+  await openBoard(page);
+  await addContext(page);
+  const badge = page.getByText("Big Ball of Mud", { exact: true });
+  await expect(badge).toHaveCount(0);
+
+  // mark via the context ⋯ menu → legend badge shows
+  await page.getByRole("button", { name: "Context options" }).click();
+  await page.getByRole("button", { name: "Big Ball of Mud", exact: true }).click();
+  await expect(badge).toBeVisible();
+
+  // the Context Map card carries the same designation
+  await page.getByRole("button", { name: "Context Map" }).click();
+  await expect(page.getByTestId("context-node").getByText("Big Ball of Mud")).toBeVisible();
+  await page.getByRole("button", { name: "Board" }).click();
+
+  // re-selecting clears it
+  await page.getByRole("button", { name: "Context options" }).click();
+  await page.getByRole("button", { name: "Big Ball of Mud", exact: true }).click();
+  await expect(badge).toHaveCount(0);
+});
+
 test("Context Map renders contexts + a typed relationship; edits and deletes it; leaves the board intact [us-00020-AC-1.1/3.1/4.1/7.1]", async ({
   page,
 }) => {

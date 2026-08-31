@@ -50,7 +50,12 @@ function ContextMapSurface() {
       id: c.id,
       type: "context",
       position: pos.get(c.id)!,
-      data: { name: c.name, tint: contextTint(c.id), classification: c.classification },
+      data: {
+        name: c.name,
+        tint: contextTint(c.id),
+        classification: c.classification,
+        bigBallOfMud: c.bigBallOfMud,
+      },
     }));
   }, [contexts]);
 
@@ -79,7 +84,7 @@ function ContextMapSurface() {
       : null;
 
   const [nodes, setNodes, onNodesChange] = useNodesState<ContextFlowNode>([]);
-  // Re-seed when the set of contexts (or their names/classification) changes;
+  // Re-seed when the set of contexts (or their names/classification/mud mark) changes;
   // editing relationships does not touch this, so drag positions survive.
   useEffect(() => setNodes(seeded), [seeded, setNodes]);
 

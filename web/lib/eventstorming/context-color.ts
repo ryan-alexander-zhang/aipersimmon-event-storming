@@ -30,3 +30,7 @@ export const SUBDOMAIN_STYLE: Record<Subdomain, { label: string; color: string }
   supporting: { label: "Supporting", color: "#0891b2" },
   generic: { label: "Generic", color: "#6b7280" },
 };
+
+// Evans's Big Ball of Mud: a designation of one context, not a relationship
+// (decision-00015). Orthogonal to the subdomain classification.
+export const MUD_STYLE = { label: "Big Ball of Mud", color: "#8d6e63" } as const;
