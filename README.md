@@ -1,3 +1,19 @@
+# Event Storming Tool
+
+A visual Event Storming board editor (`web/`) and an authoring skill
+(`skills/event-storming/`) that build, validate and render models as DSL v4.0
+JSON, with worked examples in `examples/`.
+
+**What this is - and is not.** This tool does *modelling with EventStorming
+grammar*; it is not EventStorming. Alberto Brandolini reserves the name for the
+in-person workshop format ("don't call it EventStorming because there's no
+'storming' in it"), and the method's main outcome - collective learning in one
+room - cannot be produced by a tool. What the tool produces is a **draft
+model**: validated, reviewable, code-adjacent. Use it to prepare, record and
+continue that learning, not to replace it.
+
+---
+
 # AI-Native Project Template
 
 This repository is a docs-first template for starting an AI-native software

@@ -7,6 +7,8 @@ description: Builds and edits Event Storming models as validated DSL v4.0 JSON f
 
 Build one model file the editor can import. Interview first, write second, validate always.
 
+This is modelling **with EventStorming grammar**, not an EventStorming workshop - Brandolini reserves the name for the in-person format, and its main outcome (collective learning) does not fit in a file. What you produce is a **draft model**: something to learn from, review and code against. That is also why you interview instead of generating - the coherence has to be built in the user's head, question by question, and written down second.
+
 ## Read what you need
 
 | Need | File |

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Event Storming",
-  description: "Visual Event Storming editor with JSON DSL export",
+  description: "A visual modelling board using EventStorming grammar - validated JSON DSL, import and export",
 };
 
 export default function RootLayout({
