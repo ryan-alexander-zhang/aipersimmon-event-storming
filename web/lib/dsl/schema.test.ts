@@ -36,6 +36,13 @@ describe("DSL model schema (v2)", () => {
     expect(parsed.contexts).toEqual([]);
   });
 
+  it("keeps the temporal marker on import [issue-00039]", () => {
+    const model = validModel() as { nodes: Array<{ properties: Record<string, unknown> }> };
+    model.nodes[2].properties = { temporal: true };
+    const parsed = modelSchema.parse(model) as Model;
+    expect(parsed.nodes[2].properties.temporal).toBe(true);
+  });
+
   it("accepts the new updates relation", () => {
     const model = validModel() as { edges: Array<Record<string, unknown>> };
     model.edges.push({ id: "r2", source: "e1", target: "rm1", relation: "updates" });

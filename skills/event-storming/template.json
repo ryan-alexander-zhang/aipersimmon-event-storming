@@ -98,6 +98,17 @@
     },
     { "id": "pay-e-failed", "type": "domainEvent", "label": "Payment Failed", "context": "pay", "order": 2, "properties": { "alternativeSet": "charge-outcome" } },
     {
+      "id": "pay-e-window-elapsed",
+      "type": "domainEvent",
+      "label": "Refund Window Elapsed",
+      "context": "pay",
+      "order": 4,
+      "properties": {
+        "temporal": true,
+        "description": "Raised by time passing, 30 days after delivery - nothing commands it, and no fake Clock system produces it."
+      }
+    },
+    {
       "id": "pay-h-refund",
       "type": "hotspot",
       "label": "How long is the refund window?",

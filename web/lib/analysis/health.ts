@@ -58,9 +58,11 @@ export function analyzeModel(nodes: ESNode[], edges: ESEdge[]): Finding[] {
 
   const findings: Finding[] = [];
 
-  // orphan-event: a Domain Event nothing produces or emits.
+  // orphan-event: a Domain Event nothing produces or emits. A temporal event is
+  // raised by time passing and needs no producer (decision-00014).
   for (const n of nodes) {
     if (n.type !== "domainEvent") continue;
+    if (n.data.temporal) continue;
     const produced = (incoming.get(n.id) ?? []).some(
       (e) => e.data?.relation === "produces" || e.data?.relation === "emits",
     );

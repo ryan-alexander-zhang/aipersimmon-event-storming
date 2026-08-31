@@ -44,7 +44,10 @@ RELATIONS = [r[0] for r in RULES]
 CTX_RELS = GRAMMAR["contextRelations"]
 
 # property -> the node types allowed to carry it (None = any type)
-PROPS = {"description": None, "pivotal": {"domainEvent"}, "state": {"hotspot"},
+PROPS = {"description": None, "pivotal": {"domainEvent"},
+         # raised by time passing - a deadline reached, a schedule fired; exempt from
+         # the producer checks (decision-00014)
+         "temporal": {"domainEvent"}, "state": {"hotspot"},
          "kind": {"hotspot"}, "priority": {"hotspot"}, "resolution": {"hotspot"},
          "resolvedAt": {"hotspot"}, "condition": {"policy"},
          "execution": {"policy"}, "parameters": {"policy"}, "rule": {"constraint"},
@@ -159,8 +162,8 @@ def check_properties(nid, t, props):
             err(f"node {nid}: property '{k}' is only allowed on {'/'.join(sorted(allowed))}, not {t}")
         if k in ENUMS and v not in ENUMS[k]:
             err(f"node {nid}: {k} '{v}' - use {'|'.join(ENUMS[k])}")
-        if k == "pivotal" and not isinstance(v, bool):
-            err(f"node {nid}: pivotal must be true or false")
+        if k in ("pivotal", "temporal") and not isinstance(v, bool):
+            err(f"node {nid}: {k} must be true or false")
         if k == "parameters":
             if not isinstance(v, list):
                 err(f"node {nid}: parameters must be an array")
@@ -217,7 +220,8 @@ def check_health(nodes, edges, level, ctx_ids):
     for nid, n in nodes.items():
         t = n["type"]
         if t == "domainEvent" and level != "big-picture":
-            if not any(r in ("produces", "emits") for _, r in inc[nid]):
+            if not n.get("properties", {}).get("temporal") \
+                    and not any(r in ("produces", "emits") for _, r in inc[nid]):
                 warn(f"orphan event '{n['label']}': nothing produces or emits it")
         if t == "command":
             if not reaches_event(nid, out, nodes):

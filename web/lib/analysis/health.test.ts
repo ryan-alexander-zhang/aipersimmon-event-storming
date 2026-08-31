@@ -59,6 +59,12 @@ describe("analyzeModel", () => {
       const nodes = [node("a", "aggregate"), node("e", "domainEvent")];
       expect(types(nodes, [edge("a", "e", "emits")], "orphan-event")).toHaveLength(0);
     });
+
+    it("does not flag a temporal Domain Event - time is its producer [issue-00039]", () => {
+      const e = node("e", "domainEvent", "Billing Month Ended");
+      e.data.temporal = true;
+      expect(types([e], [], "orphan-event")).toHaveLength(0);
+    });
   });
 
   describe("dangling-command (us-00011-AC-1.2)", () => {

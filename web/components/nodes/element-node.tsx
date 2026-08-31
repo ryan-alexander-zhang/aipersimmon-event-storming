@@ -3,6 +3,7 @@
 import { Handle, type NodeProps, Position } from "@xyflow/react";
 import {
   Box,
+  Clock,
   Eye,
   Flame,
   Lightbulb,
@@ -138,6 +139,13 @@ function ElementNodeInner({ id, type, data, selected }: NodeProps<ESNode>) {
         </span>
         {type === "domainEvent" && data.pivotal && (
           <Star size={12} className="ml-auto fill-current opacity-80" aria-label="pivotal" />
+        )}
+        {type === "domainEvent" && data.temporal && (
+          <Clock
+            size={12}
+            className={data.pivotal ? "opacity-80" : "ml-auto opacity-80"}
+            aria-label="temporal"
+          />
         )}
       </div>
       {editing ? (

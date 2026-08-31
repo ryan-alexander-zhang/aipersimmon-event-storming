@@ -276,6 +276,15 @@ test("toggling pivotal shows the marker [us-00001-AC-3.1]", async ({ page }) => 
   await expect(nodes(page, "domainEvent").locator("[aria-label=pivotal]")).toBeVisible();
 });
 
+test("toggling temporal shows the clock badge [issue-00039]", async ({ page }) => {
+  await openBoard(page);
+  await addContext(page);
+  await addEvent(page);
+  await nodes(page, "domainEvent").click();
+  await page.getByLabel("Temporal event (raised by time)").check();
+  await expect(nodes(page, "domainEvent").locator("[aria-label=temporal]")).toBeVisible();
+});
+
 test("attaches and edits a hotspot [us-00003-AC-1.1/2.1]", async ({ page }) => {
   await openBoard(page);
   await addContext(page);

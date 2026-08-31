@@ -57,6 +57,19 @@ describe("serialize v2 (T2/RT1)", () => {
     });
   });
 
+  it("round-trips a temporal Domain Event's clock marker [issue-00039]", () => {
+    const nodes: ESNode[] = [
+      {
+        id: "e1",
+        type: "domainEvent",
+        position: { x: 0, y: 0 },
+        data: { label: "Billing Month Ended", order: 0, temporal: true },
+      },
+    ];
+    const back = fromModel(toModel(nodes, [], [], META));
+    expect(back.nodes[0].data).toMatchObject({ temporal: true });
+  });
+
   it("round-trips a Hotspot's resolution and when it was resolved [us-00033-AC-6.1]", () => {
     const nodes: ESNode[] = [
       {

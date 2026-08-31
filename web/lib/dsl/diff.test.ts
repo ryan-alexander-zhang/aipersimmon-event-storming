@@ -83,6 +83,13 @@ describe("diffModels [us-00023]", () => {
     expect(c?.fields).toEqual([{ field: "pivotal", before: undefined, after: true }]);
   });
 
+  it("records a temporal toggle as a changed field [issue-00039]", () => {
+    const base = model([node("a", { properties: {} })]);
+    const target = model([node("a", { properties: { temporal: true } })]);
+    const c = diffModels(base, target).changed.get("a");
+    expect(c?.fields).toEqual([{ field: "temporal", before: undefined, after: true }]);
+  });
+
   it("leaves `changed` empty for added/removed/unchanged nodes", () => {
     const base = model([node("a")]);
     const target = model([node("a"), node("b", { order: 1 })]);

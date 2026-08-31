@@ -11,6 +11,7 @@ validator will say so.
 - Element types
 - Node properties per type (all special parameters)
 - Timeline order
+- Temporal events (time is the producer)
 - Relations (edge rules)
 - Alternative sets (things that happen instead of each other)
 - Contexts and context relationships
@@ -61,6 +62,7 @@ validator will say so.
 | --- | --- | --- | --- |
 | `description` | string | free text, one or two sentences | any type |
 | `pivotal` | boolean | `true` = one of the few key events | `domainEvent` |
+| `temporal` | boolean | `true` = raised by time passing: a deadline reached, a date arrived, a schedule fired. Needs no producer | `domainEvent` |
 | `state` | enum | `open` \| `resolved` (absent = open) | `hotspot` |
 | `kind` | enum | `conflict` \| `question` \| `risk` | `hotspot` |
 | `priority` | enum | `low` \| `medium` \| `high` | `hotspot` |
@@ -126,6 +128,28 @@ Hotspot full form:
 - Gaps are allowed but keep it dense; renumber when you insert events.
 - Every `domainEvent` should have an `order`.
 
+## Temporal events - time is the producer
+
+An event nothing commands and no outside system sends - `Billing Month Ended`,
+`Hold Expired`, `Review Window Closed` - is raised by time passing. Mark it:
+
+```json
+{ "id": "bil-e-month-ended", "type": "domainEvent", "label": "Billing Month Ended",
+  "order": 0, "properties": { "temporal": true } }
+```
+
+- A temporal event needs no incoming `produces` or `emits` - the validator and the
+  editor's health check both exempt it. Everything else is ordinary: it carries
+  `order`, may be `pivotal`, may join an `alternativeSet`, and `triggers` policies.
+- Do **not** invent a `Clock` or `Scheduler` external system to produce it. An
+  external system is a real outside integration; a calendar is not, and the fake
+  node shows up as a context seam that does not exist.
+- A timeout the system itself runs is **not** temporal - it is a reaction with the
+  numbers on the policy: `Booking Held --triggers--> Hold Expiry Policy` (condition
+  `not confirmed within holdWindow`, parameter `holdWindow`) `--invokes--> Expire
+  Hold --produces--> Hold Expired`. Use `temporal` only where the clock itself is
+  the source.
+
 ## Relations
 
 `edges[].relation` must match the source and target types exactly:
@@ -182,6 +206,8 @@ Levels are cumulative. Raising the level never removes anything.
 ## Common errors
 
 - `order` on a command or read model - only events carry it.
+- `temporal` on a command or policy - only events are raised by time.
+- A `Clock`/`Scheduler` external system emitting deadline events - mark the events `temporal` instead.
 - `condition` on a constraint, or `rule` on a policy - swapped.
 - `parameters` values as numbers - both `name` and `value` are strings.
 - A relation the type pair does not allow (`policy -> domainEvent`, `command -> command`).

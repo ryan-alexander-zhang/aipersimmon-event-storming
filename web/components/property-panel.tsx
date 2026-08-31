@@ -445,6 +445,14 @@ export function PropertyPanel() {
             />
             Pivotal event
           </label>
+          <label className="flex items-center gap-2 text-sm text-zinc-700">
+            <input
+              type="checkbox"
+              checked={!!node.data.temporal}
+              onChange={(e) => updateNodeData(node.id, { temporal: e.target.checked })}
+            />
+            Temporal event (raised by time)
+          </label>
           <div className="flex items-center gap-2 text-xs">
             <span className="text-zinc-500">Timeline</span>
             <button

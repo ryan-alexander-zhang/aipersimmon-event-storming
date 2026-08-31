@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, type NodeProps } from "@xyflow/react";
-import { Star } from "lucide-react";
+import { Clock, Star } from "lucide-react";
 import type { DiffStatus } from "@/lib/dsl/diff";
 import type { DiffChange } from "@/lib/dsl/diff-display";
 import { contextTint } from "@/lib/eventstorming/context-color";
@@ -55,6 +55,13 @@ export function SnapshotNode({ type, data }: NodeProps<ESNode>) {
         </span>
         {type === "domainEvent" && data.pivotal && (
           <Star size={12} className="ml-auto fill-current opacity-80" aria-label="pivotal" />
+        )}
+        {type === "domainEvent" && data.temporal && (
+          <Clock
+            size={12}
+            className={data.pivotal ? "opacity-80" : "ml-auto opacity-80"}
+            aria-label="temporal"
+          />
         )}
       </div>
       {/* Clamped like the live sticky, for the same reason (issue-00036). */}

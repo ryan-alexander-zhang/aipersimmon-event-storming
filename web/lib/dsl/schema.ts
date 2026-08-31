@@ -13,6 +13,9 @@ export const DSL_VERSION = "4.0";
 export const propertiesSchema = z.object({
   description: z.string().optional(),
   pivotal: z.boolean().optional(),
+  // Raised by time passing (a deadline reached, a schedule fired) - the DSL's form
+  // of the method's calendar icon. Exempt from the producer checks (decision-00014).
+  temporal: z.boolean().optional(),
   // Hotspot workflow (spec-00003); all optional and additive — absent state = open.
   state: z.enum(["open", "resolved"]).optional(),
   kind: z.enum(["conflict", "question", "risk"]).optional(),

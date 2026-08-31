@@ -12,7 +12,7 @@ Allowed types: `domainEvent`, `actor`, `externalSystem`, `hotspot`, `opportunity
 
 **3. Converge (ordered).** Deduplicate, rename to past tense, sort into one global `order` from 0. Events that happen in parallel share one `order`.
 
-**4. Mark.** Set `pivotal: true` on the few events that change the state of the business (typically 3-7 on a board). Add hotspots and opportunities.
+**4. Mark.** Set `pivotal: true` on the few events that change the state of the business (typically 3-7 on a board). Set `temporal: true` on events raised by time passing - a deadline elapsed, a period ended (see `reference/dsl.md`). Add hotspots and opportunities.
 
 **5. Draft contexts.** Group events into candidate bounded contexts; write `contexts` and set `nodes[].context`. Classification and relationships come later - see `reference/context-map.md`.
 

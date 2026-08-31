@@ -90,6 +90,14 @@ The few most significant Domain Events, marked with a vertical line. A marked
 state of a Domain Event, not a separate element.
 _Avoid_: milestone, key event.
 
+**Temporal Event**:
+A Domain Event raised by time passing - a deadline reached, a date arrived, a
+schedule fired - marked `temporal` and shown with a clock badge. It needs no
+producing Command or External System; downstream it behaves like any other
+Domain Event. A marked state of a Domain Event, not a separate element
+(decision-00014).
+_Avoid_: timer, clock event, scheduled event, fake Clock system.
+
 ### Relations (canvas edges)
 
 Edges carry a **semantic type**, not just a geometric connection:

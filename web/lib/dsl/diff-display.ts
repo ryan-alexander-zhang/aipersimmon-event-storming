@@ -52,6 +52,10 @@ export function describeChange(
         chips.push(f.after ? "★ set" : "★ cleared");
         detail.push(`pivotal: ${f.before ? "yes" : "no"} → ${f.after ? "yes" : "no"}`);
         break;
+      case "temporal":
+        chips.push(f.after ? "⏱ set" : "⏱ cleared");
+        detail.push(`temporal: ${f.before ? "yes" : "no"} → ${f.after ? "yes" : "no"}`);
+        break;
       case "description":
         chips.push("description ✎");
         detail.push(`description: ${val(f.before)} → ${val(f.after)}`);

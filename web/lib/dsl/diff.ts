@@ -9,7 +9,7 @@ export type DiffStatus = "added" | "removed" | "changed" | "unchanged";
 
 /** A single changed field of a node, value-only (no display strings). */
 export interface FieldChange {
-  field: "label" | "order" | "context" | "pivotal" | "state" | "kind" | "priority" | "description";
+  field: "label" | "order" | "context" | "pivotal" | "temporal" | "state" | "kind" | "priority" | "description";
   before: unknown;
   after: unknown;
 }
@@ -45,6 +45,7 @@ function changedFields(before: ModelNode, after: ModelNode): FieldChange[] {
   push("order", before.order, after.order);
   push("context", before.context, after.context);
   push("pivotal", before.properties.pivotal, after.properties.pivotal);
+  push("temporal", before.properties.temporal, after.properties.temporal);
   push("state", before.properties.state, after.properties.state);
   push("kind", before.properties.kind, after.properties.kind);
   push("priority", before.properties.priority, after.properties.priority);
