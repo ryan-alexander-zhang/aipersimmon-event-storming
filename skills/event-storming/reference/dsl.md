@@ -1,4 +1,4 @@
-# DSL v4.0 - full grammar
+# DSL v5.0 - full grammar
 
 `scripts/grammar.json` is the machine-readable copy of the element types, level gating,
 edge rules and context-relationship types below - it is what `scripts/validate.py`
@@ -23,16 +23,16 @@ validator will say so.
 
 ```json
 {
-  "version": "4.0",
+  "version": "5.0",
   "meta": { "name": "Order Fulfilment", "level": "design", "createdAt": "2026-08-17T00:00:00Z" },
-  "contexts": [{ "id": "ord", "name": "Ordering", "order": 0, "classification": "core" }],
+  "contexts": [{ "id": "ord", "name": "Ordering", "order": 0, "subdomain": { "name": "Ordering", "type": "core" } }],
   "contextRelationships": [{ "id": "cr-1", "source": "ord", "target": "pay", "type": "customerSupplier" }],
   "nodes": [{ "id": "ord-e-placed", "type": "domainEvent", "label": "Order Placed", "context": "ord", "order": 0, "properties": {} }],
   "edges": [{ "id": "e-1", "source": "ord-c-place", "target": "ord-e-placed", "relation": "produces" }]
 }
 ```
 
-- `version` must be the literal `"4.0"`.
+- `version` must be the literal `"5.0"`. The editor still imports `4.0` files: each `classification` moves into `subdomain.type`, the subdomain named after its context.
 - `meta.level` is one of `big-picture` | `process` | `design`. It is the view filter: raise it as phases complete.
 - `meta.createdAt` is an ISO 8601 string.
 - `contexts`, `contextRelationships`, `nodes`, `edges` are arrays; all four may be empty.
@@ -180,8 +180,8 @@ Edges cross contexts freely - that is how seams show up.
 ## Contexts and context relationships
 
 - `contexts[].order` sets left-to-right reading order of the map, starting at 0.
-- `classification` is `core` | `supporting` | `generic`, optional.
-- `bigBallOfMud` is an optional boolean on a context: Evans's designation for a model that is a recognised mess - draw the boundary, mark it, do not let its model propagate. It marks the context itself, never a relationship; downstreams usually defend with `acl`. Orthogonal to `classification`.
+- `subdomain` is the business capability the context realises: `{ "name": "...", "type": "core" | "supporting" | "generic" }`. `name` is required and defaults to the context's name; `type` is optional. One context realises one subdomain, and no two contexts may name the same one (compared case-insensitively) - an ERROR at any level. At `design` every context must have a `subdomain` with a `type` - an ERROR; below design both are optional, because the boundaries are not drawn yet.
+- `bigBallOfMud` is an optional boolean on a context: Evans's designation for a model that is a recognised mess - draw the boundary, mark it, do not let its model propagate. It marks the context itself, never a relationship; downstreams usually defend with `acl`. Orthogonal to `subdomain`: a muddy context still realises one subdomain, and the other capabilities it covers are recorded as hotspots.
 - `nodes[].context` is optional; a node without it is Ungrouped. Any `context` you use should be declared in `contexts`.
 - `contextRelationships[].type` is one of `partnership`, `sharedKernel`, `customerSupplier`, `conformist`, `acl`, `openHostService`, `publishedLanguage`, `separateWays`. `source` = upstream, `target` = downstream. One pair may carry several. See `reference/context-map.md` for when to use which.
 

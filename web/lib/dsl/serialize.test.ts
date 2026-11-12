@@ -251,7 +251,7 @@ describe("serialize v2 (T2/RT1)", () => {
     const result = importJSON(v2);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.model.version).toBe("4.0");
+      expect(result.model.version).toBe("5.0");
       const o = Object.fromEntries(result.model.nodes.map((n) => [n.id, n.order]));
       // dense-rank by (context.order, per-context order): {A, A2} concurrent → 0,
       // C → 1, then Payment's B → 2 (block-sequential, design-00005 §2).
@@ -265,7 +265,7 @@ describe("serialize v2 (T2/RT1)", () => {
   it("export omits position and includes contexts + order + level [us-00004]", () => {
     const { nodes, edges } = sampleCanvas();
     const out = JSON.parse(exportJSON(nodes, edges, CONTEXTS, META));
-    expect(out.version).toBe("4.0");
+    expect(out.version).toBe("5.0");
     expect(out.contexts).toEqual(CONTEXTS);
     expect(out.meta.level).toBe("design");
     expect(out.nodes[0].position).toBeUndefined();
@@ -303,8 +303,10 @@ describe("serialize v2 (T2/RT1)", () => {
     const result = importJSON(v1);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.model.version).toBe("4.0"); // chained v1 → v2 → v3 → v4
-      expect(result.model.contexts).toEqual([{ id: "default", name: "Default", order: 0 }]);
+      expect(result.model.version).toBe("5.0"); // chained v1 → v2 → v3 → v4 → v5
+      expect(result.model.contexts).toEqual([
+        { id: "default", name: "Default", order: 0, subdomain: { name: "Default" } },
+      ]);
       const byId = Object.fromEntries(result.model.nodes.map((n) => [n.id, n]));
       expect(byId.e1.context).toBe("default");
       // order derived from v1 x: e2 (x=10) before e1 (x=200)
@@ -328,15 +330,50 @@ describe("serialize v2 (T2/RT1)", () => {
     }
   });
 
-  it("round-trips a context's subdomain classification [us-00019-AC-3.1]", () => {
-    const classified: Context[] = [{ id: "ord", name: "Ordering", order: 0, classification: "core" }];
+  it("round-trips a context's subdomain [us-00019-AC-3.1, decision-00016]", () => {
+    const classified: Context[] = [
+      { id: "ord", name: "Ordering", order: 0, subdomain: { name: "Sales", type: "core" } },
+    ];
     const back = fromModel(toModel([], [], classified, META));
     expect(back.contexts).toEqual(classified);
     const out = JSON.parse(exportJSON([], [], classified, META));
-    expect(out.contexts[0].classification).toBe("core");
+    expect(out.contexts[0].subdomain).toEqual({ name: "Sales", type: "core" });
   });
 
-  it("imports a pre-strategic v3.0 file as an unclassified v4 model [us-00019-AC-4.1, spec-00004-XAC-1.1]", () => {
+  it("imports a v4.0 file, moving classification into a subdomain named after its context [decision-00016]", () => {
+    const v4 = JSON.stringify({
+      version: "4.0",
+      meta: { name: "old", level: "design", createdAt: "t" },
+      contexts: [
+        { id: "ord", name: "Ordering", order: 0, classification: "core", bigBallOfMud: true },
+        { id: "pay", name: "Payment", order: 1 },
+      ],
+      nodes: [],
+      edges: [],
+    });
+    const result = importJSON(v4);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.model.version).toBe("5.0");
+      expect(result.model.contexts).toEqual([
+        { id: "ord", name: "Ordering", order: 0, bigBallOfMud: true, subdomain: { name: "Ordering", type: "core" } },
+        { id: "pay", name: "Payment", order: 1, subdomain: { name: "Payment" } },
+      ]);
+    }
+  });
+
+  it("rejects a subdomain with an empty name [decision-00016]", () => {
+    const bad = JSON.stringify({
+      version: "5.0",
+      meta: { name: "m", level: "design", createdAt: "t" },
+      contexts: [{ id: "ord", name: "Ordering", order: 0, subdomain: { name: "" } }],
+      nodes: [],
+      edges: [],
+    });
+    expect(importJSON(bad).ok).toBe(false);
+  });
+
+  it("imports a pre-strategic v3.0 file as an untyped v5 model [us-00019-AC-4.1, spec-00004-XAC-1.1]", () => {
     const v3 = JSON.stringify({
       version: "3.0",
       meta: { name: "old", level: "design", createdAt: "t" },
@@ -347,8 +384,8 @@ describe("serialize v2 (T2/RT1)", () => {
     const result = importJSON(v3);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.model.version).toBe("4.0"); // v3 → v4 bump
-      expect(result.model.contexts[0].classification).toBeUndefined(); // unclassified
+      expect(result.model.version).toBe("5.0"); // v3 → v4 → v5
+      expect(result.model.contexts[0].subdomain).toEqual({ name: "Ordering" }); // untyped
     }
   });
 

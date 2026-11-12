@@ -4,6 +4,7 @@ import { useViewport } from "@xyflow/react";
 import { Check, Crosshair, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { SUBDOMAIN_TYPES } from "@/lib/dsl/schema";
 import {
   BAND_ORDER,
   type Band,
@@ -56,7 +57,8 @@ export function BoardChrome({
   const level = useESStore((s) => s.level);
   const addNode = useESStore((s) => s.addNode);
   const renameContext = useESStore((s) => s.renameContext);
-  const setContextClassification = useESStore((s) => s.setContextClassification);
+  const setContextSubdomainType = useESStore((s) => s.setContextSubdomainType);
+  const setContextSubdomainName = useESStore((s) => s.setContextSubdomainName);
   const setContextBigBallOfMud = useESStore((s) => s.setContextBigBallOfMud);
   const removeContext = useESStore((s) => s.removeContext);
   const setSelected = useESStore((s) => s.setSelected);
@@ -138,7 +140,7 @@ export function BoardChrome({
               .map((c) => {
                 const tint = contextTint(c.id);
                 const focused = focusedContext === c.id;
-                const badge = c.classification ? SUBDOMAIN_STYLE[c.classification] : null;
+                const badge = c.subdomain?.type ? SUBDOMAIN_STYLE[c.subdomain.type] : null;
                 return (
                   <div key={c.id} className="relative shrink-0">
                     <div
@@ -275,15 +277,32 @@ export function BoardChrome({
                   <div className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
                     Subdomain
                   </div>
-                  {(["core", "supporting", "generic"] as const).map((k) => (
+                  {/* The subdomain this context realises (decision-00016): its name
+                      defaults to the context's, its type is the classification. */}
+                  <button
+                    type="button"
+                    className={MENU_ITEM}
+                    aria-label="Subdomain name"
+                    title="The business capability this context realises"
+                    onClick={() => {
+                      const current = menuCtx.subdomain?.name ?? menuCtx.name;
+                      const name = window.prompt("Subdomain name", current)?.trim();
+                      if (name) setContextSubdomainName(menuCtx.id, name);
+                      setMenu(null);
+                    }}
+                  >
+                    <Pencil size={13} />
+                    <span className="truncate">{menuCtx.subdomain?.name ?? menuCtx.name}</span>
+                  </button>
+                  {SUBDOMAIN_TYPES.map((k) => (
                     <button
                       key={k}
                       type="button"
                       className={MENU_ITEM}
                       onClick={() => {
-                        setContextClassification(
+                        setContextSubdomainType(
                           menuCtx.id,
-                          menuCtx.classification === k ? undefined : k,
+                          menuCtx.subdomain?.type === k ? undefined : k,
                         );
                         setMenu(null);
                       }}
@@ -293,7 +312,7 @@ export function BoardChrome({
                         style={{ background: SUBDOMAIN_STYLE[k].color }}
                       />
                       {SUBDOMAIN_STYLE[k].label}
-                      {menuCtx.classification === k && <Check size={13} className="ml-auto" />}
+                      {menuCtx.subdomain?.type === k && <Check size={13} className="ml-auto" />}
                     </button>
                   ))}
                   <div className="my-1 border-t border-zinc-100" />

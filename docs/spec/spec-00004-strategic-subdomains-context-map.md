@@ -14,6 +14,9 @@ parent: prd-00002-complex-business-analysis
 > (FR5). Delivers [prd-00002](../prd/prd-00002-complex-business-analysis.md)
 > FR4/FR5. Relationship vocabulary fixed by
 > [decision-00007](../decision/decision-00007-context-relationship-vocabulary.md).
+> The `classification` shape below is superseded by
+> [decision-00016](../decision/decision-00016-every-bounded-context-realises-one-named-subdomain.md):
+> it is now `subdomain.type`, on a named Subdomain each context realises (DSL `5.0`).
 
 ## 1. Context
 

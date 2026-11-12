@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate an Event Storming DSL v4.0 file.
+"""Validate an Event Storming DSL file (the version grammar.json names).
 
 Usage: python3 scripts/validate.py <model.json>
 
@@ -81,8 +81,9 @@ def as_list(model, key):
     return [x for x in v if isinstance(x, dict)]
 
 
-def check_contexts(model):
+def check_contexts(model, level):
     ids = set()
+    subdomains = defaultdict(list)  # lowercased subdomain name -> context ids (decision-00016)
     for c in as_list(model, "contexts"):
         cid = c.get("id")
         if not cid or not isinstance(cid, str):
@@ -95,12 +96,31 @@ def check_contexts(model):
             err(f"context {cid}: name is required")
         if not isinstance(c.get("order"), (int, float)):
             err(f"context {cid}: order must be a number")
-        cls = c.get("classification")
-        if cls is not None and cls not in ("core", "supporting", "generic"):
-            err(f"context {cid}: classification '{cls}' - use core|supporting|generic")
+        if "classification" in c:
+            err(f"context {cid}: classification is gone - write subdomain: {{\"name\": ..., \"type\": ...}}")
+        sd = c.get("subdomain")
+        if sd is None:
+            if level == "design":
+                err(f"context {cid}: no subdomain - at design every context realises one "
+                    "(subdomain: {\"name\": ..., \"type\": core|supporting|generic})")
+        elif not isinstance(sd, dict) or not isinstance(sd.get("name"), str) or not sd["name"].strip():
+            err(f"context {cid}: subdomain must be an object with a non-empty name")
+        else:
+            unknown = set(sd) - {"name", "type"}
+            if unknown:
+                err(f"context {cid}: subdomain has unknown key(s) {', '.join(sorted(unknown))}")
+            t = sd.get("type")
+            if t is not None and t not in ("core", "supporting", "generic"):
+                err(f"context {cid}: subdomain type '{t}' - use core|supporting|generic")
+            elif t is None and level == "design":
+                err(f"context {cid}: subdomain '{sd['name']}' has no type - core|supporting|generic")
+            subdomains[sd["name"].strip().lower()].append(cid)
         bbm = c.get("bigBallOfMud")
         if bbm is not None and not isinstance(bbm, bool):
             err(f"context {cid}: bigBallOfMud must be true or false")
+    for owners in subdomains.values():
+        if len(owners) > 1:
+            err(f"contexts {', '.join(owners)} realise the same subdomain - one context each")
     return ids
 
 
@@ -350,7 +370,7 @@ def main():
     if level not in LEVEL_TYPES:
         err(f"meta.level '{level}' - use big-picture|process|design")
 
-    ctx_ids = check_contexts(model)
+    ctx_ids = check_contexts(model, level)
     check_context_relationships(model, ctx_ids)
     nodes = check_nodes(model, ctx_ids, level)
     edges = check_edges(model, nodes)

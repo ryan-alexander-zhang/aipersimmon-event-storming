@@ -1,11 +1,11 @@
 {
-  "version": "4.0",
+  "version": "5.0",
   "meta": {"name": "FTGO Food Delivery", "level": "design", "createdAt": "2026-06-18T00:00:00Z"},
   "contexts": [
-    {"id": "ord", "name": "Order", "order": 0, "classification": "core"},
-    {"id": "kit", "name": "Kitchen", "order": 1, "classification": "supporting"},
-    {"id": "acc", "name": "Accounting", "order": 2, "classification": "generic"},
-    {"id": "del", "name": "Delivery", "order": 3, "classification": "supporting"}
+    {"id": "ord", "name": "Order", "order": 0, "subdomain": {"name": "Order", "type": "core"}},
+    {"id": "kit", "name": "Kitchen", "order": 1, "subdomain": {"name": "Kitchen", "type": "supporting"}},
+    {"id": "acc", "name": "Accounting", "order": 2, "subdomain": {"name": "Accounting", "type": "generic"}},
+    {"id": "del", "name": "Delivery", "order": 3, "subdomain": {"name": "Delivery", "type": "supporting"}}
   ],
   "contextRelationships": [
     {"id": "cr-01", "source": "ord", "target": "kit", "type": "customerSupplier"},

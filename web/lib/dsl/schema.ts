@@ -8,7 +8,7 @@ import { ELEMENT_TYPES } from "@/lib/eventstorming/elements";
 import { LEVELS } from "@/lib/eventstorming/levels";
 import { RELATION_TYPES } from "@/lib/eventstorming/relations";
 
-export const DSL_VERSION = "4.0";
+export const DSL_VERSION = "5.0";
 
 export const propertiesSchema = z.object({
   description: z.string().optional(),
@@ -39,16 +39,25 @@ export const propertiesSchema = z.object({
   rule: z.string().optional(),
 });
 
+export const SUBDOMAIN_TYPES = ["core", "supporting", "generic"] as const;
+
+// The named business capability a context realises - one per context, never shared
+// by two (decision-00016). Its name defaults to the context's; its type is the
+// strategic classification (spec-00004 FR4). Required at design, optional before.
+export const subdomainSchema = z.object({
+  name: z.string().min(1),
+  type: z.enum(SUBDOMAIN_TYPES).optional(),
+});
+
 // A bounded context: a named region/attribute over the global timeline (decision-00005).
-// classification is the optional strategic subdomain type (spec-00004 FR4).
 export const contextSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
   order: z.number(),
-  classification: z.enum(["core", "supporting", "generic"]).optional(),
+  subdomain: subdomainSchema.optional(),
   // Evans's Big Ball of Mud: the boundary is drawn around a recognised mess so its
   // model is not let propagate. A designation of the context itself, not a
-  // relationship; orthogonal to classification (decision-00015).
+  // relationship; orthogonal to its subdomain (decision-00015).
   bigBallOfMud: z.boolean().optional(),
 });
 
@@ -95,6 +104,8 @@ export const modelSchema = z.object({
 });
 
 export type NodeProperties = z.infer<typeof propertiesSchema>;
+export type Subdomain = z.infer<typeof subdomainSchema>;
+export type SubdomainType = (typeof SUBDOMAIN_TYPES)[number];
 export type Context = z.infer<typeof contextSchema>;
 export type ContextRelationship = z.infer<typeof contextRelationshipSchema>;
 export type ModelNode = z.infer<typeof nodeSchema>;

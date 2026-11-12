@@ -1116,7 +1116,7 @@ test("search and filter never change the exported model [us-00018-AC-5.1, spec-0
   expect(normalize(after)).toEqual(normalize(before)); // identical model
 });
 
-test("classifies a Bounded Context and shows the badge; export carries it [us-00019-AC-1.1/2.1/3.1]", async ({
+test("types and names the subdomain a Bounded Context realises; export carries it [us-00019-AC-1.1/2.1/3.1, decision-00016]", async ({
   page,
 }) => {
   await openBoard(page);
@@ -1139,8 +1139,21 @@ test("classifies a Bounded Context and shows the badge; export carries it [us-00
     page.getByRole("button", { name: "Export" }).click(),
   ]);
   const exported = JSON.parse(readFileSync(await download.path(), "utf8"));
-  expect(exported.version).toBe("4.0");
-  expect(exported.contexts[0].classification).toBe("core");
+  expect(exported.version).toBe("5.0");
+  // the subdomain is named after its context by default (decision-00016)
+  expect(exported.contexts[0].subdomain).toEqual({ name: exported.contexts[0].name, type: "core" });
+
+  // naming the subdomain apart from its context is exported too (decision-00016)
+  await page.getByRole("button", { name: "Context options" }).click();
+  page.once("dialog", (d) => void d.accept("Sales"));
+  await page.getByRole("button", { name: "Subdomain name" }).click();
+  await openFileMenu(page);
+  const [renamed] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Export" }).click(),
+  ]);
+  const named = JSON.parse(readFileSync(await renamed.path(), "utf8"));
+  expect(named.contexts[0].subdomain).toEqual({ name: "Sales", type: "core" });
 
   // re-selecting the same subdomain clears it (us-00019-AC-2.1)
   await page.getByRole("button", { name: "Context options" }).click();

@@ -2,7 +2,9 @@
 // from the structured model. Pure — a function of nodes + edges only, no store,
 // layout, or React Flow dependency. Findings are advisory and never block editing.
 
+import type { Context } from "@/lib/dsl/schema";
 import type { ElementType } from "@/lib/eventstorming/elements";
+import type { Level } from "@/lib/eventstorming/levels";
 import type { RelationType } from "@/lib/eventstorming/relations";
 import type { ESEdge, ESNode } from "@/lib/store/types";
 
@@ -15,7 +17,9 @@ export type SmellType =
   | "policy-cycle"
   | "unresolved-hotspots"
   | "unrecorded-resolution"
-  | "lone-alternative";
+  | "lone-alternative"
+  | "duplicate-subdomain"
+  | "missing-subdomain";
 
 export interface Finding {
   id: string;
@@ -44,7 +48,12 @@ function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
 
 /** Analyse the model and return advisory findings, ordered warning→info then by
  *  type and id so the output is deterministic. */
-export function analyzeModel(nodes: ESNode[], edges: ESEdge[]): Finding[] {
+export function analyzeModel(
+  nodes: ESNode[],
+  edges: ESEdge[],
+  contexts: Context[] = [],
+  level?: Level,
+): Finding[] {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const label = (id: string): string => byId.get(id)?.data.label ?? id;
   const typeOf = (id: string): ElementType | undefined => byId.get(id)?.type;
@@ -209,6 +218,8 @@ export function analyzeModel(nodes: ESNode[], edges: ESEdge[]): Finding[] {
     });
   }
 
+  findings.push(...subdomainFindings(contexts, level));
+
   findings.sort(
     (a, b) =>
       SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] ||
@@ -216,4 +227,43 @@ export function analyzeModel(nodes: ESNode[], edges: ESEdge[]): Finding[] {
       a.id.localeCompare(b.id),
   );
   return findings;
+}
+
+// One context, one Subdomain, never shared (decision-00016). A shared name is wrong
+// at any level; a missing subdomain or type only once the boundaries are designed.
+function subdomainFindings(contexts: Context[], level?: Level): Finding[] {
+  const out: Finding[] = [];
+  const byName = new Map<string, Context[]>();
+  for (const c of contexts) {
+    if (c.subdomain) push(byName, c.subdomain.name.trim().toLowerCase(), c);
+    else if (level === "design") {
+      out.push({
+        id: `missing-subdomain:${c.id}`,
+        type: "missing-subdomain",
+        severity: "warning",
+        message: `Bounded Context '${c.name}' realises no Subdomain`,
+        elementIds: [],
+      });
+    }
+    if (c.subdomain && !c.subdomain.type && level === "design") {
+      out.push({
+        id: `missing-subdomain:${c.id}`,
+        type: "missing-subdomain",
+        severity: "warning",
+        message: `Subdomain '${c.subdomain.name}' of '${c.name}' has no type - core, supporting or generic?`,
+        elementIds: [],
+      });
+    }
+  }
+  for (const [, shared] of byName) {
+    if (shared.length < 2) continue;
+    out.push({
+      id: `duplicate-subdomain:${shared[0].subdomain!.name}`,
+      type: "duplicate-subdomain",
+      severity: "warning",
+      message: `Subdomain '${shared[0].subdomain!.name}' is realised by ${shared.map((c) => `'${c.name}'`).join(", ")} - one context each`,
+      elementIds: [],
+    });
+  }
+  return out;
 }

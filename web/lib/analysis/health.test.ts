@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Context } from "@/lib/dsl/schema";
 import type { ElementType } from "@/lib/eventstorming/elements";
 import type { RelationType } from "@/lib/eventstorming/relations";
 import type { ESEdge, ESNode } from "@/lib/store/types";
@@ -257,5 +258,44 @@ describe("analyzeModel", () => {
     const nodes = [node("e", "domainEvent"), node("h", "hotspot")];
     const out = analyzeModel(nodes, []);
     expect(out.map((f) => f.severity)).toEqual(["warning", "info"]);
+  });
+});
+
+describe("subdomain findings [decision-00016]", () => {
+  const ctx = (id: string, name: string, subdomain?: Context["subdomain"]): Context => ({
+    id,
+    name,
+    order: 0,
+    ...(subdomain && { subdomain }),
+  });
+
+  it("flags two contexts realising one subdomain, at any level, names compared case-insensitively", () => {
+    const contexts = [
+      ctx("a", "Ordering", { name: "Sales", type: "core" }),
+      ctx("b", "Checkout", { name: "sales ", type: "core" }),
+      ctx("c", "Payment", { name: "Payment", type: "generic" }),
+    ];
+    const out = analyzeModel([], [], contexts, "big-picture");
+    expect(out.map((f) => f.type)).toEqual(["duplicate-subdomain"]);
+    expect(out[0].message).toContain("'Ordering', 'Checkout'");
+  });
+
+  it("at design, flags a context with no subdomain and a subdomain with no type", () => {
+    const contexts = [ctx("a", "Ordering"), ctx("b", "Payment", { name: "Payment" })];
+    const out = analyzeModel([], [], contexts, "design");
+    expect(out.map((f) => f.id)).toEqual(["missing-subdomain:a", "missing-subdomain:b"]);
+  });
+
+  it("does not ask for a subdomain before design", () => {
+    const contexts = [ctx("a", "Ordering"), ctx("b", "Payment", { name: "Payment" })];
+    expect(analyzeModel([], [], contexts, "process")).toEqual([]);
+  });
+
+  it("is clean when every context realises its own typed subdomain", () => {
+    const contexts = [
+      ctx("a", "Ordering", { name: "Ordering", type: "core" }),
+      ctx("b", "Payment", { name: "Payment", type: "generic" }),
+    ];
+    expect(analyzeModel([], [], contexts, "design")).toEqual([]);
   });
 });

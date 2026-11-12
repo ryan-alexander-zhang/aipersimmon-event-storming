@@ -1,15 +1,15 @@
 {
-  "version": "4.0",
+  "version": "5.0",
   "meta": {
     "name": "Template - Order Fulfilment",
     "level": "design",
     "createdAt": "2026-08-17T00:00:00Z"
   },
   "contexts": [
-    { "id": "cat", "name": "Catalog", "order": 0, "classification": "supporting", "bigBallOfMud": true },
-    { "id": "ord", "name": "Ordering", "order": 1, "classification": "core" },
-    { "id": "pay", "name": "Payment", "order": 2, "classification": "supporting" },
-    { "id": "shp", "name": "Shipping", "order": 3, "classification": "generic" }
+    { "id": "cat", "name": "Catalog", "order": 0, "subdomain": { "name": "Catalog", "type": "supporting" }, "bigBallOfMud": true },
+    { "id": "ord", "name": "Ordering", "order": 1, "subdomain": { "name": "Ordering", "type": "core" } },
+    { "id": "pay", "name": "Payment", "order": 2, "subdomain": { "name": "Payment", "type": "supporting" } },
+    { "id": "shp", "name": "Shipping", "order": 3, "subdomain": { "name": "Delivery", "type": "generic" } }
   ],
   "contextRelationships": [
     { "id": "cr-01", "source": "ord", "target": "pay", "type": "customerSupplier" },

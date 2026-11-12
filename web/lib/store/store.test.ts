@@ -20,8 +20,8 @@ describe("store v2 (RT3)", () => {
     const a = get().addContext("Ordering");
     const b = get().addContext("Payment");
     expect(get().contexts).toEqual([
-      { id: a, name: "Ordering", order: 0 },
-      { id: b, name: "Payment", order: 1 },
+      { id: a, name: "Ordering", order: 0, subdomain: { name: "Ordering" } },
+      { id: b, name: "Payment", order: 1, subdomain: { name: "Payment" } },
     ]);
   });
 
@@ -240,14 +240,47 @@ describe("store v2 (RT3)", () => {
     expect(get().level).toBe("big-picture");
   });
 
-  it("sets and clears a context's subdomain classification [us-00019-AC-1.1/2.1]", () => {
+  it("sets and clears the type of a context's subdomain [us-00019-AC-1.1/2.1, decision-00016]", () => {
     const a = get().addContext("Ordering");
     const b = get().addContext("Payment");
-    get().setContextClassification(a, "core");
-    expect(get().contexts.find((c) => c.id === a)?.classification).toBe("core");
-    expect(get().contexts.find((c) => c.id === b)?.classification).toBeUndefined(); // only target
-    get().setContextClassification(a, undefined); // clear
-    expect(get().contexts.find((c) => c.id === a)?.classification).toBeUndefined();
+    const ctx = (id: string) => get().contexts.find((c) => c.id === id);
+    get().setContextSubdomainType(a, "core");
+    expect(ctx(a)?.subdomain).toEqual({ name: "Ordering", type: "core" });
+    expect(ctx(b)?.subdomain).toEqual({ name: "Payment" }); // only target
+    get().setContextSubdomainType(a, undefined); // clear
+    expect(ctx(a)?.subdomain).toEqual({ name: "Ordering" });
+  });
+
+  it("gives a new context a subdomain named after it [decision-00016]", () => {
+    const a = get().addContext("Ordering");
+    expect(get().contexts.find((c) => c.id === a)?.subdomain).toEqual({ name: "Ordering" });
+  });
+
+  it("keeps the subdomain name in step on rename only while it is the default [decision-00016]", () => {
+    const a = get().addContext("Ordering");
+    const ctx = () => get().contexts.find((c) => c.id === a);
+    get().setContextSubdomainType(a, "core");
+    get().renameContext(a, "Order Taking");
+    expect(ctx()?.subdomain).toEqual({ name: "Order Taking", type: "core" });
+    get().setContextSubdomainName(a, "Sales");
+    get().renameContext(a, "Orders");
+    expect(ctx()?.subdomain).toEqual({ name: "Sales", type: "core" }); // set apart: stays
+  });
+
+  it("names the subdomain of a context that had none [decision-00016]", () => {
+    get().setModel({ nodes: [], edges: [], contexts: [{ id: "ord", name: "Ordering", order: 0 }] });
+    get().setContextSubdomainName("ord", "Sales");
+    expect(get().contexts[0].subdomain).toEqual({ name: "Sales" });
+    get().setContextSubdomainType("ord", "generic");
+    expect(get().contexts[0].subdomain).toEqual({ name: "Sales", type: "generic" });
+  });
+
+  it("types and renames a context that had no subdomain [decision-00016]", () => {
+    get().setModel({ nodes: [], edges: [], contexts: [{ id: "ord", name: "Ordering", order: 0 }] });
+    get().renameContext("ord", "Orders");
+    expect(get().contexts[0]).toEqual({ id: "ord", name: "Orders", order: 0, subdomain: undefined });
+    get().setContextSubdomainType("ord", "core");
+    expect(get().contexts[0].subdomain).toEqual({ name: "Orders", type: "core" });
   });
 
   it("marks and clears a context as a Big Ball of Mud [decision-00015]", () => {
@@ -974,7 +1007,7 @@ describe("snapshots + compare [spec-00008]", () => {
 
 describe("the active Project [spec-00012]", () => {
   const model: Model = {
-    version: "4.0",
+    version: "5.0",
     meta: { name: "Ordering", level: "design", createdAt: "2026-01-01T00:00:00.000Z" },
     contexts: [{ id: "ord", name: "Ordering", order: 0 }],
     contextRelationships: [],

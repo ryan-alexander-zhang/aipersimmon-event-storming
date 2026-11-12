@@ -17,12 +17,17 @@ const DOT: Record<Severity, string> = {
 export function HealthPanel() {
   const nodes = useESStore((s) => s.nodes);
   const edges = useESStore((s) => s.edges);
+  const contexts = useESStore((s) => s.contexts);
+  const level = useESStore((s) => s.level);
   const setSelected = useESStore((s) => s.setSelected);
   const toggleHealth = useESStore((s) => s.toggleHealth);
   const { fitView } = useReactFlow();
 
   // Findings are a pure function of the model, recomputed whenever it changes.
-  const findings = useMemo(() => analyzeModel(nodes, edges), [nodes, edges]);
+  const findings = useMemo(
+    () => analyzeModel(nodes, edges, contexts, level),
+    [nodes, edges, contexts, level],
+  );
 
   const focus = (ids: string[]) => {
     if (ids.length === 0) return;

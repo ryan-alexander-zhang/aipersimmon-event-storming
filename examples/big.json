@@ -1,5 +1,5 @@
 {
-  "version": "4.0",
+  "version": "5.0",
   "meta": {
     "name": "Event Storming",
     "level": "design",
@@ -10,43 +10,43 @@
       "id": "invc",
       "name": "Invoicing",
       "order": 0,
-      "classification": "core"
+      "subdomain": {"name": "Invoicing", "type": "core"}
     },
     {
       "id": "pay",
       "name": "Payment",
       "order": 1,
-      "classification": "core"
+      "subdomain": {"name": "Payment", "type": "core"}
     },
     {
       "id": "conn",
       "name": "Connector",
       "order": 2,
-      "classification": "core"
+      "subdomain": {"name": "Connector", "type": "core"}
     },
     {
       "id": "disp",
       "name": "Dispute",
       "order": 3,
-      "classification": "supporting"
+      "subdomain": {"name": "Dispute", "type": "supporting"}
     },
     {
       "id": "ledg",
       "name": "Ledger",
       "order": 4,
-      "classification": "core"
+      "subdomain": {"name": "Ledger", "type": "core"}
     },
     {
       "id": "recn",
       "name": "Reconciliation",
       "order": 5,
-      "classification": "supporting"
+      "subdomain": {"name": "Reconciliation", "type": "supporting"}
     },
     {
       "id": "noti",
       "name": "Notification",
       "order": 6,
-      "classification": "generic"
+      "subdomain": {"name": "Notification", "type": "generic"}
     }
   ],
   "contextRelationships": [

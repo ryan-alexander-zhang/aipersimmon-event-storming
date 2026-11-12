@@ -1,3 +1,5 @@
+import type { SubdomainType } from "@/lib/dsl/schema";
+
 // Bounded Context is shown as a sticky colour (decision-00005): a deterministic
 // tint per context id, so a context keeps its colour across renames. Shared by
 // the element sticky (a left stripe) and the context legend. Ungrouped (no
@@ -21,16 +23,14 @@ export function contextTint(ctx?: string): string | undefined {
   return CONTEXT_TINTS[h % CONTEXT_TINTS.length];
 }
 
-// Strategic subdomain classification (spec-00004 FR4). A label + badge colour per
-// type — independent of the identity tint above. Core is the strong/invest colour.
-export type Subdomain = "core" | "supporting" | "generic";
-
-export const SUBDOMAIN_STYLE: Record<Subdomain, { label: string; color: string }> = {
+// Strategic subdomain type (spec-00004 FR4, decision-00016). A label + badge colour
+// per type — independent of the identity tint above. Core is the strong/invest colour.
+export const SUBDOMAIN_STYLE: Record<SubdomainType, { label: string; color: string }> = {
   core: { label: "Core", color: "#7c3aed" },
   supporting: { label: "Supporting", color: "#0891b2" },
   generic: { label: "Generic", color: "#6b7280" },
 };
 
 // Evans's Big Ball of Mud: a designation of one context, not a relationship
-// (decision-00015). Orthogonal to the subdomain classification.
+// (decision-00015). Orthogonal to the subdomain type.
 export const MUD_STYLE = { label: "Big Ball of Mud", color: "#8d6e63" } as const;

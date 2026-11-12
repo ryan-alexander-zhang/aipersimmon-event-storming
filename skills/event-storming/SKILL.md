@@ -1,6 +1,6 @@
 ---
 name: event-storming
-description: Builds and edits Event Storming models as validated DSL v4.0 JSON for the event-storming editor. Runs the session phase by phase - Big Picture, then Process, then Design, plus the Context Map - interviews the user to fill gaps, and validates every write. Use when the user wants to model a domain, run an event storming, create or extend a board, or write, repair, or review an event storming model JSON.
+description: Builds and edits Event Storming models as validated DSL v5.0 JSON for the event-storming editor. Runs the session phase by phase - Big Picture, then Process, then Design, plus the Context Map - interviews the user to fill gaps, and validates every write. Use when the user wants to model a domain, run an event storming, create or extend a board, or write, repair, or review an event storming model JSON.
 ---
 
 # Event Storming
@@ -17,7 +17,7 @@ This is modelling **with EventStorming grammar**, not an EventStorming workshop 
 | Phase 1 - events, hotspots | `reference/big-picture.md` |
 | Phase 2 - commands, actors, policies, read models | `reference/process.md` |
 | Phase 3 - aggregates, constraints | `reference/design.md` |
-| Contexts, classification, context relationships | `reference/context-map.md` |
+| Contexts, subdomains, context relationships | `reference/context-map.md` |
 | Working example using every feature | `template.json` (copy, then edit) |
 
 ## Workflow
@@ -55,8 +55,8 @@ Grill on: gaps in the story, unhappy paths, who acts, what triggers what, exact 
 
 - **Big Picture**: events past tense, ordered, story has no gap, pivotal events marked, alternative outcomes of one moment share an `alternativeSet`, every unknown captured as a hotspot.
 - **Process**: every event has a producing command or external system, or is marked `temporal` (raised by time); every command has an issuing actor or external system, or an invoking policy; every actor decision has a read model.
-- **Design**: every command is handled by an aggregate or external system; every rule that can block a command is a constraint; every policy has `condition`, `execution`, and `parameters` where they exist.
-- **Context Map**: every context classified; every cross-context seam typed.
+- **Design**: every command is handled by an aggregate or external system; every rule that can block a command is a constraint; every policy has `condition`, `execution`, and `parameters` where they exist; every context realises its own typed `subdomain` (the validator errors otherwise at `design`).
+- **Context Map**: every context realises one named, typed subdomain, no two the same; every cross-context seam typed.
 
 Then ask: "Move on to <next phase>?" Do not continue on your own.
 

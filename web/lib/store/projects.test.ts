@@ -17,7 +17,7 @@ import { putRecord } from "./projects-db";
 import type { DiscoveryItem, Snapshot } from "./store";
 
 const model: Model = {
-  version: "4.0",
+  version: "5.0",
   meta: { name: "Ordering", level: "design", createdAt: "2026-01-01T00:00:00.000Z" },
   contexts: [{ id: "ord", name: "Ordering", order: 0 }],
   contextRelationships: [],
@@ -69,7 +69,7 @@ describe("project records [us-00030 / us-00032]", () => {
     const v3 = { version: "3.0", meta: model.meta, contexts: model.contexts, nodes: model.nodes, edges: [] };
     await putRecord({ ...created, model: v3 } as unknown as { id: string });
     const loaded = await loadProject(created.id);
-    expect(loaded?.model.version).toBe("4.0");
+    expect(loaded?.model.version).toBe("5.0");
     expect(loaded?.model.contextRelationships).toEqual([]);
   });
 

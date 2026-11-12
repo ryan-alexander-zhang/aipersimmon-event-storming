@@ -1,11 +1,11 @@
 {
-  "version": "4.0",
+  "version": "5.0",
   "meta": {"name": "Cargo Shipping", "level": "design", "createdAt": "2026-05-10T00:00:00Z"},
   "contexts": [
-    {"id": "book", "name": "Booking", "order": 0, "classification": "core"},
-    {"id": "rout", "name": "Routing", "order": 1, "classification": "supporting"},
-    {"id": "hand", "name": "Handling", "order": 2, "classification": "core"},
-    {"id": "trak", "name": "Tracking", "order": 3, "classification": "supporting"}
+    {"id": "book", "name": "Booking", "order": 0, "subdomain": {"name": "Booking", "type": "core"}},
+    {"id": "rout", "name": "Routing", "order": 1, "subdomain": {"name": "Routing", "type": "supporting"}},
+    {"id": "hand", "name": "Handling", "order": 2, "subdomain": {"name": "Handling", "type": "core"}},
+    {"id": "trak", "name": "Tracking", "order": 3, "subdomain": {"name": "Tracking", "type": "supporting"}}
   ],
   "contextRelationships": [
     {"id": "cr-01", "source": "rout", "target": "book", "type": "openHostService"},

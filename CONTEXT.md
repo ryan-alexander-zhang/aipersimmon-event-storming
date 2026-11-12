@@ -124,11 +124,14 @@ overlap in time (decision-00005).
 _Avoid_: module, service, area.
 
 **Subdomain**:
-The strategic classification of a Bounded Context — **core** (a competitive
+The named business capability a Bounded Context realises — problem space, where
+the context is solution space. Each context realises exactly one Subdomain and no
+two contexts realise the same one; its name defaults to the context's. Its type
+is **core** (a competitive
 advantage, worth the most investment), **supporting** (needed but not
-differentiating), or **generic** (a solved problem, buy or outsource). An optional
-attribute on a Bounded Context; classification is not identity.
-_Avoid_: domain, module, tier.
+differentiating), or **generic** (a solved problem, buy or outsource). Required
+at the Design level; optional before boundaries are drawn (decision-00016).
+_Avoid_: domain, module, tier, classification (for the whole Subdomain).
 
 **Big Ball of Mud**:
 Evans's designation for a Bounded Context whose model is a recognised mess: the
@@ -220,7 +223,7 @@ _Avoid_: dependency, link, connection.
 
 **Context Map**:
 A bird's-eye view of the model's strategic design: each Bounded Context as a node
-(with its Subdomain classification) and each Context Relationship as a directed
+(with its Subdomain's type) and each Context Relationship as a directed
 edge. A distinct view over the model — it never mutates the timeline board.
 _Avoid_: architecture diagram, system map.
 

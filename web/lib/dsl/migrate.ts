@@ -82,6 +82,20 @@ function migrateV3toV4(v3: Record<string, unknown>): unknown {
   return { ...v3, version: "4.0" };
 }
 
+// v4 → v5: a context realises one named Subdomain (decision-00016).
+// `classification` moves into `subdomain.type`; the name defaults to the context's.
+function migrateV4toV5(v4: Record<string, unknown>): unknown {
+  const contexts = Array.isArray(v4.contexts) ? (v4.contexts as Record<string, unknown>[]) : [];
+  return {
+    ...v4,
+    version: "5.0",
+    contexts: contexts.map(({ classification, ...c }) => ({
+      ...c,
+      subdomain: classification === undefined ? { name: c.name } : { name: c.name, type: classification },
+    })),
+  };
+}
+
 /** Migrate any supported older document to the latest shape (chained). */
 export function migrateToLatest(raw: unknown): unknown {
   if (!raw || typeof raw !== "object") return raw;
@@ -89,5 +103,6 @@ export function migrateToLatest(raw: unknown): unknown {
   if (r.version === "1.0") r = migrateV1toV2(r) as Record<string, unknown>;
   if (r.version === "2.0") r = migrateV2toV3(r) as Record<string, unknown>;
   if (r.version === "3.0") r = migrateV3toV4(r) as Record<string, unknown>;
+  if (r.version === "4.0") r = migrateV4toV5(r) as Record<string, unknown>;
   return r;
 }

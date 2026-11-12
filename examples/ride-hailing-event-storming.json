@@ -1,15 +1,15 @@
 {
-  "version": "4.0",
+  "version": "5.0",
   "meta": {
     "name": "Ride-Hailing Platform",
     "level": "design",
     "createdAt": "2026-07-20T00:00:00Z"
   },
   "contexts": [
-    { "id": "ord", "name": "Trip Ordering", "order": 0, "classification": "core" },
-    { "id": "dsp", "name": "Dispatch & Matching", "order": 1, "classification": "core" },
-    { "id": "trp", "name": "Trip Lifecycle", "order": 2, "classification": "supporting" },
-    { "id": "bil", "name": "Billing & Payment", "order": 3, "classification": "generic" }
+    { "id": "ord", "name": "Trip Ordering", "order": 0, "subdomain": { "name": "Trip Ordering", "type": "core" } },
+    { "id": "dsp", "name": "Dispatch & Matching", "order": 1, "subdomain": { "name": "Dispatch & Matching", "type": "core" } },
+    { "id": "trp", "name": "Trip Lifecycle", "order": 2, "subdomain": { "name": "Trip Lifecycle", "type": "supporting" } },
+    { "id": "bil", "name": "Billing & Payment", "order": 3, "subdomain": { "name": "Billing & Payment", "type": "generic" } }
   ],
   "contextRelationships": [
     { "id": "cr-01", "source": "ord", "target": "dsp", "type": "customerSupplier" },

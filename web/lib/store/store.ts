@@ -13,7 +13,7 @@ import {
 import { nanoid } from "nanoid";
 import { create } from "zustand";
 import { createStore, type StateCreator } from "zustand/vanilla";
-import type { Context, ContextRelationship, Model } from "@/lib/dsl/schema";
+import type { Context, ContextRelationship, Model, SubdomainType } from "@/lib/dsl/schema";
 import { fromModel, toModel } from "@/lib/dsl/serialize";
 import {
   type ContextRelationType,
@@ -200,11 +200,10 @@ export interface ESState {
   /** Add a bounded context; returns its id. */
   addContext: (name: string) => string;
   renameContext: (id: string, name: string) => void;
-  /** Set (or clear, with undefined) a Bounded Context's subdomain classification. */
-  setContextClassification: (
-    id: string,
-    classification: "core" | "supporting" | "generic" | undefined,
-  ) => void;
+  /** Set (or clear, with undefined) the type of the Subdomain a context realises. */
+  setContextSubdomainType: (id: string, type: SubdomainType | undefined) => void;
+  /** Name the Subdomain a context realises (decision-00016). */
+  setContextSubdomainName: (id: string, name: string) => void;
   /** Mark (or clear, with undefined) a Bounded Context as a Big Ball of Mud (decision-00015). */
   setContextBigBallOfMud: (id: string, bigBallOfMud: true | undefined) => void;
   /** Add a directed relationship source→target (default Customer/Supplier); returns its id. */
@@ -434,15 +433,36 @@ const initializer: StateCreator<ESState> = (set, get) => ({
   addContext: (name) => {
     const id = nanoid();
     const order = get().contexts.reduce((m, c) => Math.max(m, c.order), -1) + 1;
-    set({ contexts: [...get().contexts, { id, name, order }] });
+    set({ contexts: [...get().contexts, { id, name, order, subdomain: { name } }] });
     return id;
   },
 
+  // The subdomain name follows a rename while the two are still equal - its default
+  // (decision-00016); a name the author set apart stays.
   renameContext: (id, name) =>
-    set({ contexts: get().contexts.map((c) => (c.id === id ? { ...c, name } : c)) }),
+    set({
+      contexts: get().contexts.map((c) => {
+        if (c.id !== id) return c;
+        const subdomain = c.subdomain?.name === c.name ? { ...c.subdomain, name } : c.subdomain;
+        return { ...c, name, subdomain };
+      }),
+    }),
 
-  setContextClassification: (id, classification) =>
-    set({ contexts: get().contexts.map((c) => (c.id === id ? { ...c, classification } : c)) }),
+  setContextSubdomainType: (id, type) =>
+    set({
+      contexts: get().contexts.map((c) => {
+        if (c.id !== id) return c;
+        const name = c.subdomain?.name ?? c.name;
+        return { ...c, subdomain: type ? { name, type } : { name } };
+      }),
+    }),
+
+  setContextSubdomainName: (id, name) =>
+    set({
+      contexts: get().contexts.map((c) =>
+        c.id === id ? { ...c, subdomain: { ...c.subdomain, name } } : c,
+      ),
+    }),
 
   setContextBigBallOfMud: (id, bigBallOfMud) =>
     set({ contexts: get().contexts.map((c) => (c.id === id ? { ...c, bigBallOfMud } : c)) }),

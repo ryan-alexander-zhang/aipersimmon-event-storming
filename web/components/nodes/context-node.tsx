@@ -1,13 +1,15 @@
 "use client";
 
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
-import { MUD_STYLE, SUBDOMAIN_STYLE, type Subdomain } from "@/lib/eventstorming/context-color";
+import type { Subdomain } from "@/lib/dsl/schema";
+import { MUD_STYLE, SUBDOMAIN_STYLE } from "@/lib/eventstorming/context-color";
 
 // A Bounded Context as a node in the Context Map (spec-00004 FR5): its name, its
-// identity tint, and its subdomain classification badge. Four connection handles
+// identity tint, its subdomain's type badge, and the subdomain's name when it differs
+// from the context's (decision-00016). Four connection handles
 // so a relationship can be drawn in any direction.
 export type ContextFlowNode = Node<
-  { name: string; tint?: string; classification?: Subdomain; bigBallOfMud?: boolean },
+  { name: string; tint?: string; subdomain?: Subdomain; bigBallOfMud?: boolean },
   "context"
 >;
 
@@ -23,7 +25,8 @@ const SIDES = [
 ] as const;
 
 export function ContextNode({ data, selected }: NodeProps<ContextFlowNode>) {
-  const cls = data.classification;
+  const cls = data.subdomain?.type;
+  const subdomainName = data.subdomain?.name;
   return (
     <div
       data-testid="context-node"
@@ -42,6 +45,11 @@ export function ContextNode({ data, selected }: NodeProps<ContextFlowNode>) {
         <span className="h-3 w-3 shrink-0 rounded-[3px]" style={{ background: data.tint ?? "#d4d4d8" }} />
         <span className="text-sm font-semibold text-zinc-800">{data.name}</span>
       </div>
+      {subdomainName && subdomainName !== data.name && (
+        <div data-testid="context-node-subdomain" className="text-[11px] text-zinc-500">
+          realises {subdomainName}
+        </div>
+      )}
       {cls && (
         <span
           className="mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white"
