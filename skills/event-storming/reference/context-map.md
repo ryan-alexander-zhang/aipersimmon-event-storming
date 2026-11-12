@@ -8,7 +8,7 @@ Runs any time after phase 1. It never changes the timeline; it only fills `conte
 
 1. **Cut the contexts.** Group the board where the language changes meaning, the owner changes, the pace of change differs, or the data can be stale without harm. One team can own several contexts; one context should not be owned by several teams.
 2. **Name and type the subdomain each one realises** in `subdomain: {name, type}`. One context, one subdomain, and no two contexts share one. The name defaults to the context's; change it only when the business calls the capability something else. A context whose model is a recognised mess gets `bigBallOfMud: true` on top - the point of the mark is to not let that model propagate; its downstreams usually defend with `acl`. A muddy context still realises one subdomain, named and typed by its dominant value; that it also covers other capabilities goes on the board as a `hotspot` - a split waiting to happen.
-3. **Find the seams.** Every edge that crosses a context is a seam. Each pair of contexts with at least one seam needs a relationship.
+3. **Find the seams.** Every edge that crosses a context is a seam - except an actor's: a person working in two contexts is not the contexts integrating. Each pair of contexts with at least one seam needs a relationship.
 4. **Type each relationship.** `source` = upstream (the one that sets the terms), `target` = downstream. One pair may carry several.
 5. Validate, run the gate.
 
@@ -56,6 +56,6 @@ Picking between the near ones:
 
 - [ ] Every context has a `subdomain` with a `name` and a `type`; no two contexts name the same subdomain.
 - [ ] Every context used by a node is declared in `contexts`, with an `order`.
-- [ ] Every pair of contexts with a crossing edge has at least one relationship.
+- [ ] Every pair of contexts with a crossing edge has at least one relationship (else the validator warns `unbacked seam`).
 - [ ] No relationship between a context and itself.
 - [ ] Core subdomains are few and are the ones the business would defend.

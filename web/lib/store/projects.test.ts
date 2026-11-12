@@ -138,6 +138,20 @@ describe("Recent [us-00030-FR-2, us-00030-FR-7]", () => {
     expect((await loadProject(broken.id))?.source).toBeUndefined();
   });
 
+  it("keeps a folder source a folder, and reads a source stored before folders as a file [plan-00024-AC-10]", async () => {
+    const folder = await createProject("Folder");
+    const file = await createProject("File");
+    const at = "2026-01-01T00:00:00.000Z";
+    await putRecord({ ...folder, source: { kind: "folder", handle: {}, name: "ride", lastRefreshedAt: at } } as unknown as {
+      id: string;
+    });
+    await putRecord({ ...file, source: { handle: {}, name: "a.json", lastRefreshedAt: at } } as unknown as { id: string });
+    expect((await loadProject(folder.id))?.source?.kind).toBe("folder");
+    const old = (await loadProject(file.id))?.source;
+    expect(old?.name).toBe("a.json");
+    expect(old?.kind).toBeUndefined();
+  });
+
   it("reports a Project's source file name", async () => {
     const created = await createProject("Ordering");
     await putRecord({

@@ -34,8 +34,8 @@ Stop at the level the user asked for. Big Picture always runs first - every leve
 
 ## Rules
 
-1. **One file, grown in place.** Each phase edits the same JSON and raises `meta.level`. Never restart from scratch.
-2. **Validate every write:** `python3 <skill-dir>/scripts/validate.py <file>`. Fix all ERRORs, re-run until clean, report WARNs to the user. Python 3, no packages needed.
+1. **One model, grown in place.** Each phase edits the same model and raises `meta.level`. Never restart from scratch. It starts as one file; once the Context Map has cut the contexts, offer to split it into a `domain.json` plus one file per context (`reference/dsl.md`, Split models). From then on, edit only the files a change touches - usually one context file, plus `domain.json` for a seam.
+2. **Validate every write:** `python3 <skill-dir>/scripts/validate.py <file>` - for a split model, pass its `domain.json`; the linked files are read with it. Fix all ERRORs, re-run until clean, report WARNs to the user. Python 3, no packages needed.
 3. **Ask, don't invent.** A domain fact you cannot read from the repo or the brief is a question. Still unknown after asking? Write a `hotspot`, not a guess. If the user answers it later, set `state: "resolved"` **and** write the answer into `resolution` - a hotspot closed with nothing written down loses why it was closed.
 4. **Use the user's words** as labels, in their language. Do not rename their concepts.
 5. **Report after each phase:** counts per type, open hotspots, assumptions you made.
@@ -56,10 +56,10 @@ Grill on: gaps in the story, unhappy paths, who acts, what triggers what, exact 
 - **Big Picture**: events past tense, ordered, story has no gap, pivotal events marked, alternative outcomes of one moment share an `alternativeSet`, every unknown captured as a hotspot.
 - **Process**: every event has a producing command or external system, or is marked `temporal` (raised by time); every command has an issuing actor or external system, or an invoking policy; every actor decision has a read model.
 - **Design**: every command is handled by an aggregate or external system; every rule that can block a command is a constraint; every policy has `condition`, `execution`, and `parameters` where they exist; every context realises its own typed `subdomain` (the validator errors otherwise at `design`).
-- **Context Map**: every context realises one named, typed subdomain, no two the same; every cross-context seam typed.
+- **Context Map**: every context realises one named, typed subdomain, no two the same; every cross-context seam backed by a typed relationship (the validator warns `unbacked seam` otherwise).
 
 Then ask: "Move on to <next phase>?" Do not continue on your own.
 
 ## Output
 
-Default path `<slug>.eventstorming.json` in the working directory. Load it with **File > Import** in the editor.
+Default path `<slug>.eventstorming.json` in the working directory; a split model is a folder `<slug>/` holding `domain.json` and `contexts/`. Load a file with **Import a model file…** and a folder with **Import a model folder…** in the editor's Projects.

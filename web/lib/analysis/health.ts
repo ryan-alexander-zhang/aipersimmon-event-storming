@@ -2,7 +2,7 @@
 // from the structured model. Pure — a function of nodes + edges only, no store,
 // layout, or React Flow dependency. Findings are advisory and never block editing.
 
-import type { Context } from "@/lib/dsl/schema";
+import type { Context, ContextRelationship } from "@/lib/dsl/schema";
 import type { ElementType } from "@/lib/eventstorming/elements";
 import type { Level } from "@/lib/eventstorming/levels";
 import type { RelationType } from "@/lib/eventstorming/relations";
@@ -19,7 +19,8 @@ export type SmellType =
   | "unrecorded-resolution"
   | "lone-alternative"
   | "duplicate-subdomain"
-  | "missing-subdomain";
+  | "missing-subdomain"
+  | "unbacked-seam";
 
 export interface Finding {
   id: string;
@@ -53,6 +54,7 @@ export function analyzeModel(
   edges: ESEdge[],
   contexts: Context[] = [],
   level?: Level,
+  contextRelationships: ContextRelationship[] = [],
 ): Finding[] {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const label = (id: string): string => byId.get(id)?.data.label ?? id;
@@ -219,6 +221,7 @@ export function analyzeModel(
   }
 
   findings.push(...subdomainFindings(contexts, level));
+  findings.push(...seamFindings(nodes, edges, contexts, contextRelationships));
 
   findings.sort(
     (a, b) =>
@@ -266,4 +269,40 @@ function subdomainFindings(contexts: Context[], level?: Level): Finding[] {
     });
   }
   return out;
+}
+
+// Every edge crossing two contexts is a seam, and every seam is backed by a Context
+// Relationship between the pair, in either direction (decision-00017) - the Context
+// Map gate's rule, checked. An Actor's edge is not one: a person using two contexts
+// is not the contexts integrating. One finding per pair, pointing at its elements.
+function seamFindings(
+  nodes: ESNode[],
+  edges: ESEdge[],
+  contexts: Context[],
+  relationships: ContextRelationship[],
+): Finding[] {
+  const ctxOf = new Map(nodes.filter((n) => n.type !== "actor").map((n) => [n.id, n.data.context]));
+  const nameOf = new Map(contexts.map((c) => [c.id, c.name]));
+  const pair = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  const backed = new Set(relationships.map((r) => pair(r.source, r.target)));
+  const seams = new Map<string, Set<string>>();
+  for (const e of edges) {
+    const s = ctxOf.get(e.source);
+    const t = ctxOf.get(e.target);
+    if (!s || !t || s === t || backed.has(pair(s, t))) continue;
+    const key = pair(s, t);
+    const ids = seams.get(key) ?? new Set<string>();
+    ids.add(e.source).add(e.target);
+    seams.set(key, ids);
+  }
+  return [...seams].map(([key, ids]) => {
+    const [a, b] = key.split("|").map((id) => nameOf.get(id) ?? id);
+    return {
+      id: `unbacked-seam:${key}`,
+      type: "unbacked-seam" as const,
+      severity: "warning" as const,
+      message: `'${a}' and '${b}' are joined by an edge but have no Context Relationship`,
+      elementIds: [...ids],
+    };
+  });
 }

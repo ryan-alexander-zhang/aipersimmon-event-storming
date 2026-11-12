@@ -362,6 +362,13 @@ describe("serialize v2 (T2/RT1)", () => {
     }
   });
 
+  it("exports one file with no context links, which imports as a single file [plan-00024-AC-11]", () => {
+    const linked: Context[] = [{ id: "ord", name: "Ordering", order: 0, file: "contexts/ord.json" }];
+    const json = exportJSON([], [], linked, META);
+    expect(JSON.parse(json).contexts[0]).not.toHaveProperty("file");
+    expect(importJSON(json).ok).toBe(true);
+  });
+
   it("rejects a subdomain with an empty name [decision-00016]", () => {
     const bad = JSON.stringify({
       version: "5.0",

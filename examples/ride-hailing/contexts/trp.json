@@ -1,0 +1,207 @@
+{
+  "context": "trp",
+  "nodes": [
+    {
+      "id": "trp-driver",
+      "type": "actor",
+      "label": "Driver",
+      "properties": {}
+    },
+    {
+      "id": "trp-rider",
+      "type": "actor",
+      "label": "Rider",
+      "properties": {}
+    },
+    {
+      "id": "trp-c-arrive",
+      "type": "command",
+      "label": "Confirm Pickup",
+      "properties": {}
+    },
+    {
+      "id": "trp-e-arrived",
+      "type": "domainEvent",
+      "label": "Arrived At Pickup",
+      "order": 4,
+      "properties": {}
+    },
+    {
+      "id": "trp-c-start",
+      "type": "command",
+      "label": "Start Trip",
+      "properties": {}
+    },
+    {
+      "id": "trp-ag-trip",
+      "type": "aggregate",
+      "label": "Trip",
+      "properties": {}
+    },
+    {
+      "id": "trp-e-started",
+      "type": "domainEvent",
+      "label": "Trip Started",
+      "order": 5,
+      "properties": {
+        "pivotal": true
+      }
+    },
+    {
+      "id": "trp-rm-live",
+      "type": "readModel",
+      "label": "Live Location View",
+      "properties": {}
+    },
+    {
+      "id": "trp-c-end",
+      "type": "command",
+      "label": "End Trip",
+      "properties": {}
+    },
+    {
+      "id": "trp-e-ended",
+      "type": "domainEvent",
+      "label": "Trip Ended",
+      "order": 6,
+      "properties": {
+        "description": "Rider dropped off; hand off to billing to compute the fare.",
+        "pivotal": true
+      }
+    },
+    {
+      "id": "trp-rm-summary",
+      "type": "readModel",
+      "label": "Trip Summary View",
+      "properties": {}
+    },
+    {
+      "id": "trp-p-begin",
+      "type": "policy",
+      "label": "Begin Pickup Policy",
+      "properties": {
+        "description": "When a driver accepts, ask them to confirm pickup.",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "trp-p-autostart",
+      "type": "policy",
+      "label": "Auto-Start Policy",
+      "properties": {
+        "condition": "the rider is on board",
+        "execution": "automatic"
+      }
+    },
+    {
+      "id": "trp-h-gps",
+      "type": "hotspot",
+      "label": "How do we handle pickup-point GPS drift?",
+      "properties": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-trp-01",
+      "source": "trp-driver",
+      "target": "trp-c-arrive",
+      "relation": "issues"
+    },
+    {
+      "id": "e-trp-02",
+      "source": "trp-c-arrive",
+      "target": "trp-ag-trip",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-trp-03",
+      "source": "trp-ag-trip",
+      "target": "trp-e-arrived",
+      "relation": "emits"
+    },
+    {
+      "id": "e-trp-04",
+      "source": "trp-driver",
+      "target": "trp-c-start",
+      "relation": "issues"
+    },
+    {
+      "id": "e-trp-05",
+      "source": "trp-c-start",
+      "target": "trp-ag-trip",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-trp-06",
+      "source": "trp-ag-trip",
+      "target": "trp-e-started",
+      "relation": "emits"
+    },
+    {
+      "id": "e-trp-07",
+      "source": "trp-e-started",
+      "target": "trp-rm-live",
+      "relation": "updates"
+    },
+    {
+      "id": "e-trp-08",
+      "source": "trp-rm-live",
+      "target": "trp-rider",
+      "relation": "informs"
+    },
+    {
+      "id": "e-trp-09",
+      "source": "trp-driver",
+      "target": "trp-c-end",
+      "relation": "issues"
+    },
+    {
+      "id": "e-trp-10",
+      "source": "trp-c-end",
+      "target": "trp-ag-trip",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-trp-11",
+      "source": "trp-ag-trip",
+      "target": "trp-e-ended",
+      "relation": "emits"
+    },
+    {
+      "id": "e-trp-12",
+      "source": "trp-e-ended",
+      "target": "trp-rm-summary",
+      "relation": "updates"
+    },
+    {
+      "id": "e-trp-13",
+      "source": "trp-rm-summary",
+      "target": "trp-rider",
+      "relation": "informs"
+    },
+    {
+      "id": "e-trp-15",
+      "source": "trp-p-begin",
+      "target": "trp-c-arrive",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-trp-16",
+      "source": "trp-e-arrived",
+      "target": "trp-p-autostart",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-trp-17",
+      "source": "trp-p-autostart",
+      "target": "trp-c-start",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-trp-18",
+      "source": "trp-h-gps",
+      "target": "trp-e-arrived",
+      "relation": "annotates"
+    }
+  ]
+}

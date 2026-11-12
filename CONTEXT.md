@@ -227,6 +227,13 @@ A bird's-eye view of the model's strategic design: each Bounded Context as a nod
 edge. A distinct view over the model — it never mutates the timeline board.
 _Avoid_: architecture diagram, system map.
 
+**Seam**:
+An edge whose two ends lie in different Bounded Contexts, neither of them an
+Actor — a person working in two contexts is not the contexts integrating. Every
+pair of contexts joined by a seam is backed by at least one Context Relationship
+(decision-00017).
+_Avoid_: integration point, crossing (as a noun).
+
 **Concurrent Events**:
 Two or more Domain Events that occupy the same global timeline position because
 they happen in parallel — including across different Bounded Contexts. They share
@@ -247,10 +254,22 @@ created, reopened, or deleted.
 _Avoid_: recent files, history, project list.
 
 **Source File**:
-The `.json` file a Project was imported from, when the browser can retain access
-to it. Refreshing re-reads it and replaces the Project's Model; the tool never
-writes back to it.
+The `.json` file — or a split Model's folder — a Project was imported from, when
+the browser can retain access to it. Refreshing re-reads it and replaces the
+Project's Model. The tool never writes back to a file; a folder it writes only on
+an explicit Save to folder.
 _Avoid_: linked file, path, attachment.
+
+**Domain File**:
+The file that holds a Model's meta, its Bounded Contexts and Context
+Relationships, and every element not kept in a Context File. A Model that is one
+file is all Domain File; a split Model's is named `domain.json` (decision-00017).
+_Avoid_: index, manifest, root file.
+
+**Context File**:
+The file a Bounded Context links from the Domain File to hold its own elements
+and the relations between them. Belonging to the context is being in its file.
+_Avoid_: subdomain file, module file, part.
 
 **Refresh**:
 Re-reading a Project's Source File and replacing the Model with its contents.

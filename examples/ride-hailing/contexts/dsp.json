@@ -1,0 +1,243 @@
+{
+  "context": "dsp",
+  "nodes": [
+    {
+      "id": "dsp-driver",
+      "type": "actor",
+      "label": "Driver",
+      "properties": {}
+    },
+    {
+      "id": "dsp-c-match",
+      "type": "command",
+      "label": "Match Driver",
+      "properties": {}
+    },
+    {
+      "id": "dsp-ag-dispatch",
+      "type": "aggregate",
+      "label": "Dispatch",
+      "properties": {}
+    },
+    {
+      "id": "dsp-e-matched",
+      "type": "domainEvent",
+      "label": "Driver Matched",
+      "order": 2,
+      "properties": {
+        "pivotal": true
+      }
+    },
+    {
+      "id": "dsp-rm-offer",
+      "type": "readModel",
+      "label": "Driver Offer View",
+      "properties": {}
+    },
+    {
+      "id": "dsp-c-accept",
+      "type": "command",
+      "label": "Accept Offer",
+      "properties": {}
+    },
+    {
+      "id": "dsp-e-accepted",
+      "type": "domainEvent",
+      "label": "Driver Accepted",
+      "order": 3,
+      "properties": {
+        "description": "One of the three ways an offer can go (accepted / declined / timed out) - see alternativeSet.",
+        "pivotal": true,
+        "alternativeSet": "dispatch-outcome"
+      }
+    },
+    {
+      "id": "dsp-c-decline",
+      "type": "command",
+      "label": "Decline Offer",
+      "properties": {}
+    },
+    {
+      "id": "dsp-e-declined",
+      "type": "domainEvent",
+      "label": "Driver Declined",
+      "order": 3,
+      "properties": {
+        "alternativeSet": "dispatch-outcome"
+      }
+    },
+    {
+      "id": "dsp-e-timeout",
+      "type": "domainEvent",
+      "label": "Match Timed Out",
+      "order": 3,
+      "properties": {
+        "description": "The offer window (offerTimeout) closed with no driver accepting - raised by time passing, not by a command or a fake Timer system.",
+        "temporal": true,
+        "alternativeSet": "dispatch-outcome"
+      }
+    },
+    {
+      "id": "dsp-p-autodispatch",
+      "type": "policy",
+      "label": "Auto-Dispatch Policy",
+      "properties": {
+        "description": "When a ride is requested, match a driver.",
+        "condition": "a driver is available within the search radius",
+        "execution": "automatic",
+        "parameters": [
+          {
+            "name": "searchRadius",
+            "value": "3km"
+          },
+          {
+            "name": "offerTimeout",
+            "value": "30s"
+          }
+        ]
+      }
+    },
+    {
+      "id": "dsp-p-redecline",
+      "type": "policy",
+      "label": "Re-match on Decline Policy",
+      "properties": {
+        "condition": "decline attempts for this ride < maxAttempts",
+        "execution": "automatic",
+        "parameters": [
+          {
+            "name": "maxAttempts",
+            "value": "5"
+          },
+          {
+            "name": "radiusStep",
+            "value": "1km"
+          }
+        ]
+      }
+    },
+    {
+      "id": "dsp-p-retimeout",
+      "type": "policy",
+      "label": "Re-dispatch on Timeout Policy",
+      "properties": {
+        "condition": "re-dispatch attempts < maxRetries",
+        "execution": "automatic",
+        "parameters": [
+          {
+            "name": "offerTimeout",
+            "value": "30s"
+          },
+          {
+            "name": "maxRetries",
+            "value": "3"
+          }
+        ]
+      }
+    },
+    {
+      "id": "dsp-h-radius",
+      "type": "hotspot",
+      "label": "How wide is the match radius at peak?",
+      "properties": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-dsp-01",
+      "source": "dsp-c-match",
+      "target": "dsp-ag-dispatch",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-dsp-02",
+      "source": "dsp-ag-dispatch",
+      "target": "dsp-e-matched",
+      "relation": "emits"
+    },
+    {
+      "id": "e-dsp-03",
+      "source": "dsp-e-matched",
+      "target": "dsp-rm-offer",
+      "relation": "updates"
+    },
+    {
+      "id": "e-dsp-04",
+      "source": "dsp-rm-offer",
+      "target": "dsp-driver",
+      "relation": "informs"
+    },
+    {
+      "id": "e-dsp-05",
+      "source": "dsp-driver",
+      "target": "dsp-c-accept",
+      "relation": "issues"
+    },
+    {
+      "id": "e-dsp-06",
+      "source": "dsp-c-accept",
+      "target": "dsp-ag-dispatch",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-dsp-07",
+      "source": "dsp-ag-dispatch",
+      "target": "dsp-e-accepted",
+      "relation": "emits"
+    },
+    {
+      "id": "e-dsp-08",
+      "source": "dsp-driver",
+      "target": "dsp-c-decline",
+      "relation": "issues"
+    },
+    {
+      "id": "e-dsp-09",
+      "source": "dsp-c-decline",
+      "target": "dsp-ag-dispatch",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-dsp-10",
+      "source": "dsp-ag-dispatch",
+      "target": "dsp-e-declined",
+      "relation": "emits"
+    },
+    {
+      "id": "e-dsp-13",
+      "source": "dsp-p-autodispatch",
+      "target": "dsp-c-match",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-dsp-14",
+      "source": "dsp-e-declined",
+      "target": "dsp-p-redecline",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-dsp-15",
+      "source": "dsp-p-redecline",
+      "target": "dsp-c-match",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-dsp-16",
+      "source": "dsp-e-timeout",
+      "target": "dsp-p-retimeout",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-dsp-17",
+      "source": "dsp-p-retimeout",
+      "target": "dsp-c-match",
+      "relation": "invokes"
+    },
+    {
+      "id": "e-dsp-18",
+      "source": "dsp-h-radius",
+      "target": "dsp-c-match",
+      "relation": "annotates"
+    }
+  ]
+}

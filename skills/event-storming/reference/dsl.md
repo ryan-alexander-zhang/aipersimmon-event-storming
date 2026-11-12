@@ -15,6 +15,7 @@ validator will say so.
 - Relations (edge rules)
 - Alternative sets (things that happen instead of each other)
 - Contexts and context relationships
+- Split models (one file per context)
 - Level gating
 - Id and label conventions
 - Common errors
@@ -185,6 +186,25 @@ Edges cross contexts freely - that is how seams show up.
 - `nodes[].context` is optional; a node without it is Ungrouped. Any `context` you use should be declared in `contexts`.
 - `contextRelationships[].type` is one of `partnership`, `sharedKernel`, `customerSupplier`, `conformist`, `acl`, `openHostService`, `publishedLanguage`, `separateWays`. `source` = upstream, `target` = downstream. One pair may carry several. See `reference/context-map.md` for when to use which.
 
+## Split models - one file per context
+
+A model may live in a folder: `domain.json` plus one file per context. A context that carries `file` (a path relative to `domain.json`) keeps its elements in that file; a context without it keeps them inline. No `file` anywhere is an ordinary single-file model.
+
+```text
+<slug>/
+  domain.json        # version, meta, contexts (+ file), contextRelationships,
+                     # Ungrouped nodes, cross-context edges
+  contexts/ord.json  # { "context": "ord", "nodes": [...], "edges": [...] }
+```
+
+- **Membership is the file.** A node in a context file has no `context` key - writing one is an ERROR. A node in `domain.json` may only name a context that has no `file`.
+- **An edge lives where both its ends live.** Both ends in one linked context: that context's file. Anything else - crossing two contexts, or touching an Ungrouped node - goes in `domain.json`. A context file never references another file.
+- **Ids are unique across all files**; `order` stays one global sequence across them.
+- **`file`** is relative, stays inside the folder, ends `.json`, is not `domain.json`, and no two contexts share one. Default `contexts/<context id>.json`.
+- Validate the folder with `validate.py <slug>/domain.json`; errors name the file they are in.
+
+Split when the user agrees after the Context Map; Big Picture stays one file, because there are no contexts to split by yet. To split: give every context a `file`, move its nodes (dropping `context`) and its internal edges into that file, leave everything else in `domain.json`.
+
 ## Level gating
 
 `meta.level` decides which node types are allowed to be on the board:
@@ -213,5 +233,6 @@ Levels are cumulative. Raising the level never removes anything.
 - `parameters` values as numbers - both `name` and `value` are strings.
 - A relation the type pair does not allow (`policy -> domainEvent`, `command -> command`).
 - A node type not allowed at `meta.level`.
+- In a split model: a `context` key on a node in a context file, or an edge left in `domain.json` whose both ends are in one context file.
 - `context` id that is not declared in `contexts`.
 - Two events with the same `order` that are not actually concurrent.

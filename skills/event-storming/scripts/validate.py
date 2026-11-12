@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Validate an Event Storming DSL file (the version grammar.json names).
 
-Usage: python3 scripts/validate.py <model.json>
+Usage: python3 scripts/validate.py <model.json | domain.json>
+
+A split model (decision-00017) is validated through its domain file: the files its
+contexts link are read relative to it and merged, then the whole model is checked.
 
 ERROR = the editor rejects it, or the grammar forbids it. Must be fixed.
 WARN  = a model smell. Report it to the user; fix only if they agree.
@@ -11,7 +14,7 @@ Exit code 1 when there is at least one ERROR.
 import json
 import sys
 from collections import defaultdict
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 # The grammar is data, not code: grammar.json next to this script is the one copy the
 # skill keeps, and the editor's test suite checks it against the editor's own tables.
@@ -63,6 +66,9 @@ AGG_MAX_COMMANDS = 5
 AGG_MAX_EVENTS = 5
 
 errors, warns = [], []
+# In a split model, the file each node / edge id was read from, so an error about
+# one names where to fix it (decision-00017).
+ORIGIN = {}
 
 
 def err(msg):
@@ -115,6 +121,8 @@ def check_contexts(model, level):
             elif t is None and level == "design":
                 err(f"context {cid}: subdomain '{sd['name']}' has no type - core|supporting|generic")
             subdomains[sd["name"].strip().lower()].append(cid)
+        if "file" in c and not isinstance(c["file"], str):
+            err(f"context {cid}: file must be a path")
         bbm = c.get("bigBallOfMud")
         if bbm is not None and not isinstance(bbm, bool):
             err(f"context {cid}: bigBallOfMud must be true or false")
@@ -122,6 +130,150 @@ def check_contexts(model, level):
         if len(owners) > 1:
             err(f"contexts {', '.join(owners)} realise the same subdomain - one context each")
     return ids
+
+
+DOMAIN_FILE = "domain.json"
+
+
+def link_problem(file):
+    """Why a context's `file` cannot be followed, or None (mirrors the editor)."""
+    if file.startswith("/") or "\\" in file or (len(file) > 1 and file[1] == ":" and file[0].isalpha()):
+        return "must be a relative path"
+    if any(seg in ("..", ".", "") for seg in file.split("/")):
+        return "must stay inside the model's folder"
+    if not file.endswith(".json"):
+        return "must be a .json file"
+    if file == DOMAIN_FILE:
+        return "cannot be the domain file"
+    return None
+
+
+def merge_split(model, base):
+    """Read the files a domain file's contexts link and merge them into one model.
+    Returns the merged model, or None after reporting why it cannot be merged."""
+    links = {}
+    owners = {}
+    for c in model.get("contexts", []) if isinstance(model.get("contexts"), list) else []:
+        if not isinstance(c, dict) or "file" not in c:
+            continue
+        cid, f = str(c.get("id")), c["file"]
+        if not isinstance(f, str):
+            err(f"context {cid}: file must be a path")
+            return None
+        problem = link_problem(f)
+        if problem:
+            err(f'context {cid}: file "{f}" {problem}')
+            return None
+        if f in owners:
+            err(f'contexts {owners[f]} and {cid} both link "{f}" - one file each')
+            return None
+        owners[f] = cid
+        links[cid] = f
+    if not links:
+        return model
+
+    seen, home = {}, {}
+
+    def claim(i, place):
+        first = seen.get(str(i))
+        if first:
+            err(f"id {i} is used in both {first} and {place}")
+            return False
+        seen[str(i)] = place
+        return True
+
+    for c in model.get("contexts", []):
+        if isinstance(c, dict) and not claim(c.get("id"), DOMAIN_FILE):
+            return None
+
+    nodes = []
+    for n in model.get("nodes", []):
+        if not isinstance(n, dict):
+            continue
+        if n.get("context") in links:
+            err(f"{DOMAIN_FILE}: node {n.get('id')} names context {n['context']}, "
+                f"whose elements live in {links[n['context']]}")
+            return None
+        if not claim(n.get("id"), DOMAIN_FILE):
+            return None
+        home[str(n.get("id"))] = None
+        nodes.append(n)
+
+    ctx_edges = []
+    for cid, f in links.items():
+        try:
+            with open(PurePosixPath(base) / f, encoding="utf-8") as fh:
+                part = json.load(fh)
+        except FileNotFoundError:
+            err(f'context {cid}: linked file "{f}" is missing')
+            return None
+        except (OSError, json.JSONDecodeError):
+            err(f"{f} is not valid JSON.")
+            return None
+        if not isinstance(part, dict) or not isinstance(part.get("nodes"), list) \
+                or not isinstance(part.get("edges"), list):
+            err(f'{f}: must be {{ "context", "nodes", "edges" }}')
+            return None
+        if part.get("context") != cid:
+            err(f'{f}: says context "{part.get("context")}", but context {cid} links it')
+            return None
+        for n in part["nodes"]:
+            if not isinstance(n, dict):
+                continue
+            if "context" in n:
+                err(f"{f}: node {n.get('id')} carries context - the file is its context")
+                return None
+            if not claim(n.get("id"), f):
+                return None
+            home[str(n.get("id"))] = cid
+            nodes.append({**n, "context": cid})
+        ctx_edges.append((cid, f, [e for e in part["edges"] if isinstance(e, dict)]))
+
+    # An edge lives where both its ends live, so context files never point elsewhere.
+    edges = []
+    for e in model.get("edges", []):
+        if not isinstance(e, dict):
+            continue
+        if not claim(e.get("id"), DOMAIN_FILE):
+            return None
+        s = home.get(str(e.get("source")))
+        if s and s == home.get(str(e.get("target"))):
+            err(f"{DOMAIN_FILE}: edge {e.get('id')} joins two elements of {s} - it belongs in {links[s]}")
+            return None
+        edges.append(e)
+    for cid, f, es in ctx_edges:
+        for e in es:
+            if not claim(e.get("id"), f):
+                return None
+            if home.get(str(e.get("source"))) != cid or home.get(str(e.get("target"))) != cid:
+                err(f"{f}: edge {e.get('id')} leaves context {cid} - it belongs in {DOMAIN_FILE}")
+                return None
+            edges.append(e)
+    ORIGIN.update(seen)
+    return {**model, "nodes": nodes, "edges": edges}
+
+
+def check_seams(model, nodes, edges):
+    """Every edge crossing two contexts needs a Context Relationship between them, in
+    either direction (decision-00017). An actor's edge is not a seam: a person using
+    two contexts is not the contexts integrating. One warning per pair."""
+    pair = lambda a, b: (a, b) if a < b else (b, a)  # noqa: E731
+    backed = {pair(r.get("source"), r.get("target")) for r in as_list(model, "contextRelationships")
+              if isinstance(r.get("source"), str) and isinstance(r.get("target"), str)}
+    names = {c.get("id"): c.get("name") for c in as_list(model, "contexts")}
+    reported = set()
+    for s, t, _ in edges:
+        if nodes[s]["type"] == "actor" or nodes[t]["type"] == "actor":
+            continue
+        a, b = nodes[s].get("context"), nodes[t].get("context")
+        if not isinstance(a, str) or not isinstance(b, str) or a == b:
+            continue
+        key = pair(a, b)
+        if key in backed or key in reported:
+            continue
+        reported.add(key)
+        warn(f"unbacked seam: '{names.get(key[0], key[0])}' and '{names.get(key[1], key[1])}' "
+             "are joined by an edge but have no Context Relationship")
 
 
 def check_context_relationships(model, ctx_ids):
@@ -338,6 +490,16 @@ def policy_cycles(nodes, edges):
     return found
 
 
+def where(message):
+    """`<file>: ` for a message about a node or edge read from a split model's file."""
+    parts = message.split(" ", 2)
+    if len(parts) > 1 and parts[0] in ("node", "edge"):
+        origin = ORIGIN.get(parts[1].rstrip(":"))
+        if origin:
+            return f"{origin}: "
+    return ""
+
+
 def main():
     if len(sys.argv) != 2:
         print("usage: python3 validate.py <model.json>")
@@ -370,16 +532,25 @@ def main():
     if level not in LEVEL_TYPES:
         err(f"meta.level '{level}' - use big-picture|process|design")
 
+    merged = merge_split(model, Path(path).resolve().parent)
+    if merged is None:
+        for m in errors:
+            print(f"ERROR {m}")
+        print(f"\n{path}: the split model could not be merged - {len(errors)} error(s)")
+        return 1
+    model = merged
+
     ctx_ids = check_contexts(model, level)
     check_context_relationships(model, ctx_ids)
     nodes = check_nodes(model, ctx_ids, level)
     edges = check_edges(model, nodes)
     check_health(nodes, edges, level, ctx_ids)
+    check_seams(model, nodes, edges)
 
     for m in errors:
-        print(f"ERROR {m}")
+        print(f"ERROR {where(m)}{m}")
     for m in warns:
-        print(f"WARN  {m}")
+        print(f"WARN  {where(m)}{m}")
     print(f"\n{path}: {len(nodes)} nodes, {len(edges)} edges, {len(ctx_ids)} contexts, "
           f"level {level} - {len(errors)} error(s), {len(warns)} warning(s)")
     return 1 if errors else 0

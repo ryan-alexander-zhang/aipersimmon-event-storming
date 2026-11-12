@@ -2,14 +2,16 @@
 
 import { RefreshCw, Upload } from "lucide-react";
 import { type ChangeEvent, useRef, useState } from "react";
-import { fromModel, importJSON } from "@/lib/dsl/serialize";
-import { saveProject } from "@/lib/store/projects";
+import { fromModel, type ImportResult, importJSON } from "@/lib/dsl/serialize";
+import { mergeFiles } from "@/lib/dsl/split";
+import { type ProjectSource, saveProject } from "@/lib/store/projects";
 import {
   canRetainFileAccess,
   pickFile,
   READ_FAILURE_MESSAGE,
   readHandle,
 } from "@/lib/store/source-file";
+import { readFolder } from "@/lib/store/source-folder";
 import { useESStore } from "@/lib/store/store";
 
 const shortTime = (iso: string) => {
@@ -39,17 +41,16 @@ export function SourceFileControls() {
       "This board has changes that are not in the file. Reloading replaces them with the file's contents.",
     );
 
-  // Replace the Model from freshly read text, keeping the current one on any failure
-  // (spec-00001-XFR-2). `name`/`handle` present = this file becomes the source.
-  const applyText = (text: string, file?: { handle: FileSystemFileHandle; name: string }) => {
-    const result = importJSON(text);
+  // Replace the Model from a freshly read one, keeping the current one on any failure
+  // (spec-00001-XFR-2). `file` present = this file becomes the source.
+  const apply = (result: ImportResult, file?: { handle: FileSystemFileHandle; name: string }) => {
     if (!result.ok) {
       setError(result.error);
       return;
     }
     setError(null);
     setModel(fromModel(result.model));
-    const nextSource = file
+    const nextSource: ProjectSource | undefined = file
       ? { handle: file.handle, name: file.name, lastRefreshedAt: new Date().toISOString() }
       : source && { ...source, lastRefreshedAt: new Date().toISOString() };
     markSynced(nextSource ?? undefined);
@@ -78,7 +79,7 @@ export function SourceFileControls() {
     }
     const picked = await pickFile();
     if (!picked) return;
-    applyText(picked.text, { handle: picked.handle, name: picked.name });
+    apply(importJSON(picked.text), { handle: picked.handle, name: picked.name });
   };
 
   const onInputFile = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -87,18 +88,28 @@ export function SourceFileControls() {
     if (!file) return;
     // No handle to keep here: this browser cannot re-read the file later, so the
     // Project stays source-less and "Reload from file…" keeps re-picking.
-    applyText(await file.text());
+    apply(importJSON(await file.text()));
   };
 
   const refresh = async () => {
     if (!source) return;
     if (!confirmOverwrite()) return;
+    // A folder is re-read and merged exactly as on open (decision-00017).
+    if (source.kind === "folder") {
+      const folder = await readFolder(source.handle);
+      if (!folder.ok) {
+        setError(READ_FAILURE_MESSAGE[folder.failure]);
+        return;
+      }
+      apply(mergeFiles(folder.domain, folder.files));
+      return;
+    }
     const result = await readHandle(source.handle);
     if (!result.ok) {
       setError(READ_FAILURE_MESSAGE[result.failure]);
       return;
     }
-    applyText(result.text, { handle: source.handle, name: source.name });
+    apply(importJSON(result.text), { handle: source.handle, name: source.name });
   };
 
   const btn =

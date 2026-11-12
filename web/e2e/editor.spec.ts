@@ -2505,3 +2505,124 @@ test("commands are marked as alternatives, and a set of one is reported [us-0003
     page.getByTestId("health-panel").getByTestId("health-finding").filter({ hasText: "one member" }),
   ).toBeVisible();
 });
+
+test("imports a split model's folder as one board [plan-00024-AC-8, decision-00017]", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("projects-dialog")).toBeVisible();
+  // Every browser reads a folder through a directory input; Chromium also offers the
+  // picker, which a test cannot drive, so the input is fed directly.
+  await page
+    .getByTestId("folder-input")
+    .setInputFiles(path.join(__dirname, "../../examples/ride-hailing"));
+  await expect(page.getByTestId("projects-dialog")).toHaveCount(0);
+  // every Domain Event of every file is on the board - the spine the rest hangs off
+  await expect(nodes(page, "domainEvent")).toHaveCount(13);
+  await expect(page.getByTestId("context-legend")).toContainText("Trip Ordering");
+});
+
+test("a folder without a domain file is refused with a reason [decision-00017]", async ({ page }) => {
+  await page.goto("/");
+  await page.getByTestId("folder-input").setInputFiles(path.join(__dirname, "../../examples/ride-hailing/contexts"));
+  await expect(page.getByText("That folder has no domain.json at its top.")).toBeVisible();
+});
+
+test("Save to folder is offered only where a folder can be written [plan-00024-AC-9]", async ({ page }) => {
+  await page.addInitScript(() => {
+    // @ts-expect-error simulate a browser without the File System Access API
+    delete window.showDirectoryPicker;
+  });
+  await openBoard(page);
+  await openFileMenu(page);
+  await expect(page.getByRole("button", { name: "Export" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save to folder…" })).toHaveCount(0);
+});
+
+test("Save to folder is in the File menu on Chromium [plan-00024-AC-9]", async ({ page }) => {
+  await openBoard(page);
+  await openFileMenu(page);
+  await expect(page.getByRole("button", { name: "Save to folder…" })).toBeVisible();
+});
+
+// A folder on disk, flat: `window.__folder.files` maps paths inside it to text. The
+// stub handles walk it by prefix, so sub-folders exist as soon as a file is in them.
+const FOLDER_STUB = `
+class StubDir {
+  constructor(prefix, name) { this.prefix = prefix; this.name = name; }
+  async queryPermission() { return "granted"; }
+  async requestPermission() { return "granted"; }
+  async getDirectoryHandle(name, opts) {
+    const p = this.prefix + name + "/";
+    const exists = Object.keys(window.__folder.files).some((k) => k.startsWith(p));
+    if (!exists && !opts?.create) throw new DOMException("no dir", "NotFoundError");
+    return new StubDir(p, name);
+  }
+  async getFileHandle(name, opts) {
+    const path = this.prefix + name;
+    if (!(path in window.__folder.files)) {
+      if (!opts?.create) throw new DOMException("no file", "NotFoundError");
+      window.__folder.files[path] = "";
+    }
+    return {
+      getFile: async () => ({ text: async () => window.__folder.files[path] }),
+      createWritable: async () => {
+        let buf = "";
+        return { write: async (t) => { buf += t; }, close: async () => { window.__folder.files[path] = buf; } };
+      },
+    };
+  }
+}
+window.showDirectoryPicker = async () => new StubDir("", "ride-hailing");
+`;
+
+const withStubbedFolder = async (page: Page, files: Record<string, string>) => {
+  await page.addInitScript(`window.__folder = { files: ${JSON.stringify(files)} };\n${FOLDER_STUB}`);
+};
+const folderOnDisk = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __folder: { files: Record<string, string> } }).__folder.files);
+
+const RIDE = path.join(__dirname, "../../examples/ride-hailing");
+const rideFiles = (): Record<string, string> => ({
+  "domain.json": readFileSync(path.join(RIDE, "domain.json"), "utf8"),
+  ...Object.fromEntries(
+    ["ord", "dsp", "trp", "bil"].map((c) => [`contexts/${c}.json`, readFileSync(path.join(RIDE, `contexts/${c}.json`), "utf8")]),
+  ),
+});
+
+test("a folder Project re-reads its folder on Refresh [plan-00024-AC-10]", async ({ page }) => {
+  await withStubbedFolder(page, rideFiles());
+  await page.goto("/");
+  await page.getByRole("button", { name: "Import a model folder…" }).click();
+  await expect(nodes(page, "domainEvent")).toHaveCount(13);
+  await expect(page.getByRole("button", { name: "Refresh" })).toBeVisible(); // the folder is the source
+
+  // the folder changes on disk: one Domain Event renamed in a context file
+  await page.evaluate(() => {
+    const files = (window as unknown as { __folder: { files: Record<string, string> } }).__folder.files;
+    files["contexts/ord.json"] = files["contexts/ord.json"].replace('"Ride Requested"', '"Ride Booked"');
+  });
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(nodes(page, "domainEvent").filter({ hasText: "Ride Booked" })).toHaveCount(1);
+  await expect(nodes(page, "domainEvent")).toHaveCount(13);
+});
+
+test("Save to folder writes a domain file and one file per context [plan-00024-AC-9]", async ({ page }) => {
+  await withStubbedFolder(page, { "notes.md": "keep" });
+  await openBoard(page);
+  await addContext(page);
+  await addEvent(page);
+  await openFileMenu(page);
+  await page.getByRole("button", { name: "Save to folder…" }).click();
+
+  await expect.poll(async () => Object.keys(await folderOnDisk(page)).length).toBe(3);
+  const files = await folderOnDisk(page);
+  expect(files["notes.md"]).toBe("keep"); // nothing already there is touched
+  const domain = JSON.parse(files["domain.json"]);
+  const ctx = domain.contexts[0];
+  expect(ctx.file).toBe(`contexts/${ctx.id}.json`);
+  expect(domain.nodes).toEqual([]);
+  const contextFile = JSON.parse(files[ctx.file]);
+  expect(contextFile.context).toBe(ctx.id);
+  expect(contextFile.nodes.map((n: { type: string }) => n.type)).toEqual(["domainEvent"]);
+  expect(contextFile.nodes[0]).not.toHaveProperty("context");
+  await expect(page.getByTitle("ride-hailing")).toBeVisible(); // the folder became the source
+});

@@ -1,0 +1,138 @@
+{
+  "context": "ord",
+  "nodes": [
+    {
+      "id": "ord-rider",
+      "type": "actor",
+      "label": "Rider",
+      "properties": {}
+    },
+    {
+      "id": "ord-c-request",
+      "type": "command",
+      "label": "Request Ride",
+      "properties": {}
+    },
+    {
+      "id": "ord-ag-ride",
+      "type": "aggregate",
+      "label": "Ride",
+      "properties": {}
+    },
+    {
+      "id": "ord-e-requested",
+      "type": "domainEvent",
+      "label": "Ride Requested",
+      "order": 0,
+      "properties": {
+        "description": "Rider confirmed pickup/drop-off; starts the dispatch flow.",
+        "pivotal": true
+      }
+    },
+    {
+      "id": "ord-rm-mytrips",
+      "type": "readModel",
+      "label": "My Trips View",
+      "properties": {}
+    },
+    {
+      "id": "ord-rm-nearby",
+      "type": "readModel",
+      "label": "Nearby Cars View",
+      "properties": {}
+    },
+    {
+      "id": "ord-c-cancel",
+      "type": "command",
+      "label": "Cancel Ride",
+      "properties": {}
+    },
+    {
+      "id": "ord-e-cancelled",
+      "type": "domainEvent",
+      "label": "Ride Cancelled",
+      "order": 1,
+      "properties": {}
+    },
+    {
+      "id": "ord-h-fee",
+      "type": "hotspot",
+      "label": "How is the cancellation fee charged?",
+      "properties": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-ord-01",
+      "source": "ord-rider",
+      "target": "ord-c-request",
+      "relation": "issues"
+    },
+    {
+      "id": "e-ord-02",
+      "source": "ord-c-request",
+      "target": "ord-ag-ride",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-ord-03",
+      "source": "ord-ag-ride",
+      "target": "ord-e-requested",
+      "relation": "emits"
+    },
+    {
+      "id": "e-ord-04",
+      "source": "ord-e-requested",
+      "target": "ord-rm-mytrips",
+      "relation": "updates"
+    },
+    {
+      "id": "e-ord-05",
+      "source": "ord-e-requested",
+      "target": "ord-rm-nearby",
+      "relation": "updates"
+    },
+    {
+      "id": "e-ord-06",
+      "source": "ord-rm-mytrips",
+      "target": "ord-rider",
+      "relation": "informs"
+    },
+    {
+      "id": "e-ord-07",
+      "source": "ord-rm-nearby",
+      "target": "ord-rider",
+      "relation": "informs"
+    },
+    {
+      "id": "e-ord-08",
+      "source": "ord-rider",
+      "target": "ord-c-cancel",
+      "relation": "issues"
+    },
+    {
+      "id": "e-ord-09",
+      "source": "ord-c-cancel",
+      "target": "ord-ag-ride",
+      "relation": "handledBy"
+    },
+    {
+      "id": "e-ord-10",
+      "source": "ord-ag-ride",
+      "target": "ord-e-cancelled",
+      "relation": "emits"
+    },
+    {
+      "id": "e-ord-11",
+      "source": "ord-e-cancelled",
+      "target": "ord-rm-mytrips",
+      "relation": "updates"
+    },
+    {
+      "id": "e-ord-12",
+      "source": "ord-h-fee",
+      "target": "ord-e-cancelled",
+      "relation": "annotates"
+    }
+  ]
+}

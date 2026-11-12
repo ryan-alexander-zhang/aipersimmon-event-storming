@@ -1,17 +1,26 @@
 "use client";
 
-import { FilePlus, FolderOpen, Trash2, Upload, X } from "lucide-react";
+import { FilePlus, FolderInput, FolderOpen, Trash2, Upload, X } from "lucide-react";
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
-import { importJSON } from "@/lib/dsl/serialize";
+import { type ImportResult, importJSON } from "@/lib/dsl/serialize";
+import { mergeFiles } from "@/lib/dsl/split";
 import {
   createProject,
   deleteProject,
   listProjects,
   loadProject,
+  type ProjectSource,
   type ProjectSummary,
   saveProject,
   setActiveProjectId,
 } from "@/lib/store/projects";
+import { READ_FAILURE_MESSAGE } from "@/lib/store/source-file";
+import {
+  canRetainFolderAccess,
+  pickFolder,
+  readFolder,
+  readFolderInput,
+} from "@/lib/store/source-folder";
 import { useESStore } from "@/lib/store/store";
 
 /** Recent: create a Project, reopen one, import a file into a new one, delete one
@@ -25,6 +34,7 @@ export function ProjectsDialog() {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
 
   const refresh = async () => {
     setProjects(await listProjects());
@@ -83,16 +93,52 @@ export function ProjectsDialog() {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-importing the same file
     if (!file) return;
-    const result = importJSON(await file.text());
+    await start(file.name.replace(/\.json$/i, ""), importJSON(await file.text()));
+  };
+
+  const start = async (projectName: string, result: ImportResult, source?: ProjectSource) => {
     if (!result.ok) {
       setError(result.error);
       return;
     }
-    const record = await createProject(file.name.replace(/\.json$/i, ""));
-    const imported = { ...record, model: result.model };
+    const record = await createProject(projectName);
+    const imported = { ...record, model: result.model, ...(source ? { source } : {}) };
     openProject(imported);
     setActiveProjectId(imported.id);
     void saveProject(imported);
+  };
+
+  // Import a split model's folder as a new Project (decision-00017). Where the browser
+  // can keep the folder it becomes the Project's source, to refresh and save back to;
+  // elsewhere a directory input reads it once.
+  const importFolder = async () => {
+    setError(null);
+    if (!canRetainFolderAccess()) {
+      folderRef.current?.click();
+      return;
+    }
+    const handle = await pickFolder();
+    if (!handle) return;
+    const folder = await readFolder(handle);
+    if (!folder.ok) {
+      setError(READ_FAILURE_MESSAGE[folder.failure]);
+      return;
+    }
+    const source = { kind: "folder" as const, handle, name: handle.name, lastRefreshedAt: new Date().toISOString() };
+    await start(handle.name, mergeFiles(folder.domain, folder.files), source);
+  };
+
+  const onFolderInput = async (e: ChangeEvent<HTMLInputElement>) => {
+    setError(null);
+    const chosen = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (chosen.length === 0) return;
+    const folder = await readFolderInput(chosen);
+    if (!folder) {
+      setError("That folder has no domain.json at its top.");
+      return;
+    }
+    await start(folder.name, mergeFiles(folder.domain, folder.files));
   };
 
   const item =
@@ -179,6 +225,9 @@ export function ProjectsDialog() {
         <button type="button" className={item} onClick={() => fileRef.current?.click()}>
           <Upload size={14} /> Import a model file…
         </button>
+        <button type="button" className={item} onClick={() => void importFolder()}>
+          <FolderInput size={14} /> Import a model folder…
+        </button>
 
         {error && (
           <p className="mt-2 rounded bg-red-50 px-2 py-1 text-[11px] text-red-600" role="alert">
@@ -191,6 +240,17 @@ export function ProjectsDialog() {
           accept="application/json,.json"
           className="hidden"
           onChange={(e) => void importFile(e)}
+        />
+        <input
+          ref={(el) => {
+            folderRef.current = el;
+            // not in React's attribute types; every current browser supports it
+            el?.setAttribute("webkitdirectory", "");
+          }}
+          type="file"
+          className="hidden"
+          data-testid="folder-input"
+          onChange={(e) => void onFolderInput(e)}
         />
       </div>
     </div>

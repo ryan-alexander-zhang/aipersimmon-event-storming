@@ -123,7 +123,10 @@ export function exportJSON(
   meta: ModelMeta,
   contextRelationships: ContextRelationship[] = [],
 ): string {
-  return JSON.stringify(toModel(nodes, edges, contexts, meta, contextRelationships), null, 2);
+  // One merged file holds every element inline, so no context may point elsewhere
+  // (decision-00017).
+  const inline = contexts.map((c) => ({ ...c, file: undefined }));
+  return JSON.stringify(toModel(nodes, edges, inline, meta, contextRelationships), null, 2);
 }
 
 export type ImportResult = { ok: true; model: Model } | { ok: false; error: string };
@@ -136,6 +139,11 @@ export function importJSON(json: string): ImportResult {
   } catch {
     return { ok: false, error: "The file is not valid JSON." };
   }
+  return parseModel(raw);
+}
+
+/** Migrate + validate an already-parsed document into a Model. */
+export function parseModel(raw: unknown): ImportResult {
   const result = modelSchema.safeParse(migrateToLatest(raw));
   if (!result.success) {
     const first = result.error.issues[0];

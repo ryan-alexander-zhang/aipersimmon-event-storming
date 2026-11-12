@@ -55,6 +55,9 @@ export const contextSchema = z.object({
   name: z.string(),
   order: z.number(),
   subdomain: subdomainSchema.optional(),
+  // Where this context's elements live when the model is split: a path relative to
+  // the domain file (decision-00017). Absent = inline in the domain file.
+  file: z.string().min(1).optional(),
   // Evans's Big Ball of Mud: the boundary is drawn around a recognised mess so its
   // model is not let propagate. A designation of the context itself, not a
   // relationship; orthogonal to its subdomain (decision-00015).

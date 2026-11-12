@@ -299,3 +299,60 @@ describe("subdomain findings [decision-00016]", () => {
     expect(analyzeModel([], [], contexts, "design")).toEqual([]);
   });
 });
+
+describe("unbacked-seam [decision-00017, plan-00024-AC-7]", () => {
+  const inCtx = (id: string, type: ElementType, context: string): ESNode => ({
+    ...node(id, type),
+    data: { label: id, context },
+  });
+  const contexts: Context[] = [
+    { id: "ord", name: "Ordering", order: 0 },
+    { id: "pay", name: "Payment", order: 1 },
+  ];
+  const nodes = [
+    inCtx("c1", "command", "ord"),
+    inCtx("e1", "domainEvent", "pay"),
+    inCtx("c2", "command", "ord"),
+    inCtx("e2", "domainEvent", "pay"),
+    inCtx("e3", "domainEvent", "ord"),
+    node("loose", "domainEvent"),
+    inCtx("op", "actor", "pay"),
+  ];
+  const edges = [
+    edge("c1", "e1", "produces"),
+    edge("c2", "e2", "produces"),
+    edge("c1", "e3", "produces"), // inside one context
+    edge("c2", "loose", "produces"), // to an Ungrouped element
+    edge("op", "c2", "issues"), // a person acting in two contexts
+  ];
+  const seams = (rels: Parameters<typeof analyzeModel>[4]) =>
+    analyzeModel(nodes, edges, contexts, "process", rels).filter((f) => f.type === "unbacked-seam");
+
+  it("reports a pair joined by an edge and no relationship, once", () => {
+    const out = seams([]);
+    expect(out).toHaveLength(1);
+    expect(out[0].message).toBe("'Ordering' and 'Payment' are joined by an edge but have no Context Relationship");
+    expect([...out[0].elementIds].sort()).toEqual(["c1", "c2", "e1", "e2"]);
+  });
+
+  it("does not count an Actor's edge as a seam", () => {
+    const actorOnly = analyzeModel(
+      [inCtx("op", "actor", "pay"), inCtx("c", "command", "ord")],
+      [edge("op", "c", "issues")],
+      contexts,
+    );
+    expect(actorOnly.filter((f) => f.type === "unbacked-seam")).toEqual([]);
+  });
+
+  it("is satisfied by a relationship in either direction", () => {
+    expect(seams([{ id: "r", source: "pay", target: "ord", type: "conformist" }])).toEqual([]);
+    expect(seams([{ id: "r", source: "ord", target: "pay", type: "acl" }])).toEqual([]);
+  });
+
+  it("names a context that is not declared by its id", () => {
+    const out = analyzeModel([inCtx("a", "command", "x"), inCtx("b", "domainEvent", "y")], [edge("a", "b", "produces")]);
+    expect(out.find((f) => f.type === "unbacked-seam")?.message).toBe(
+      "'x' and 'y' are joined by an edge but have no Context Relationship",
+    );
+  });
+});

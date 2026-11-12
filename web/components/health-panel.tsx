@@ -19,14 +19,15 @@ export function HealthPanel() {
   const edges = useESStore((s) => s.edges);
   const contexts = useESStore((s) => s.contexts);
   const level = useESStore((s) => s.level);
+  const contextRelationships = useESStore((s) => s.contextRelationships);
   const setSelected = useESStore((s) => s.setSelected);
   const toggleHealth = useESStore((s) => s.toggleHealth);
   const { fitView } = useReactFlow();
 
   // Findings are a pure function of the model, recomputed whenever it changes.
   const findings = useMemo(
-    () => analyzeModel(nodes, edges, contexts, level),
-    [nodes, edges, contexts, level],
+    () => analyzeModel(nodes, edges, contexts, level, contextRelationships),
+    [nodes, edges, contexts, level, contextRelationships],
   );
 
   const focus = (ids: string[]) => {

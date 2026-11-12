@@ -27,12 +27,16 @@ export const STORAGE_KEY_SNAPSHOTS = "event-storming:snapshots";
 
 /** The source file a Project was imported from, when the browser can retain access
  *  to it. A `FileSystemFileHandle` survives structured cloning, so IndexedDB can
- *  store it — localStorage never could. Absent on Firefox/Safari (decision-00011 §3). */
-export interface ProjectSource {
-  handle: FileSystemFileHandle;
+ *  store it — localStorage never could. Absent on Firefox/Safari (decision-00011 §3).
+ *  `kind: "folder"` is a split model's folder (decision-00017); absent is a file, so
+ *  Projects stored before folders existed read unchanged. */
+export type ProjectSource = {
   name: string;
   lastRefreshedAt: string;
-}
+} & (
+  | { kind?: undefined; handle: FileSystemFileHandle }
+  | { kind: "folder"; handle: FileSystemDirectoryHandle }
+);
 
 export interface ProjectRecord {
   id: string;
@@ -112,6 +116,14 @@ function parseSource(raw: unknown): ProjectSource | undefined {
   // The handle is opaque here; whether it still grants access is only knowable when
   // a refresh actually reads it (us-00031-FR-5, us-00031-FR-6).
   if (typeof r.handle !== "object" || r.handle === null) return undefined;
+  if (r.kind === "folder") {
+    return {
+      kind: "folder",
+      handle: r.handle as FileSystemDirectoryHandle,
+      name: r.name,
+      lastRefreshedAt: r.lastRefreshedAt,
+    };
+  }
   return {
     handle: r.handle as FileSystemFileHandle,
     name: r.name,

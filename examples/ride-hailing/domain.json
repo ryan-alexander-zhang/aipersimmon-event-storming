@@ -1,0 +1,103 @@
+{
+  "version": "5.0",
+  "meta": {
+    "name": "Ride-Hailing Platform",
+    "level": "design",
+    "createdAt": "2026-07-20T00:00:00Z"
+  },
+  "contexts": [
+    {
+      "id": "ord",
+      "name": "Trip Ordering",
+      "order": 0,
+      "subdomain": {
+        "name": "Trip Ordering",
+        "type": "core"
+      },
+      "file": "contexts/ord.json"
+    },
+    {
+      "id": "dsp",
+      "name": "Dispatch & Matching",
+      "order": 1,
+      "subdomain": {
+        "name": "Dispatch & Matching",
+        "type": "core"
+      },
+      "file": "contexts/dsp.json"
+    },
+    {
+      "id": "trp",
+      "name": "Trip Lifecycle",
+      "order": 2,
+      "subdomain": {
+        "name": "Trip Lifecycle",
+        "type": "supporting"
+      },
+      "file": "contexts/trp.json"
+    },
+    {
+      "id": "bil",
+      "name": "Billing & Payment",
+      "order": 3,
+      "subdomain": {
+        "name": "Billing & Payment",
+        "type": "generic"
+      },
+      "file": "contexts/bil.json"
+    }
+  ],
+  "contextRelationships": [
+    {
+      "id": "cr-01",
+      "source": "ord",
+      "target": "dsp",
+      "type": "customerSupplier"
+    },
+    {
+      "id": "cr-02",
+      "source": "dsp",
+      "target": "trp",
+      "type": "customerSupplier"
+    },
+    {
+      "id": "cr-03",
+      "source": "trp",
+      "target": "bil",
+      "type": "customerSupplier"
+    },
+    {
+      "id": "cr-04",
+      "source": "ord",
+      "target": "trp",
+      "type": "sharedKernel"
+    },
+    {
+      "id": "cr-05",
+      "source": "bil",
+      "target": "ord",
+      "type": "publishedLanguage"
+    }
+  ],
+  "nodes": [],
+  "edges": [
+    {
+      "id": "e-dsp-12",
+      "source": "ord-e-requested",
+      "target": "dsp-p-autodispatch",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-trp-14",
+      "source": "dsp-e-accepted",
+      "target": "trp-p-begin",
+      "relation": "triggers"
+    },
+    {
+      "id": "e-bil-13",
+      "source": "trp-e-ended",
+      "target": "bil-p-tripend",
+      "relation": "triggers"
+    }
+  ]
+}
