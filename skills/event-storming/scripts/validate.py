@@ -45,6 +45,8 @@ RULES = [(r["relation"], _types(r["sources"]), _types(r["targets"]))
 RELATIONS = [r[0] for r in RULES]
 
 CTX_RELS = GRAMMAR["contextRelations"]
+# Last words that name a CRUD or UI step, not a business fact (decision-00018 E2, E5).
+TECHNICAL_VERBS = set(GRAMMAR["technicalVerbs"])
 
 # property -> the node types allowed to carry it (None = any type)
 PROPS = {"description": None, "pivotal": {"domainEvent"},
@@ -123,6 +125,16 @@ def check_contexts(model, level):
             subdomains[sd["name"].strip().lower()].append(cid)
         if "file" in c and not isinstance(c["file"], str):
             err(f"context {cid}: file must be a path")
+        # why the context exists and the terms that mean something specific in it
+        # (decision-00018)
+        purpose = c.get("purpose")
+        if purpose is None:
+            if level == "design":
+                err(f"context {cid}: no purpose - at design every context says which "
+                    "business problem it solves (purpose: \"...\")")
+        elif not isinstance(purpose, str) or not purpose.strip():
+            err(f"context {cid}: purpose must be a non-empty string")
+        check_language(cid, c.get("language"))
         bbm = c.get("bigBallOfMud")
         if bbm is not None and not isinstance(bbm, bool):
             err(f"context {cid}: bigBallOfMud must be true or false")
@@ -130,6 +142,24 @@ def check_contexts(model, level):
         if len(owners) > 1:
             err(f"contexts {', '.join(owners)} realise the same subdomain - one context each")
     return ids
+
+
+def check_language(cid, language):
+    if language is None:
+        return
+    if not isinstance(language, list):
+        err(f"context {cid}: language must be a list of {{\"term\", \"meaning\"}}")
+        return
+    seen = set()
+    for t in language:
+        if not isinstance(t, dict) or set(t) != {"term", "meaning"} \
+                or not all(isinstance(t[k], str) and t[k].strip() for k in ("term", "meaning")):
+            err(f"context {cid}: language entry {t} must be {{\"term\": ..., \"meaning\": ...}}, both non-empty")
+            continue
+        key = t["term"].strip().lower()
+        if key in seen:
+            err(f"context {cid}: term '{t['term']}' appears twice in its language")
+        seen.add(key)
 
 
 DOMAIN_FILE = "domain.json"
@@ -398,6 +428,8 @@ def check_health(nodes, edges, level, ctx_ids):
             if not n.get("properties", {}).get("temporal") \
                     and not any(r in ("produces", "emits") for _, r in inc[nid]):
                 warn(f"orphan event '{n['label']}': nothing produces or emits it")
+        if t == "domainEvent" and n["label"].split()[-1:] and n["label"].split()[-1] in TECHNICAL_VERBS:
+            warn(f"technical event '{n['label']}': names a technical step - what happened in business terms?")
         if t == "command":
             if not reaches_event(nid, out, nodes):
                 warn(f"dangling command '{n['label']}': it produces no domain event")
@@ -407,7 +439,14 @@ def check_health(nodes, edges, level, ctx_ids):
             c = sum(1 for _, r in inc[nid] if r == "handledBy")
             ev = sum(1 for _, r in out[nid] if r == "emits")
             if c > AGG_MAX_COMMANDS or ev > AGG_MAX_EVENTS:
-                warn(f"overloaded aggregate '{n['label']}': {c} command(s), {ev} event(s) - split it?")
+                warn(f"overloaded aggregate '{n['label']}': {c} command(s), {ev} event(s) - "
+                     "which rule do they all share? If none, it is two aggregates")
+            # its boundary is the invariants it protects: the constraints on the
+            # commands it handles (decision-00018 G2)
+            if level == "design" and not any(
+                    r2 == "constrainedBy" for s2, r in inc[nid] if r == "handledBy" for _, r2 in out[s2]):
+                warn(f"unguarded aggregate '{n['label']}': it protects no invariant - "
+                     "which rule can refuse its commands?")
         if t == "policy":
             if not any(r == "triggers" for _, r in inc[nid]):
                 warn(f"policy '{n['label']}': no domain event triggers it")

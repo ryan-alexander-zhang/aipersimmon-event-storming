@@ -59,6 +59,7 @@ export function BoardChrome({
   const renameContext = useESStore((s) => s.renameContext);
   const setContextSubdomainType = useESStore((s) => s.setContextSubdomainType);
   const setContextSubdomainName = useESStore((s) => s.setContextSubdomainName);
+  const setContextPurpose = useESStore((s) => s.setContextPurpose);
   const setContextBigBallOfMud = useESStore((s) => s.setContextBigBallOfMud);
   const removeContext = useESStore((s) => s.removeContext);
   const setSelected = useESStore((s) => s.setSelected);
@@ -272,6 +273,22 @@ export function BoardChrome({
                     }}
                   >
                     <Crosshair size={13} /> Isolate this context
+                  </button>
+                  {/* Why the context exists, in one sentence (decision-00018).
+                      An empty answer clears it; Cancel keeps it. */}
+                  <button
+                    type="button"
+                    className={MENU_ITEM}
+                    aria-label="Purpose"
+                    title={menuCtx.purpose ?? "Which business problem this context solves"}
+                    onClick={() => {
+                      const purpose = window.prompt("Purpose - which business problem does it solve?", menuCtx.purpose ?? "");
+                      if (purpose !== null) setContextPurpose(menuCtx.id, purpose.trim() || undefined);
+                      setMenu(null);
+                    }}
+                  >
+                    <Pencil size={13} />
+                    <span className="truncate">{menuCtx.purpose ?? "Purpose…"}</span>
                   </button>
                   <div className="my-1 border-t border-zinc-100" />
                   <div className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">

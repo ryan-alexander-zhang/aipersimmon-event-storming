@@ -11,7 +11,8 @@ decisions. Definitions follow the [ddd-crew glossary](https://github.com/ddd-cre
 
 **Domain Event**:
 Something that already happened in the domain, named in the past tense (e.g.
-"Order Placed"). The orange sticky; the backbone of the timeline.
+"Order Placed"). The orange sticky; the backbone of the timeline. A sticky is
+one only if it passes the five tests E1-E5 (decision-00018).
 _Avoid_: event (unqualified), message.
 
 **Command**:
@@ -26,7 +27,8 @@ _Avoid_: user, agent, persona.
 **Aggregate**:
 The consistency boundary you *design* to handle a Command and emit a Domain
 Event — the design **output**. The large yellow sticky. Introduced at the Design
-level.
+level. Its boundary is the invariants it protects: the Constraints on the
+Commands it handles (heuristics G1-G6, decision-00018).
 _Avoid_: entity, model.
 
 **Constraint**:
@@ -86,8 +88,9 @@ positive counterpart to a Hotspot. Its own distinct sticky.
 _Avoid_: idea, suggestion, hotspot.
 
 **Pivotal Event**:
-The few most significant Domain Events, marked with a vertical line. A marked
-state of a Domain Event, not a separate element.
+The few most significant Domain Events, marked with a vertical line: after one,
+the work passes to other people, other language, or a phase hard to undo (P1,
+decision-00018). A marked state of a Domain Event, not a separate element.
 _Avoid_: milestone, key event.
 
 **Temporal Event**:
@@ -120,8 +123,20 @@ it is refined by the Aggregate boundary (handledBy + emits).
 **Bounded Context**:
 A named grouping of events on the single shared timeline, shown as a colour/region
 attribute (e.g. Ordering, Payment) — not a segment of the timeline; contexts may
-overlap in time (decision-00005).
+overlap in time (decision-00005). Drawn where the signals B1-B6 agree, not by
+entity or technology (decision-00018).
 _Avoid_: module, service, area.
+
+**Purpose**:
+One sentence saying which business problem a Bounded Context solves - the reason
+it exists. Required at the Design level (decision-00018).
+_Avoid_: description, summary, vision.
+
+**Ubiquitous Language**:
+The terms that mean something specific inside one Bounded Context, each with
+its meaning. The same term with different meanings in two contexts is a reason
+for the boundary between them (decision-00018).
+_Avoid_: glossary (for one context's terms), dictionary, vocabulary.
 
 **Subdomain**:
 The named business capability a Bounded Context realises — problem space, where

@@ -39,6 +39,24 @@
       "properties": {}
     },
     {
+      "id": "trp-cons-atpickup",
+      "type": "constraint",
+      "label": "Driver at pickup",
+      "properties": {
+        "description": "The rider is told the car is there only when it is.",
+        "rule": "distance(driver, pickup) <= pickup radius"
+      }
+    },
+    {
+      "id": "trp-cons-steps",
+      "type": "constraint",
+      "label": "Trip steps in order",
+      "properties": {
+        "description": "A trip cannot end before it starts, or start before the driver arrived.",
+        "rule": "ARRIVED -> IN_PROGRESS -> ENDED, never skipped"
+      }
+    },
+    {
       "id": "trp-e-started",
       "type": "domainEvent",
       "label": "Trip Started",
@@ -202,6 +220,24 @@
       "source": "trp-h-gps",
       "target": "trp-e-arrived",
       "relation": "annotates"
+    },
+    {
+      "id": "e-trp-19",
+      "source": "trp-c-arrive",
+      "target": "trp-cons-atpickup",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-trp-20",
+      "source": "trp-c-start",
+      "target": "trp-cons-steps",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-trp-21",
+      "source": "trp-c-end",
+      "target": "trp-cons-steps",
+      "relation": "constrainedBy"
     }
   ]
 }

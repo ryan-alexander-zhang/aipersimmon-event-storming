@@ -1139,7 +1139,7 @@ test("types and names the subdomain a Bounded Context realises; export carries i
     page.getByRole("button", { name: "Export" }).click(),
   ]);
   const exported = JSON.parse(readFileSync(await download.path(), "utf8"));
-  expect(exported.version).toBe("5.0");
+  expect(exported.version).toBe("5.1");
   // the subdomain is named after its context by default (decision-00016)
   expect(exported.contexts[0].subdomain).toEqual({ name: exported.contexts[0].name, type: "core" });
 
@@ -1183,6 +1183,35 @@ test("marks a context as a Big Ball of Mud and shows it on the Context Map [deci
   await page.getByRole("button", { name: "Context options" }).click();
   await page.getByRole("button", { name: "Big Ball of Mud", exact: true }).click();
   await expect(badge).toHaveCount(0);
+});
+
+test("sets a context's purpose and shows it with its terms on the Context Map [plan-00025-AC-7]", async ({ page }) => {
+  await openBoard(page);
+  await page.setInputFiles("input[type=file]", fixture("context-map.json"));
+  await expect(nodes(page, "domainEvent")).toHaveCount(1);
+
+  // set the purpose from Ordering's ⋯ menu
+  await page.getByRole("button", { name: "Context options" }).first().click();
+  page.once("dialog", (d) => void d.accept("Take orders."));
+  await page.getByRole("button", { name: "Purpose" }).click();
+
+  // the Context Map card shows the purpose and the terms of its language
+  await page.getByRole("button", { name: "Context Map" }).click();
+  const card = page.getByTestId("context-node").filter({ hasText: "Ordering" });
+  await expect(card.getByTestId("context-node-purpose")).toHaveText("Take orders.");
+  await expect(card.getByTestId("context-node-language")).toHaveText("Order");
+  await expect(card.getByTestId("context-node-language")).toHaveAttribute(
+    "title",
+    "Order - A basket the customer committed to pay.",
+  );
+  await page.getByRole("button", { name: "Board" }).click();
+
+  // an empty answer clears it
+  await page.getByRole("button", { name: "Context options" }).first().click();
+  page.once("dialog", (d) => void d.accept(""));
+  await page.getByRole("button", { name: "Purpose" }).click();
+  await page.getByRole("button", { name: "Context Map" }).click();
+  await expect(page.getByTestId("context-node-purpose")).toHaveCount(0);
 });
 
 test("Context Map renders contexts + a typed relationship; edits and deletes it; leaves the board intact [us-00020-AC-1.1/3.1/4.1/7.1]", async ({

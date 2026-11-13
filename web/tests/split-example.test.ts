@@ -19,8 +19,8 @@ describe("the split ride-hailing example [plan-00024-AC-13]", () => {
     expect(merged.ok).toBe(true);
     if (!merged.ok) return;
     expect(merged.model.contexts).toHaveLength(4);
-    expect(merged.model.nodes).toHaveLength(56);
-    expect(merged.model.edges).toHaveLength(69);
+    expect(merged.model.nodes).toHaveLength(63); // 56 + 7 constraints (plan-00025 P6.2)
+    expect(merged.model.edges).toHaveLength(78); // 69 + 9 constrainedBy edges
   });
 
   it("is what splitting that model writes, file for file", () => {

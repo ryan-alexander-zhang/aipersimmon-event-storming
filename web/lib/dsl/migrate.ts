@@ -96,6 +96,11 @@ function migrateV4toV5(v4: Record<string, unknown>): unknown {
   };
 }
 
+// v5.0 → v5.1: contexts gain optional `purpose` and `language` (decision-00018).
+function migrateV5toV51(v5: Record<string, unknown>): unknown {
+  return { ...v5, version: "5.1" };
+}
+
 /** Migrate any supported older document to the latest shape (chained). */
 export function migrateToLatest(raw: unknown): unknown {
   if (!raw || typeof raw !== "object") return raw;
@@ -104,5 +109,6 @@ export function migrateToLatest(raw: unknown): unknown {
   if (r.version === "2.0") r = migrateV2toV3(r) as Record<string, unknown>;
   if (r.version === "3.0") r = migrateV3toV4(r) as Record<string, unknown>;
   if (r.version === "4.0") r = migrateV4toV5(r) as Record<string, unknown>;
+  if (r.version === "5.0") r = migrateV5toV51(r) as Record<string, unknown>;
   return r;
 }

@@ -20,7 +20,10 @@ export type SmellType =
   | "lone-alternative"
   | "duplicate-subdomain"
   | "missing-subdomain"
-  | "unbacked-seam";
+  | "unbacked-seam"
+  | "technical-event"
+  | "missing-purpose"
+  | "unguarded-aggregate";
 
 export interface Finding {
   id: string;
@@ -33,6 +36,22 @@ export interface Finding {
 // Thresholds for `overloaded-aggregate` (an Aggregate doing too much).
 export const AGG_MAX_COMMANDS = 5;
 export const AGG_MAX_EVENTS = 5;
+
+// Last words that mark an event as CRUD or UI plumbing rather than a business fact
+// (decision-00018 E2, E5). `Loaded`, `Removed` and the like are left out: they are
+// real business verbs in some domains (`Cargo Loaded`).
+export const TECHNICAL_VERBS = [
+  "Created",
+  "Updated",
+  "Modified",
+  "Edited",
+  "Saved",
+  "Deleted",
+  "Clicked",
+  "Viewed",
+  "Fetched",
+  "Persisted",
+];
 
 // Forward causal relations a Command follows to reach the Domain Event it causes.
 const CAUSAL_FWD: RelationType[] = ["produces", "handledBy", "emits"];
@@ -129,7 +148,7 @@ export function analyzeModel(
         id: `overloaded-aggregate:${n.id}`,
         type: "overloaded-aggregate",
         severity: "info",
-        message: `Aggregate '${n.data.label}' handles ${handled} command(s) and emits ${emitted} event(s)`,
+        message: `Aggregate '${n.data.label}' handles ${handled} command(s) and emits ${emitted} event(s) - which rule do they all share? If none, it is two aggregates`,
         elementIds: [n.id],
       });
     }
@@ -218,6 +237,52 @@ export function analyzeModel(
       message: `${undocumented.length} resolved hotspot(s) with no resolution recorded`,
       elementIds: undocumented.map((h) => h.id),
     });
+  }
+
+  // technical-event: a label naming a CRUD or UI step, not what happened (E2, E5).
+  for (const n of nodes) {
+    if (n.type !== "domainEvent") continue;
+    const last = n.data.label.trim().split(/\s+/).pop() ?? "";
+    if (!TECHNICAL_VERBS.includes(last)) continue;
+    findings.push({
+      id: `technical-event:${n.id}`,
+      type: "technical-event",
+      severity: "warning",
+      message: `Domain Event '${n.data.label}' names a technical step - what happened in business terms?`,
+      elementIds: [n.id],
+    });
+  }
+
+  if (level === "design") {
+    // unguarded-aggregate: its boundary is the invariants it protects - the
+    // Constraints on the Commands it handles (G2). None means no boundary.
+    const guarded = new Set(
+      edges.filter((e) => e.data?.relation === "constrainedBy").map((e) => e.source),
+    );
+    for (const n of nodes) {
+      if (n.type !== "aggregate") continue;
+      const commands = (incoming.get(n.id) ?? []).filter((e) => e.data?.relation === "handledBy");
+      if (commands.some((e) => guarded.has(e.source))) continue;
+      findings.push({
+        id: `unguarded-aggregate:${n.id}`,
+        type: "unguarded-aggregate",
+        severity: "warning",
+        message: `Aggregate '${n.data.label}' protects no invariant - which rule can refuse its commands?`,
+        elementIds: [n.id],
+      });
+    }
+
+    // missing-purpose: every context says why it exists (decision-00018).
+    for (const c of contexts) {
+      if (c.purpose?.trim()) continue;
+      findings.push({
+        id: `missing-purpose:${c.id}`,
+        type: "missing-purpose",
+        severity: "warning",
+        message: `Bounded Context '${c.name}' has no purpose - which business problem does it solve?`,
+        elementIds: [],
+      });
+    }
   }
 
   findings.push(...subdomainFindings(contexts, level));

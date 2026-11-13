@@ -20,6 +20,24 @@
       "properties": {}
     },
     {
+      "id": "dsp-cons-available",
+      "type": "constraint",
+      "label": "Driver available and nearby",
+      "properties": {
+        "description": "Only a free driver close enough to reach the rider gets the offer.",
+        "rule": "driver is online, has no active trip, and is within the dispatch radius of the pickup"
+      }
+    },
+    {
+      "id": "dsp-cons-offeropen",
+      "type": "constraint",
+      "label": "Offer still open",
+      "properties": {
+        "description": "An offer is answered once, before it expires; after that it goes to the next driver.",
+        "rule": "offer is unanswered and now < offer expiry"
+      }
+    },
+    {
       "id": "dsp-e-matched",
       "type": "domainEvent",
       "label": "Driver Matched",
@@ -238,6 +256,24 @@
       "source": "dsp-h-radius",
       "target": "dsp-c-match",
       "relation": "annotates"
+    },
+    {
+      "id": "e-dsp-19",
+      "source": "dsp-c-match",
+      "target": "dsp-cons-available",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-dsp-20",
+      "source": "dsp-c-accept",
+      "target": "dsp-cons-offeropen",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-dsp-21",
+      "source": "dsp-c-decline",
+      "target": "dsp-cons-offeropen",
+      "relation": "constrainedBy"
     }
   ]
 }

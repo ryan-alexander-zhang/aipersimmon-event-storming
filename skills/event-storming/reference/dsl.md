@@ -1,4 +1,4 @@
-# DSL v5.0 - full grammar
+# DSL v5.1 - full grammar
 
 `scripts/grammar.json` is the machine-readable copy of the element types, level gating,
 edge rules and context-relationship types below - it is what `scripts/validate.py`
@@ -24,16 +24,18 @@ validator will say so.
 
 ```json
 {
-  "version": "5.0",
+  "version": "5.1",
   "meta": { "name": "Order Fulfilment", "level": "design", "createdAt": "2026-08-17T00:00:00Z" },
-  "contexts": [{ "id": "ord", "name": "Ordering", "order": 0, "subdomain": { "name": "Ordering", "type": "core" } }],
+  "contexts": [{ "id": "ord", "name": "Ordering", "order": 0, "subdomain": { "name": "Ordering", "type": "core" },
+                 "purpose": "Turn a customer's intent into a confirmed, payable order.",
+                 "language": [{ "term": "Order", "meaning": "A basket the customer has committed to pay." }] }],
   "contextRelationships": [{ "id": "cr-1", "source": "ord", "target": "pay", "type": "customerSupplier" }],
   "nodes": [{ "id": "ord-e-placed", "type": "domainEvent", "label": "Order Placed", "context": "ord", "order": 0, "properties": {} }],
   "edges": [{ "id": "e-1", "source": "ord-c-place", "target": "ord-e-placed", "relation": "produces" }]
 }
 ```
 
-- `version` must be the literal `"5.0"`. The editor still imports `4.0` files: each `classification` moves into `subdomain.type`, the subdomain named after its context.
+- `version` must be the literal `"5.1"`. The editor still imports older files: a `5.0` file only changes its version; in a `4.0` file each `classification` moves into `subdomain.type`, the subdomain named after its context.
 - `meta.level` is one of `big-picture` | `process` | `design`. It is the view filter: raise it as phases complete.
 - `meta.createdAt` is an ISO 8601 string.
 - `contexts`, `contextRelationships`, `nodes`, `edges` are arrays; all four may be empty.
@@ -182,6 +184,8 @@ Edges cross contexts freely - that is how seams show up.
 
 - `contexts[].order` sets left-to-right reading order of the map, starting at 0.
 - `subdomain` is the business capability the context realises: `{ "name": "...", "type": "core" | "supporting" | "generic" }`. `name` is required and defaults to the context's name; `type` is optional. One context realises one subdomain, and no two contexts may name the same one (compared case-insensitively) - an ERROR at any level. At `design` every context must have a `subdomain` with a `type` - an ERROR; below design both are optional, because the boundaries are not drawn yet.
+- `purpose` is one sentence: the business problem the context solves. At `design` every context must have one - an ERROR. When present it must be a non-empty string.
+- `language` is optional: the terms that mean something specific inside this context, `[{ "term": "...", "meaning": "..." }]`, both non-empty. A term may appear only once per context (compared case-insensitively) - an ERROR. The same term in two contexts with different meanings is allowed: it is the reason the boundary exists (`reference/context-map.md`, B1).
 - `bigBallOfMud` is an optional boolean on a context: Evans's designation for a model that is a recognised mess - draw the boundary, mark it, do not let its model propagate. It marks the context itself, never a relationship; downstreams usually defend with `acl`. Orthogonal to `subdomain`: a muddy context still realises one subdomain, and the other capabilities it covers are recorded as hotspots.
 - `nodes[].context` is optional; a node without it is Ungrouped. Any `context` you use should be declared in `contexts`.
 - `contextRelationships[].type` is one of `partnership`, `sharedKernel`, `customerSupplier`, `conformist`, `acl`, `openHostService`, `publishedLanguage`, `separateWays`. `source` = upstream, `target` = downstream. One pair may carry several. See `reference/context-map.md` for when to use which.
@@ -222,7 +226,7 @@ Levels are cumulative. Raising the level never removes anything.
 - Ids are stable, lowercase, hyphenated, unique across nodes; edges have their own id space.
 - Node pattern `<ctx>-<tag>-<slug>`: `e` event, `c` command, `p` policy, `ag` aggregate, `cons` constraint, `rm` read model, `ex` external system, `h` hotspot, `op` opportunity, actors plain (`ord-customer`).
 - Edge pattern `e-<ctx>-<nn>`, context relationship pattern `cr-<nn>`.
-- Labels: events past tense (`Order Placed`), commands imperative (`Place Order`), policies end in `Policy`, read models end in `View`, hotspots are the open question itself.
+- Labels: events past tense, naming the business fact (`Order Placed`, not `Order Created`; see E1-E5 in `reference/big-picture.md`), commands imperative (`Place Order`), policies end in `Policy`, read models end in `View`, hotspots are the open question itself.
 
 ## Common errors
 
@@ -235,4 +239,5 @@ Levels are cumulative. Raising the level never removes anything.
 - A node type not allowed at `meta.level`.
 - In a split model: a `context` key on a node in a context file, or an edge left in `domain.json` whose both ends are in one context file.
 - `context` id that is not declared in `contexts`.
+- A design-level context without `purpose`, or a term listed twice in one context's `language`.
 - Two events with the same `order` that are not actually concurrent.

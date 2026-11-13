@@ -55,6 +55,8 @@ function ContextMapSurface() {
         tint: contextTint(c.id),
         subdomain: c.subdomain,
         bigBallOfMud: c.bigBallOfMud,
+        purpose: c.purpose,
+        language: c.language,
       },
     }));
   }, [contexts]);

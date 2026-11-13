@@ -1,15 +1,23 @@
 "use client";
 
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
-import type { Subdomain } from "@/lib/dsl/schema";
+import type { Subdomain, Term } from "@/lib/dsl/schema";
 import { MUD_STYLE, SUBDOMAIN_STYLE } from "@/lib/eventstorming/context-color";
 
 // A Bounded Context as a node in the Context Map (spec-00004 FR5): its name, its
 // identity tint, its subdomain's type badge, and the subdomain's name when it differs
-// from the context's (decision-00016). Four connection handles
+// from the context's (decision-00016), its purpose and the terms of its language
+// (decision-00018). Four connection handles
 // so a relationship can be drawn in any direction.
 export type ContextFlowNode = Node<
-  { name: string; tint?: string; subdomain?: Subdomain; bigBallOfMud?: boolean },
+  {
+    name: string;
+    tint?: string;
+    subdomain?: Subdomain;
+    bigBallOfMud?: boolean;
+    purpose?: string;
+    language?: Term[];
+  },
   "context"
 >;
 
@@ -30,7 +38,7 @@ export function ContextNode({ data, selected }: NodeProps<ContextFlowNode>) {
   return (
     <div
       data-testid="context-node"
-      className="min-w-[150px] rounded-lg border-2 bg-white px-3 py-2 shadow-sm"
+      className="min-w-[150px] max-w-[240px] rounded-lg border-2 bg-white px-3 py-2 shadow-sm"
       style={{ borderColor: data.tint ?? "#d4d4d8", outline: selected ? "2px solid #111827" : "none" }}
     >
       {SIDES.map((s) => (
@@ -48,6 +56,21 @@ export function ContextNode({ data, selected }: NodeProps<ContextFlowNode>) {
       {subdomainName && subdomainName !== data.name && (
         <div data-testid="context-node-subdomain" className="text-[11px] text-zinc-500">
           realises {subdomainName}
+        </div>
+      )}
+      {data.purpose && (
+        <div data-testid="context-node-purpose" className="mt-0.5 line-clamp-2 text-[11px] text-zinc-600">
+          {data.purpose}
+        </div>
+      )}
+      {/* Terms by name, kept short so the card fits the grid; meanings on hover. */}
+      {data.language && data.language.length > 0 && (
+        <div
+          data-testid="context-node-language"
+          className="mt-0.5 line-clamp-2 text-[10px] italic text-zinc-500"
+          title={data.language.map((t) => `${t.term} - ${t.meaning}`).join("\n")}
+        >
+          {data.language.map((t) => t.term).join(", ")}
         </div>
       )}
       {cls && (

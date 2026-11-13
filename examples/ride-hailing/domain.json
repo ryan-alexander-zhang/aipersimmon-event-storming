@@ -1,5 +1,5 @@
 {
-  "version": "5.0",
+  "version": "5.1",
   "meta": {
     "name": "Ride-Hailing Platform",
     "level": "design",
@@ -14,6 +14,13 @@
         "name": "Trip Ordering",
         "type": "core"
       },
+      "purpose": "Take a rider's request for a ride and hold it until a driver has it or the rider cancels.",
+      "language": [
+        {
+          "term": "Ride",
+          "meaning": "A rider's request to be driven from pickup to destination, before any driver has it."
+        }
+      ],
       "file": "contexts/ord.json"
     },
     {
@@ -24,6 +31,7 @@
         "name": "Dispatch & Matching",
         "type": "core"
       },
+      "purpose": "Find a nearby driver who accepts each ride, fast.",
       "file": "contexts/dsp.json"
     },
     {
@@ -34,6 +42,13 @@
         "name": "Trip Lifecycle",
         "type": "supporting"
       },
+      "purpose": "Track the drive itself, from the driver arriving at pickup to drop-off.",
+      "language": [
+        {
+          "term": "Trip",
+          "meaning": "The drive itself: one driver carrying the rider from pickup to drop-off."
+        }
+      ],
       "file": "contexts/trp.json"
     },
     {
@@ -44,6 +59,7 @@
         "name": "Billing & Payment",
         "type": "generic"
       },
+      "purpose": "Price each finished trip and collect the fare.",
       "file": "contexts/bil.json"
     }
   ],

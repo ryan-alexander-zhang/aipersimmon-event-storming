@@ -20,6 +20,24 @@
       "properties": {}
     },
     {
+      "id": "ord-cons-oneride",
+      "type": "constraint",
+      "label": "One open ride per rider",
+      "properties": {
+        "description": "A rider is in one car at a time.",
+        "rule": "rider has no ride that is requested, matched or in progress"
+      }
+    },
+    {
+      "id": "ord-cons-beforepickup",
+      "type": "constraint",
+      "label": "Cancel before pickup",
+      "properties": {
+        "description": "Once the trip starts, the rider ends it rather than cancelling.",
+        "rule": "trip not started"
+      }
+    },
+    {
       "id": "ord-e-requested",
       "type": "domainEvent",
       "label": "Ride Requested",
@@ -133,6 +151,18 @@
       "source": "ord-h-fee",
       "target": "ord-e-cancelled",
       "relation": "annotates"
+    },
+    {
+      "id": "e-ord-13",
+      "source": "ord-c-request",
+      "target": "ord-cons-oneride",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "e-ord-14",
+      "source": "ord-c-cancel",
+      "target": "ord-cons-beforepickup",
+      "relation": "constrainedBy"
     }
   ]
 }

@@ -21,7 +21,15 @@ const MODEL = {
   version: "5.0",
   meta: META,
   contexts: [
-    { id: "ord", name: "Ordering", order: 0, subdomain: { name: "Ordering", type: "core" }, file: "contexts/ord.json" },
+    {
+      id: "ord",
+      name: "Ordering",
+      order: 0,
+      subdomain: { name: "Ordering", type: "core" },
+      purpose: "Take orders.",
+      language: [{ term: "Order", meaning: "A committed basket." }],
+      file: "contexts/ord.json",
+    },
     { id: "pay", name: "Payment", order: 1, subdomain: { name: "Payment", type: "generic" }, file: "contexts/pay.json" },
     { id: "shp", name: "Shipping", order: 2, subdomain: { name: "Shipping", type: "supporting" } },
   ],

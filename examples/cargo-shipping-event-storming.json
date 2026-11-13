@@ -1,11 +1,11 @@
 {
-  "version": "5.0",
+  "version": "5.1",
   "meta": {"name": "Cargo Shipping", "level": "design", "createdAt": "2026-05-10T00:00:00Z"},
   "contexts": [
-    {"id": "book", "name": "Booking", "order": 0, "subdomain": {"name": "Booking", "type": "core"}},
-    {"id": "rout", "name": "Routing", "order": 1, "subdomain": {"name": "Routing", "type": "supporting"}},
-    {"id": "hand", "name": "Handling", "order": 2, "subdomain": {"name": "Handling", "type": "core"}},
-    {"id": "trak", "name": "Tracking", "order": 3, "subdomain": {"name": "Tracking", "type": "supporting"}}
+    {"id": "book", "name": "Booking", "order": 0, "subdomain": {"name": "Booking", "type": "core"}, "purpose": "Accept cargo from shippers and commit to a delivery we can keep.", "language": [{"term": "Itinerary", "meaning": "The voyage legs one booked cargo is assigned to travel."}]},
+    {"id": "rout", "name": "Routing", "order": 1, "subdomain": {"name": "Routing", "type": "supporting"}, "purpose": "Find and schedule voyages that can carry cargo between two locations.", "language": [{"term": "Route", "meaning": "A candidate path of voyage legs between two locations, not yet assigned to any cargo."}]},
+    {"id": "hand", "name": "Handling", "order": 2, "subdomain": {"name": "Handling", "type": "core"}, "purpose": "Record what physically happens to cargo in port and on board."},
+    {"id": "trak", "name": "Tracking", "order": 3, "subdomain": {"name": "Tracking", "type": "supporting"}, "purpose": "Tell cargo owners where their cargo is and when it will arrive."}
   ],
   "contextRelationships": [
     {"id": "cr-01", "source": "rout", "target": "book", "type": "openHostService"},
@@ -17,6 +17,9 @@
     {"id": "book-clerk", "type": "actor", "label": "Booking Clerk", "context": "book", "properties": {}},
     {"id": "book-c-book", "type": "command", "label": "Book Cargo", "context": "book", "properties": {}},
     {"id": "book-ag-cargo", "type": "aggregate", "label": "Cargo", "context": "book", "properties": {}},
+    {"id": "book-cons-deadline", "type": "constraint", "label": "Deadline in the future", "context": "book", "properties": {"description": "We cannot promise a delivery that is already late.", "rule": "arrival deadline > booking time"}},
+    {"id": "book-cons-itinerary", "type": "constraint", "label": "Itinerary satisfies the route specification", "context": "book", "properties": {"description": "A route that misses the destination or the deadline is not a delivery we can keep.", "rule": "itinerary origin = spec origin and final destination = spec destination and final arrival <= arrival deadline"}},
+    {"id": "book-cons-unclaimed", "type": "constraint", "label": "Claimed cargo is closed", "context": "book", "properties": {"description": "Once the owner has claimed the cargo, its route and destination no longer change.", "rule": "transport status != CLAIMED"}},
     {"id": "book-e-booked", "type": "domainEvent", "label": "Cargo Booked", "context": "book", "order": 0, "properties": {"pivotal": true, "description": "A cargo is registered with a tracking id, origin, destination and arrival deadline."}},
     {"id": "book-c-route", "type": "command", "label": "Assign Route to Cargo", "context": "book", "properties": {}},
     {"id": "book-e-routed", "type": "domainEvent", "label": "Cargo Routed", "context": "book", "order": 2, "properties": {"pivotal": true, "description": "An itinerary of carrier legs is attached to the cargo's route specification."}},
@@ -29,6 +32,7 @@
 
     {"id": "rout-oper", "type": "actor", "label": "Operations Manager", "context": "rout", "properties": {}},
     {"id": "rout-ag-voyage", "type": "aggregate", "label": "Voyage", "context": "rout", "properties": {}},
+    {"id": "rout-cons-continuous", "type": "constraint", "label": "Carrier movements are continuous", "context": "rout", "properties": {"description": "A voyage is one vessel's sailing; it cannot jump between ports.", "rule": "each movement departs from the port the previous one arrived at, after it arrived"}},
     {"id": "rout-c-schedule", "type": "command", "label": "Schedule Voyage", "context": "rout", "properties": {}},
     {"id": "rout-e-scheduled", "type": "domainEvent", "label": "Voyage Scheduled", "context": "rout", "order": 0, "properties": {}},
     {"id": "rout-ex-graph", "type": "externalSystem", "label": "Graph Traversal Service", "context": "rout", "properties": {}},
@@ -40,6 +44,8 @@
 
     {"id": "hand-agent", "type": "actor", "label": "Handling Agent", "context": "hand", "properties": {}},
     {"id": "hand-ag-event", "type": "aggregate", "label": "Handling Event", "context": "hand", "properties": {}},
+    {"id": "hand-cons-known", "type": "constraint", "label": "Known cargo and location", "context": "hand", "properties": {"description": "A handling event about cargo or a port we do not know cannot be traced.", "rule": "tracking id is booked and location is a known UN/LOCODE"}},
+    {"id": "hand-cons-voyage", "type": "constraint", "label": "Load and unload name a voyage", "context": "hand", "properties": {"description": "Cargo goes on or off a specific vessel's voyage.", "rule": "type in (LOAD, UNLOAD) => voyage number is given"}},
     {"id": "hand-c-receive", "type": "command", "label": "Register Receipt", "context": "hand", "properties": {}},
     {"id": "hand-e-received", "type": "domainEvent", "label": "Cargo Received", "context": "hand", "order": 3, "properties": {}},
     {"id": "hand-c-load", "type": "command", "label": "Register Load", "context": "hand", "properties": {}},
@@ -73,6 +79,10 @@
     {"id": "e-book-13", "source": "book-e-booked", "target": "book-rm-booking", "relation": "updates"},
     {"id": "e-book-14", "source": "book-e-routed", "target": "book-rm-booking", "relation": "updates"},
     {"id": "e-book-15", "source": "book-rm-booking", "target": "book-clerk", "relation": "informs"},
+    {"id": "e-book-16", "source": "book-c-book", "target": "book-cons-deadline", "relation": "constrainedBy"},
+    {"id": "e-book-17", "source": "book-c-route", "target": "book-cons-itinerary", "relation": "constrainedBy"},
+    {"id": "e-book-18", "source": "book-c-route", "target": "book-cons-unclaimed", "relation": "constrainedBy"},
+    {"id": "e-book-19", "source": "book-c-changedest", "target": "book-cons-unclaimed", "relation": "constrainedBy"},
 
     {"id": "e-rout-01", "source": "rout-oper", "target": "rout-c-schedule", "relation": "issues"},
     {"id": "e-rout-02", "source": "rout-c-schedule", "target": "rout-ag-voyage", "relation": "handledBy"},
@@ -84,6 +94,7 @@
     {"id": "e-rout-08", "source": "book-e-booked", "target": "rout-p-onbooked", "relation": "triggers"},
     {"id": "e-rout-09", "source": "rout-p-onbooked", "target": "rout-c-compute", "relation": "invokes"},
     {"id": "e-rout-10", "source": "rout-h-reschedule", "target": "rout-e-scheduled", "relation": "annotates"},
+    {"id": "e-rout-11", "source": "rout-c-schedule", "target": "rout-cons-continuous", "relation": "constrainedBy"},
 
     {"id": "e-hand-01", "source": "hand-agent", "target": "hand-c-receive", "relation": "issues"},
     {"id": "e-hand-02", "source": "hand-c-receive", "target": "hand-ag-event", "relation": "handledBy"},
@@ -108,6 +119,12 @@
     {"id": "e-hand-21", "source": "hand-rm-queue", "target": "hand-agent", "relation": "informs"},
     {"id": "e-hand-22", "source": "hand-p-updatedelivery", "target": "book-c-recalc", "relation": "invokes"},
     {"id": "e-hand-23", "source": "hand-h-misdirect", "target": "book-e-misdirected", "relation": "annotates"},
+    {"id": "e-hand-24", "source": "hand-c-receive", "target": "hand-cons-known", "relation": "constrainedBy"},
+    {"id": "e-hand-25", "source": "hand-c-load", "target": "hand-cons-known", "relation": "constrainedBy"},
+    {"id": "e-hand-26", "source": "hand-c-unload", "target": "hand-cons-known", "relation": "constrainedBy"},
+    {"id": "e-hand-27", "source": "hand-c-claim", "target": "hand-cons-known", "relation": "constrainedBy"},
+    {"id": "e-hand-28", "source": "hand-c-load", "target": "hand-cons-voyage", "relation": "constrainedBy"},
+    {"id": "e-hand-29", "source": "hand-c-unload", "target": "hand-cons-voyage", "relation": "constrainedBy"},
 
     {"id": "e-trak-01", "source": "book-e-delivupdated", "target": "trak-rm-status", "relation": "updates"},
     {"id": "e-trak-02", "source": "book-e-misdirected", "target": "trak-rm-status", "relation": "updates"},

@@ -8,7 +8,7 @@ import { ELEMENT_TYPES } from "@/lib/eventstorming/elements";
 import { LEVELS } from "@/lib/eventstorming/levels";
 import { RELATION_TYPES } from "@/lib/eventstorming/relations";
 
-export const DSL_VERSION = "5.0";
+export const DSL_VERSION = "5.1";
 
 export const propertiesSchema = z.object({
   description: z.string().optional(),
@@ -49,12 +49,23 @@ export const subdomainSchema = z.object({
   type: z.enum(SUBDOMAIN_TYPES).optional(),
 });
 
+// A term whose meaning is specific to one context - its Ubiquitous Language
+// (decision-00018 B1). The same term in two contexts may mean different things.
+export const termSchema = z.object({ term: z.string().min(1), meaning: z.string().min(1) });
+
 // A bounded context: a named region/attribute over the global timeline (decision-00005).
 export const contextSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
   order: z.number(),
   subdomain: subdomainSchema.optional(),
+  // Why the context exists: the business problem it solves, in one sentence.
+  // Required at design (decision-00018).
+  purpose: z.string().min(1).optional(),
+  language: z
+    .array(termSchema)
+    .refine((ts) => new Set(ts.map((t) => t.term.toLowerCase())).size === ts.length, "a term appears twice")
+    .optional(),
   // Where this context's elements live when the model is split: a path relative to
   // the domain file (decision-00017). Absent = inline in the domain file.
   file: z.string().min(1).optional(),
@@ -108,6 +119,7 @@ export const modelSchema = z.object({
 
 export type NodeProperties = z.infer<typeof propertiesSchema>;
 export type Subdomain = z.infer<typeof subdomainSchema>;
+export type Term = z.infer<typeof termSchema>;
 export type SubdomainType = (typeof SUBDOMAIN_TYPES)[number];
 export type Context = z.infer<typeof contextSchema>;
 export type ContextRelationship = z.infer<typeof contextRelationshipSchema>;

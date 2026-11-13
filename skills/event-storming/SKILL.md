@@ -1,6 +1,6 @@
 ---
 name: event-storming
-description: Builds and edits Event Storming models as validated DSL v5.0 JSON for the event-storming editor. Runs the session phase by phase - Big Picture, then Process, then Design, plus the Context Map - interviews the user to fill gaps, and validates every write. Use when the user wants to model a domain, run an event storming, create or extend a board, or write, repair, or review an event storming model JSON.
+description: Builds and edits Event Storming models as validated DSL v5.1 JSON for the event-storming editor. Runs the session phase by phase - Big Picture, then Process, then Design, plus the Context Map - interviews the user to fill gaps, and validates every write. Use when the user wants to model a domain, run an event storming, create or extend a board, or write, repair, or review an event storming model JSON.
 ---
 
 # Event Storming
@@ -38,7 +38,8 @@ Stop at the level the user asked for. Big Picture always runs first - every leve
 2. **Validate every write:** `python3 <skill-dir>/scripts/validate.py <file>` - for a split model, pass its `domain.json`; the linked files are read with it. Fix all ERRORs, re-run until clean, report WARNs to the user. Python 3, no packages needed.
 3. **Ask, don't invent.** A domain fact you cannot read from the repo or the brief is a question. Still unknown after asking? Write a `hotspot`, not a guess. If the user answers it later, set `state: "resolved"` **and** write the answer into `resolution` - a hotspot closed with nothing written down loses why it was closed.
 4. **Use the user's words** as labels, in their language. Do not rename their concepts.
-5. **Report after each phase:** counts per type, open hotspots, assumptions you made.
+5. **Name the heuristic.** When you move a sticky to another type, draw a context boundary or split an aggregate, say which heuristic decided it: E1-E5 and P1 (`reference/big-picture.md`), B1-B6 and A1-A3 (`reference/context-map.md`), G1-G6 (`reference/design.md`). For example: "`Order Viewed` fails E3, so it becomes a read model." A call no heuristic supports is a question for the user, not a decision.
+6. **Report after each phase:** counts per type, open hotspots, assumptions you made.
 
 ## Interview loop (every phase)
 
@@ -53,10 +54,10 @@ Grill on: gaps in the story, unhappy paths, who acts, what triggers what, exact 
 
 ## Gates (the user confirms, not you)
 
-- **Big Picture**: events past tense, ordered, story has no gap, pivotal events marked, alternative outcomes of one moment share an `alternativeSet`, every unknown captured as a hotspot.
+- **Big Picture**: every event passes E1-E5 and every sticky that failed was moved, not deleted; ordered; story has no gap; pivotal events marked by P1; alternative outcomes of one moment share an `alternativeSet`, every unknown captured as a hotspot.
 - **Process**: every event has a producing command or external system, or is marked `temporal` (raised by time); every command has an issuing actor or external system, or an invoking policy; every actor decision has a read model.
-- **Design**: every command is handled by an aggregate or external system; every rule that can block a command is a constraint; every policy has `condition`, `execution`, and `parameters` where they exist; every context realises its own typed `subdomain` (the validator errors otherwise at `design`).
-- **Context Map**: every context realises one named, typed subdomain, no two the same; every cross-context seam backed by a typed relationship (the validator warns `unbacked seam` otherwise).
+- **Design**: every command is handled by an aggregate or external system; every rule that can block a command is a constraint; every aggregate guards at least one constraint and its commands share a rule (G2), and rules across aggregates are policies (G5); every policy has `condition`, `execution`, and `parameters` where they exist; every context realises its own typed `subdomain` and has a `purpose` (the validator errors otherwise at `design`).
+- **Context Map**: every boundary is backed by at least two of B1-B6 and no context is A1-A3; every context has a one-sentence `purpose`, and terms that drew a B1 boundary are in `language`; every context realises one named, typed subdomain, no two the same; every cross-context seam backed by a typed relationship (the validator warns `unbacked seam` otherwise).
 
 Then ask: "Move on to <next phase>?" Do not continue on your own.
 

@@ -1,7 +1,7 @@
 # Event Storming Tool
 
 A visual Event Storming board editor (`web/`) and an authoring skill
-(`skills/event-storming/`) that build, validate and render models as DSL v5.0
+(`skills/event-storming/`) that build, validate and render models as DSL v5.1
 JSON, with worked examples in `examples/`.
 
 **What this is - and is not.** This tool does *modelling with EventStorming

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { TECHNICAL_VERBS } from "@/lib/analysis/health";
 import { DSL_VERSION } from "@/lib/dsl/schema";
 import { CONTEXT_RELATION_TYPES } from "@/lib/eventstorming/context-relations";
 import { ELEMENT_TYPES } from "@/lib/eventstorming/elements";
@@ -20,6 +21,7 @@ interface Grammar {
   levels: Record<string, string[]>;
   relations: Array<{ relation: string; sources: string[]; targets: string[] }>;
   contextRelations: string[];
+  technicalVerbs: string[];
 }
 
 const grammar: Grammar = JSON.parse(readFileSync(GRAMMAR, "utf8"));
@@ -31,6 +33,10 @@ const types = (names: string[]): string[] =>
 describe("the authoring skill's grammar.json mirrors the editor (issue-00037)", () => {
   it("targets the DSL version the schema accepts", () => {
     expect(grammar.dslVersion).toBe(DSL_VERSION);
+  });
+
+  it("flags the same technical event verbs as model health (decision-00018)", () => {
+    expect(sorted(grammar.technicalVerbs)).toEqual(sorted(TECHNICAL_VERBS));
   });
 
   it("lists every element type, and no others", () => {

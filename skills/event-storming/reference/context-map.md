@@ -6,11 +6,35 @@ Runs any time after phase 1. It never changes the timeline; it only fills `conte
 
 ## Steps
 
-1. **Cut the contexts.** Group the board where the language changes meaning, the owner changes, the pace of change differs, or the data can be stale without harm. One team can own several contexts; one context should not be owned by several teams.
-2. **Name and type the subdomain each one realises** in `subdomain: {name, type}`. One context, one subdomain, and no two contexts share one. The name defaults to the context's; change it only when the business calls the capability something else. A context whose model is a recognised mess gets `bigBallOfMud: true` on top - the point of the mark is to not let that model propagate; its downstreams usually defend with `acl`. A muddy context still realises one subdomain, named and typed by its dominant value; that it also covers other capabilities goes on the board as a `hotspot` - a split waiting to happen.
-3. **Find the seams.** Every edge that crosses a context is a seam - except an actor's: a person working in two contexts is not the contexts integrating. Each pair of contexts with at least one seam needs a relationship.
-4. **Type each relationship.** `source` = upstream (the one that sets the terms), `target` = downstream. One pair may carry several.
-5. Validate, run the gate.
+1. **Cut the contexts.** Draw a boundary where several of the signals B1-B6 below agree, and check the cut against the anti-patterns A1-A3. A boundary backed by one weak signal alone is a hotspot, not a context. One team can own several contexts; one context should not be owned by several teams. Tell the user which signals drew each boundary.
+2. **Say why each one exists.** Write `purpose`: one sentence naming the business problem the context solves. The validator errors without it at `design`. A context whose purpose you cannot state in one sentence is probably two contexts, or none. Where B1 drew the boundary, write the terms that differ into `language` (`[{"term", "meaning"}]`), on both sides.
+3. **Name and type the subdomain each one realises** in `subdomain: {name, type}`. One context, one subdomain, and no two contexts share one. The name defaults to the context's; change it only when the business calls the capability something else. A context whose model is a recognised mess gets `bigBallOfMud: true` on top - the point of the mark is to not let that model propagate; its downstreams usually defend with `acl`. A muddy context still realises one subdomain, named and typed by its dominant value; that it also covers other capabilities goes on the board as a `hotspot` - a split waiting to happen.
+4. **Find the seams.** Every edge that crosses a context is a seam - except an actor's: a person working in two contexts is not the contexts integrating. Each pair of contexts with at least one seam needs a relationship.
+5. **Type each relationship.** `source` = upstream (the one that sets the terms), `target` = downstream. One pair may carry several.
+6. Validate, run the gate.
+
+## Where a context ends
+
+Draw a boundary where several signals agree (decision-00018).
+
+| Id | Signal | Boundary here | Not a boundary | Ask |
+| --- | --- | --- | --- | --- |
+| B1 | **Language.** One word means different things on either side, or the two sides use different words for one thing. The strongest signal. | "Payment" is money applied to an invoice in Invoicing, a collection with retries in Payment | "Order" means the same committed basket in Checkout and Order History | Does `<term>` mean the same thing here as there? |
+| B2 | **Pivotal events and swimlanes.** The business changes phase (P1 in `reference/big-picture.md`). | After `Order Placed`, the warehouse takes over | `Item Added to Cart` -> `Cart Viewed`: same people, same phase | After `<pivotal event>`, who takes over? |
+| B3 | **People.** Another actor, department or expert owns this part. | Finance answers for refunds, Support for complaints | Two screens the same clerk uses all day | Who would you ask about this part? |
+| B4 | **Capability.** The part realises one subdomain, and no other context realises the same one. | Pricing vs Shipping: two capabilities | Two contexts that both "manage customers" | What would the business call this capability? |
+| B5 | **Autonomy.** A context decides its commands without synchronously asking another context. Two candidate contexts with many seams between them are probably one. | Dispatch matches drivers without asking Billing | Every Basket command first calls Pricing and Stock | Can it decide this without asking them first? |
+| B6 | **Pace and ownership.** The part changes at its own rate, and one team can own it. | Tax rules change yearly, promotions weekly | Two parts always released together by one team | Does this change on its own schedule? Which team owns it? |
+
+| Id | Anti-pattern | Instead |
+| --- | --- | --- |
+| A1 | **Entity context** - named after a noun that every process touches (`Customer`, `Product`). | Split by phase of the lifecycle; each context keeps its own model of the noun (`Customer` in Sales is a prospect, in Billing a debtor). |
+| A2 | **Technical context** - `Notification`, `Database`, `Gateway`. | An `externalSystem`, or a generic subdomain only when it has business language of its own. |
+| A3 | **One context per aggregate**, or one context for the whole board. | Regroup by B1-B6. |
+
+**Revisit from Design.** When a constraint needs state from two contexts, either the boundary is wrong, or the rule is really a policy that is eventually consistent (G5 in `reference/design.md`). Raise a hotspot and ask. Do not force the rule into one transaction.
+
+Sources: Brandolini, *Introducing EventStorming*; Evans, *Domain-Driven Design*; ddd-crew, *Bounded Context Canvas*.
 
 ## Subdomain type
 
@@ -43,7 +67,8 @@ Picking between the near ones:
 ## Question bank
 
 - Who owns this part - which team, which roadmap?
-- Does `<term>` mean the same thing on both sides? (different meaning -> different contexts)
+- Does `<term>` mean the same thing on both sides? (different meaning -> different contexts, B1; write both meanings into `language`)
+- In one sentence, which business problem does this context solve? (-> `purpose`)
 - If they change their model, do we have to follow?
 - Can we ask them for a change and get it?
 - What would the business call the capability this context serves? (-> `subdomain.name`)
@@ -54,6 +79,9 @@ Picking between the near ones:
 
 ## Gate
 
+- [ ] Every boundary is backed by at least two of B1-B6, and no context is A1-A3.
+- [ ] Every context has a one-sentence `purpose`.
+- [ ] Every term that drew a B1 boundary is in `language` on both sides.
 - [ ] Every context has a `subdomain` with a `name` and a `type`; no two contexts name the same subdomain.
 - [ ] Every context used by a node is declared in `contexts`, with an `order`.
 - [ ] Every pair of contexts with a crossing edge has at least one relationship (else the validator warns `unbacked seam`).

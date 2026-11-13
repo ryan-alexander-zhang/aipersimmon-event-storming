@@ -1,5 +1,5 @@
 {
-  "version": "5.0",
+  "version": "5.1",
   "meta": {
     "name": "Event Storming",
     "level": "design",
@@ -10,43 +10,52 @@
       "id": "invc",
       "name": "Invoicing",
       "order": 0,
-      "subdomain": {"name": "Invoicing", "type": "core"}
+      "subdomain": {"name": "Invoicing", "type": "core"},
+      "purpose": "Bill customers for what they owe, and chase what stays unpaid.",
+      "language": [{"term": "Payment", "meaning": "Money applied to an invoice, reducing what is still owed."}]
     },
     {
       "id": "pay",
       "name": "Payment",
       "order": 1,
-      "subdomain": {"name": "Payment", "type": "core"}
+      "subdomain": {"name": "Payment", "type": "core"},
+      "purpose": "Collect and refund the money owed on invoices, through payment providers.",
+      "language": [{"term": "Payment", "meaning": "The collection of one invoice's amount, with its operations and attempts at providers."}]
     },
     {
       "id": "conn",
       "name": "Connector",
       "order": 2,
-      "subdomain": {"name": "Connector", "type": "core"}
+      "subdomain": {"name": "Connector", "type": "core"},
+      "purpose": "Speak each payment provider's protocol, so the rest of the platform does not have to."
     },
     {
       "id": "disp",
       "name": "Dispute",
       "order": 3,
-      "subdomain": {"name": "Dispute", "type": "supporting"}
+      "subdomain": {"name": "Dispute", "type": "supporting"},
+      "purpose": "Answer card disputes and record how they end."
     },
     {
       "id": "ledg",
       "name": "Ledger",
       "order": 4,
-      "subdomain": {"name": "Ledger", "type": "core"}
+      "subdomain": {"name": "Ledger", "type": "core"},
+      "purpose": "Keep the double-entry record of every money movement."
     },
     {
       "id": "recn",
       "name": "Reconciliation",
       "order": 5,
-      "subdomain": {"name": "Reconciliation", "type": "supporting"}
+      "subdomain": {"name": "Reconciliation", "type": "supporting"},
+      "purpose": "Prove our records match what providers report, and surface every mismatch."
     },
     {
       "id": "noti",
       "name": "Notification",
       "order": 6,
-      "subdomain": {"name": "Notification", "type": "generic"}
+      "subdomain": {"name": "Notification", "type": "generic"},
+      "purpose": "Tell customers and operators what happened, on the channels they use."
     }
   ],
   "contextRelationships": [
@@ -1552,6 +1561,116 @@
       "properties": {
         "description": "An Automatic Charge requires an active Mandate. Customer-Initiated Payments do not — the Customer's presence is the consent."
       }
+    },
+    {
+      "id": "cons-raw",
+      "type": "constraint",
+      "label": "No raw credentials",
+      "context": "pay",
+      "properties": {
+        "description": "Raw credentials never enter the platform; the provider stores them.",
+        "rule": "method holds a provider token, never a card number"
+      }
+    },
+    {
+      "id": "cons-methodlife",
+      "type": "constraint",
+      "label": "Method lifecycle forward only",
+      "context": "pay",
+      "properties": {
+        "description": "A deactivated credential is never charged again.",
+        "rule": "bound -> verified | verification-failed -> deactivated; a deactivated method never returns"
+      }
+    },
+    {
+      "id": "cons-consent",
+      "type": "constraint",
+      "label": "Consent evidence captured",
+      "context": "pay",
+      "properties": {
+        "description": "A mandate without evidence does not survive a dispute.",
+        "rule": "timestamp, IP address and user agent are all present"
+      }
+    },
+    {
+      "id": "cons-granted",
+      "type": "constraint",
+      "label": "Only a granted Mandate is revoked",
+      "context": "pay",
+      "properties": {
+        "description": "Revocation ends consent once.",
+        "rule": "state = granted"
+      }
+    },
+    {
+      "id": "cons-onedunning",
+      "type": "constraint",
+      "label": "One running Dunning per Invoice",
+      "context": "invc",
+      "properties": {
+        "description": "Two recovery processes would charge the customer twice.",
+        "rule": "no running or paused Dunning exists for the invoice"
+      }
+    },
+    {
+      "id": "cons-dunningrunning",
+      "type": "constraint",
+      "label": "Only a running Dunning stops or pauses",
+      "context": "invc",
+      "properties": {
+        "description": "Pause is idempotent; a stopped Dunning stays stopped.",
+        "rule": "state in (running, paused)"
+      }
+    },
+    {
+      "id": "cons-oneaccount",
+      "type": "constraint",
+      "label": "One Ledger Account per type, Provider and currency",
+      "context": "ledg",
+      "properties": {
+        "description": "Postings for one provider and currency must land in one place.",
+        "rule": "no account exists with the same type, provider and settlement currency"
+      }
+    },
+    {
+      "id": "cons-matchonce",
+      "type": "constraint",
+      "label": "Each report line matched once",
+      "context": "recn",
+      "properties": {
+        "description": "A line matched twice would hide a real mismatch.",
+        "rule": "a matched line is never matched again"
+      }
+    },
+    {
+      "id": "cons-onediscrepancy",
+      "type": "constraint",
+      "label": "One Discrepancy per provider fact",
+      "context": "recn",
+      "properties": {
+        "description": "The Operator resolves each mismatch once.",
+        "rule": "no open Discrepancy carries the same raw fact"
+      }
+    },
+    {
+      "id": "cons-sourcefirst",
+      "type": "constraint",
+      "label": "Resolve source-first",
+      "context": "recn",
+      "properties": {
+        "description": "Correction entries are the last resort (decision-00004).",
+        "rule": "state = open; a correction entry only for a genuine economic difference"
+      }
+    },
+    {
+      "id": "cons-onenotice",
+      "type": "constraint",
+      "label": "One notice per trigger, recipient and channel",
+      "context": "noti",
+      "properties": {
+        "description": "Customers are not told the same thing twice.",
+        "rule": "(triggering event, recipient, channel) is unique"
+      }
     }
   ],
   "edges": [
@@ -2904,6 +3023,84 @@
       "source": "invc-e-dunningpaused",
       "target": "invc-p-dunningexhausted",
       "relation": "triggers"
+    },
+    {
+      "id": "ed-232",
+      "source": "pay-c-bind",
+      "target": "cons-raw",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-233",
+      "source": "pay-c-verify",
+      "target": "cons-methodlife",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-234",
+      "source": "pay-c-deactivatemethod",
+      "target": "cons-methodlife",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-235",
+      "source": "pay-c-grantmandate",
+      "target": "cons-consent",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-236",
+      "source": "pay-c-revokemandate",
+      "target": "cons-granted",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-237",
+      "source": "invc-c-startdunning",
+      "target": "cons-onedunning",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-238",
+      "source": "invc-c-stopdunning",
+      "target": "cons-dunningrunning",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-239",
+      "source": "invc-c-pausedunning",
+      "target": "cons-dunningrunning",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-240",
+      "source": "ledg-c-openaccount",
+      "target": "cons-oneaccount",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-241",
+      "source": "recn-c-match",
+      "target": "cons-matchonce",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-242",
+      "source": "recn-c-recordunmatched",
+      "target": "cons-onediscrepancy",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-243",
+      "source": "recn-c-resolve",
+      "target": "cons-sourcefirst",
+      "relation": "constrainedBy"
+    },
+    {
+      "id": "ed-244",
+      "source": "noti-c-send",
+      "target": "cons-onenotice",
+      "relation": "constrainedBy"
     }
   ]
 }

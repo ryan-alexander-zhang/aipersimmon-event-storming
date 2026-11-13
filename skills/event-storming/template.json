@@ -1,15 +1,23 @@
 {
-  "version": "5.0",
+  "version": "5.1",
   "meta": {
     "name": "Template - Order Fulfilment",
     "level": "design",
     "createdAt": "2026-08-17T00:00:00Z"
   },
   "contexts": [
-    { "id": "cat", "name": "Catalog", "order": 0, "subdomain": { "name": "Catalog", "type": "supporting" }, "bigBallOfMud": true },
-    { "id": "ord", "name": "Ordering", "order": 1, "subdomain": { "name": "Ordering", "type": "core" } },
-    { "id": "pay", "name": "Payment", "order": 2, "subdomain": { "name": "Payment", "type": "supporting" } },
-    { "id": "shp", "name": "Shipping", "order": 3, "subdomain": { "name": "Delivery", "type": "generic" } }
+    {
+      "id": "cat", "name": "Catalog", "order": 0, "subdomain": { "name": "Catalog", "type": "supporting" }, "bigBallOfMud": true,
+      "purpose": "Decide what we sell and at what list price.",
+      "language": [{ "term": "Price", "meaning": "The list price currently published for a product." }]
+    },
+    {
+      "id": "ord", "name": "Ordering", "order": 1, "subdomain": { "name": "Ordering", "type": "core" },
+      "purpose": "Turn a customer's basket into a confirmed order we can ship.",
+      "language": [{ "term": "Price", "meaning": "What the customer agreed to pay for a line, fixed when the order is placed." }]
+    },
+    { "id": "pay", "name": "Payment", "order": 2, "subdomain": { "name": "Payment", "type": "supporting" }, "purpose": "Collect the money for each placed order." },
+    { "id": "shp", "name": "Shipping", "order": 3, "subdomain": { "name": "Delivery", "type": "generic" }, "purpose": "Get each paid order to the customer's door." }
   ],
   "contextRelationships": [
     { "id": "cr-01", "source": "ord", "target": "pay", "type": "customerSupplier" },
@@ -24,6 +32,16 @@
   "nodes": [
     { "id": "cat-merch", "type": "actor", "label": "Merchandiser", "context": "cat", "properties": {} },
     { "id": "cat-c-publish", "type": "command", "label": "Publish Price", "context": "cat", "properties": {} },
+    {
+      "id": "cat-cons-price",
+      "type": "constraint",
+      "label": "Price above cost",
+      "context": "cat",
+      "properties": {
+        "description": "Merchandising never publishes a loss-making price.",
+        "rule": "price > unit cost"
+      }
+    },
     { "id": "cat-ag-product", "type": "aggregate", "label": "Product", "context": "cat", "properties": {} },
     { "id": "cat-e-priced", "type": "domainEvent", "label": "Price Published", "context": "cat", "order": 0, "properties": {} },
 
@@ -58,6 +76,13 @@
       "label": "Which tax rules apply to cross-border orders?",
       "context": "ord",
       "properties": { "kind": "question", "priority": "high", "state": "open", "description": "Blocks the total shown at checkout." }
+    },
+    {
+      "id": "ord-h-stock",
+      "type": "hotspot",
+      "label": "Which context owns stock? Item in stock needs state Ordering does not hold",
+      "context": "ord",
+      "properties": { "kind": "question", "priority": "medium", "state": "open", "description": "A constraint that needs another context's state means the boundary is wrong, or the rule is a policy that is eventually consistent (G5, G6)." }
     },
     {
       "id": "ord-op-reorder",
@@ -143,6 +168,7 @@
     { "id": "e-cat-01", "source": "cat-merch", "target": "cat-c-publish", "relation": "issues" },
     { "id": "e-cat-02", "source": "cat-c-publish", "target": "cat-ag-product", "relation": "handledBy" },
     { "id": "e-cat-03", "source": "cat-ag-product", "target": "cat-e-priced", "relation": "emits" },
+    { "id": "e-cat-04", "source": "cat-c-publish", "target": "cat-cons-price", "relation": "constrainedBy" },
 
     { "id": "e-ord-01", "source": "ord-customer", "target": "ord-c-place", "relation": "issues" },
     { "id": "e-ord-02", "source": "ord-c-place", "target": "ord-cons-stock", "relation": "constrainedBy" },
@@ -152,6 +178,7 @@
     { "id": "e-ord-06", "source": "ord-rm-cart", "target": "ord-customer", "relation": "informs" },
     { "id": "e-ord-07", "source": "ord-h-tax", "target": "ord-c-place", "relation": "annotates" },
     { "id": "e-ord-08", "source": "ord-op-reorder", "target": "ord-c-place", "relation": "highlights" },
+    { "id": "e-ord-09", "source": "ord-h-stock", "target": "ord-cons-stock", "relation": "annotates" },
 
     { "id": "e-pay-01", "source": "ord-e-placed", "target": "pay-p-charge", "relation": "triggers" },
     { "id": "e-pay-02", "source": "pay-p-charge", "target": "pay-c-charge", "relation": "invokes" },

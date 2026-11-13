@@ -32,6 +32,15 @@
       "properties": {}
     },
     {
+      "id": "bil-cons-once",
+      "type": "constraint",
+      "label": "One fare per trip",
+      "properties": {
+        "description": "A rider is charged once for one trip.",
+        "rule": "no fare statement exists for the trip"
+      }
+    },
+    {
       "id": "bil-e-calculated",
       "type": "domainEvent",
       "label": "Fare Calculated",
@@ -273,6 +282,12 @@
       "source": "bil-h-surge",
       "target": "bil-c-calc",
       "relation": "annotates"
+    },
+    {
+      "id": "e-bil-23",
+      "source": "bil-c-calc",
+      "target": "bil-cons-once",
+      "relation": "constrainedBy"
     }
   ]
 }

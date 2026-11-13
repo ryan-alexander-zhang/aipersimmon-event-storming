@@ -251,7 +251,7 @@ describe("serialize v2 (T2/RT1)", () => {
     const result = importJSON(v2);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.model.version).toBe("5.0");
+      expect(result.model.version).toBe("5.1");
       const o = Object.fromEntries(result.model.nodes.map((n) => [n.id, n.order]));
       // dense-rank by (context.order, per-context order): {A, A2} concurrent → 0,
       // C → 1, then Payment's B → 2 (block-sequential, design-00005 §2).
@@ -265,7 +265,7 @@ describe("serialize v2 (T2/RT1)", () => {
   it("export omits position and includes contexts + order + level [us-00004]", () => {
     const { nodes, edges } = sampleCanvas();
     const out = JSON.parse(exportJSON(nodes, edges, CONTEXTS, META));
-    expect(out.version).toBe("5.0");
+    expect(out.version).toBe("5.1");
     expect(out.contexts).toEqual(CONTEXTS);
     expect(out.meta.level).toBe("design");
     expect(out.nodes[0].position).toBeUndefined();
@@ -303,7 +303,7 @@ describe("serialize v2 (T2/RT1)", () => {
     const result = importJSON(v1);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.model.version).toBe("5.0"); // chained v1 → v2 → v3 → v4 → v5
+      expect(result.model.version).toBe("5.1"); // chained v1 → v2 → v3 → v4 → v5 → v5.1
       expect(result.model.contexts).toEqual([
         { id: "default", name: "Default", order: 0, subdomain: { name: "Default" } },
       ]);
@@ -354,7 +354,7 @@ describe("serialize v2 (T2/RT1)", () => {
     const result = importJSON(v4);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.model.version).toBe("5.0");
+      expect(result.model.version).toBe("5.1");
       expect(result.model.contexts).toEqual([
         { id: "ord", name: "Ordering", order: 0, bigBallOfMud: true, subdomain: { name: "Ordering", type: "core" } },
         { id: "pay", name: "Payment", order: 1, subdomain: { name: "Payment" } },
@@ -380,6 +380,47 @@ describe("serialize v2 (T2/RT1)", () => {
     expect(importJSON(bad).ok).toBe(false);
   });
 
+  describe("a context's purpose and language [decision-00018, plan-00025-AC-1, AC-2]", () => {
+    const withContext = (ctx: Record<string, unknown>, version = "5.1") =>
+      JSON.stringify({
+        version,
+        meta: { name: "m", level: "design", createdAt: "t" },
+        contexts: [{ id: "ord", name: "Ordering", order: 0, ...ctx }],
+        nodes: [],
+        edges: [],
+      });
+    const LANG = [
+      { term: "Order", meaning: "A confirmed basket." },
+      { term: "Basket", meaning: "Items not yet committed." },
+    ];
+
+    it("keeps both through import and export", () => {
+      const r = importJSON(withContext({ purpose: "Take orders.", language: LANG }));
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(r.model.contexts[0]).toMatchObject({ purpose: "Take orders.", language: LANG });
+      const back = importJSON(exportJSON([], [], r.model.contexts, r.model.meta));
+      expect(back.ok && back.model.contexts[0]).toMatchObject({ purpose: "Take orders.", language: LANG });
+    });
+
+    it.each([
+      ["an empty purpose", { purpose: "" }],
+      ["an empty term", { language: [{ term: "", meaning: "x" }] }],
+      ["an empty meaning", { language: [{ term: "Order", meaning: "" }] }],
+      ["a term twice, in any case", { language: [...LANG, { term: "order", meaning: "again" }] }],
+    ])("rejects %s", (_, ctx) => {
+      expect(importJSON(withContext(ctx)).ok).toBe(false);
+    });
+
+    it("migrates a 5.0 file by its version alone", () => {
+      const r = importJSON(withContext({ subdomain: { name: "Ordering" } }, "5.0"));
+      expect(r.ok && r.model).toMatchObject({
+        version: "5.1",
+        contexts: [{ id: "ord", name: "Ordering", order: 0, subdomain: { name: "Ordering" } }],
+      });
+    });
+  });
+
   it("imports a pre-strategic v3.0 file as an untyped v5 model [us-00019-AC-4.1, spec-00004-XAC-1.1]", () => {
     const v3 = JSON.stringify({
       version: "3.0",
@@ -391,7 +432,7 @@ describe("serialize v2 (T2/RT1)", () => {
     const result = importJSON(v3);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.model.version).toBe("5.0"); // v3 → v4 → v5
+      expect(result.model.version).toBe("5.1"); // v3 → v4 → v5 → v5.1
       expect(result.model.contexts[0].subdomain).toEqual({ name: "Ordering" }); // untyped
     }
   });

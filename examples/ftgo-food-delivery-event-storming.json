@@ -1,11 +1,11 @@
 {
-  "version": "5.0",
+  "version": "5.1",
   "meta": {"name": "FTGO Food Delivery", "level": "design", "createdAt": "2026-06-18T00:00:00Z"},
   "contexts": [
-    {"id": "ord", "name": "Order", "order": 0, "subdomain": {"name": "Order", "type": "core"}},
-    {"id": "kit", "name": "Kitchen", "order": 1, "subdomain": {"name": "Kitchen", "type": "supporting"}},
-    {"id": "acc", "name": "Accounting", "order": 2, "subdomain": {"name": "Accounting", "type": "generic"}},
-    {"id": "del", "name": "Delivery", "order": 3, "subdomain": {"name": "Delivery", "type": "supporting"}}
+    {"id": "ord", "name": "Order", "order": 0, "subdomain": {"name": "Order", "type": "core"}, "purpose": "Take a consumer's order and see it through approval to delivery.", "language": [{"term": "Order", "meaning": "A consumer's request for food from one restaurant, from placement to delivery."}]},
+    {"id": "kit", "name": "Kitchen", "order": 1, "subdomain": {"name": "Kitchen", "type": "supporting"}, "purpose": "Let restaurants accept and prepare orders on time.", "language": [{"term": "Ticket", "meaning": "The restaurant's work item for an order: what to cook, and when it must be ready."}]},
+    {"id": "acc", "name": "Accounting", "order": 2, "subdomain": {"name": "Accounting", "type": "generic"}, "purpose": "Charge consumers for the orders they place."},
+    {"id": "del", "name": "Delivery", "order": 3, "subdomain": {"name": "Delivery", "type": "supporting"}, "purpose": "Get prepared orders from restaurants to consumers by courier."}
   ],
   "contextRelationships": [
     {"id": "cr-01", "source": "ord", "target": "kit", "type": "customerSupplier"},
@@ -16,22 +16,27 @@
   "nodes": [
     {"id": "ord-consumer", "type": "actor", "label": "Consumer", "context": "ord", "properties": {}},
     {"id": "ord-ag-order", "type": "aggregate", "label": "Order", "context": "ord", "properties": {}},
-    {"id": "ord-c-create", "type": "command", "label": "Create Order", "context": "ord", "properties": {}},
-    {"id": "ord-e-created", "type": "domainEvent", "label": "Order Created", "context": "ord", "order": 0, "properties": {"pivotal": true, "description": "Consumer submits an order; it starts APPROVAL_PENDING while the Create Order Saga runs."}},
+    {"id": "ord-cons-minimum", "type": "constraint", "label": "Order minimum met", "context": "ord", "properties": {"description": "Restaurants set a minimum below which delivery does not pay.", "rule": "order subtotal >= restaurant's minimum order"}},
+    {"id": "ord-cons-pending", "type": "constraint", "label": "Only a pending order is decided", "context": "ord", "properties": {"description": "An order is approved or rejected once, while the saga is still running.", "rule": "state = APPROVAL_PENDING"}},
+    {"id": "ord-c-create", "type": "command", "label": "Place Order", "context": "ord", "properties": {}},
+    {"id": "ord-e-created", "type": "domainEvent", "label": "Order Placed", "context": "ord", "order": 0, "properties": {"pivotal": true, "description": "Consumer submits an order; it starts APPROVAL_PENDING while the Create Order Saga runs."}},
     {"id": "ord-c-approve", "type": "command", "label": "Approve Order", "context": "ord", "properties": {}},
     {"id": "ord-e-approved", "type": "domainEvent", "label": "Order Approved", "context": "ord", "order": 4, "properties": {"pivotal": true,"alternativeSet": "order-approval"}},
     {"id": "ord-c-reject", "type": "command", "label": "Reject Order", "context": "ord", "properties": {}},
     {"id": "ord-e-rejected", "type": "domainEvent", "label": "Order Rejected", "context": "ord", "order": 4, "properties": {"description": "A saga step failed (e.g. card declined); the order is rejected and prior steps are compensated.","alternativeSet": "order-approval"}},
     {"id": "ord-rm-status", "type": "readModel", "label": "Order Status View", "context": "ord", "properties": {}},
-    {"id": "ord-p-saga", "type": "policy", "label": "Create Order Saga", "context": "ord", "properties": {"description": "When an order is created, create the kitchen ticket and authorize the consumer's card.", "execution": "automatic", "parameters": [{"name": "stepTimeout", "value": "30s"}]}},
+    {"id": "ord-p-saga", "type": "policy", "label": "Create Order Saga", "context": "ord", "properties": {"description": "When an order is placed, open the kitchen ticket and authorize the consumer's card.", "execution": "automatic", "parameters": [{"name": "stepTimeout", "value": "30s"}]}},
     {"id": "ord-p-onauth", "type": "policy", "label": "Approve on Authorization Policy", "context": "ord", "properties": {"description": "When the card is authorized, approve the order.", "execution": "automatic"}},
     {"id": "ord-p-ondecline", "type": "policy", "label": "Reject on Decline Policy", "context": "ord", "properties": {"description": "When the card is declined, reject the order and compensate the ticket.", "execution": "automatic"}},
     {"id": "ord-h-compensate", "type": "hotspot", "label": "What compensating steps run if the card is declined after the ticket is created?", "context": "ord", "properties": {"kind": "risk", "priority": "high"}},
 
     {"id": "kit-restaurant", "type": "actor", "label": "Restaurant", "context": "kit", "properties": {}},
     {"id": "kit-ag-ticket", "type": "aggregate", "label": "Ticket", "context": "kit", "properties": {}},
-    {"id": "kit-c-create", "type": "command", "label": "Create Ticket", "context": "kit", "properties": {}},
-    {"id": "kit-e-created", "type": "domainEvent", "label": "Ticket Created", "context": "kit", "order": 1, "properties": {}},
+    {"id": "kit-cons-open", "type": "constraint", "label": "Restaurant takes orders", "context": "kit", "properties": {"description": "A ticket the kitchen cannot cook must not be opened.", "rule": "restaurant is open and every line item is on its menu"}},
+    {"id": "kit-cons-readyby", "type": "constraint", "label": "Ready-by time is feasible", "context": "kit", "properties": {"description": "The restaurant commits only to a time it can keep.", "rule": "promised ready-by time >= now + preparation time"}},
+    {"id": "kit-cons-accepted", "type": "constraint", "label": "Only an accepted ticket is ready", "context": "kit", "properties": {"description": "Food is ready only for a ticket the kitchen accepted.", "rule": "state = ACCEPTED"}},
+    {"id": "kit-c-create", "type": "command", "label": "Open Ticket", "context": "kit", "properties": {}},
+    {"id": "kit-e-created", "type": "domainEvent", "label": "Ticket Opened", "context": "kit", "order": 1, "properties": {}},
     {"id": "kit-c-accept", "type": "command", "label": "Accept Ticket", "context": "kit", "properties": {}},
     {"id": "kit-e-accepted", "type": "domainEvent", "label": "Ticket Accepted", "context": "kit", "order": 5, "properties": {}},
     {"id": "kit-c-ready", "type": "command", "label": "Mark Ready for Pickup", "context": "kit", "properties": {}},
@@ -41,6 +46,7 @@
     {"id": "kit-h-hold", "type": "hotspot", "label": "How long is a ticket held before it auto-cancels?", "context": "kit", "properties": {"kind": "question", "priority": "medium"}},
 
     {"id": "acc-ag-account", "type": "aggregate", "label": "Consumer Account", "context": "acc", "properties": {}},
+    {"id": "acc-cons-standing", "type": "constraint", "label": "Account in good standing", "context": "acc", "properties": {"description": "We authorize cards only for consumers we can bill.", "rule": "consumer account is not disabled and has a valid card on file"}},
     {"id": "acc-c-authorize", "type": "command", "label": "Authorize Card", "context": "acc", "properties": {}},
     {"id": "acc-e-authorized", "type": "domainEvent", "label": "Card Authorized", "context": "acc", "order": 2, "properties": {"pivotal": true, "description": "One of the two ways a single authorization can go (authorized / declined) - see alternativeSet.","alternativeSet": "card-authorization"}},
     {"id": "acc-e-declined", "type": "domainEvent", "label": "Card Declined", "context": "acc", "order": 2, "properties": {"alternativeSet": "card-authorization"}},
@@ -52,6 +58,8 @@
 
     {"id": "del-courier", "type": "actor", "label": "Courier", "context": "del", "properties": {}},
     {"id": "del-ag-delivery", "type": "aggregate", "label": "Delivery", "context": "del", "properties": {}},
+    {"id": "del-cons-onedelivery", "type": "constraint", "label": "One delivery per order", "context": "del", "properties": {"description": "An order is carried by one courier; a second delivery would send two.", "rule": "no delivery exists for the order"}},
+    {"id": "del-cons-steps", "type": "constraint", "label": "Delivery steps in order", "context": "del", "properties": {"description": "A courier cannot deliver food they have not picked up.", "rule": "scheduled -> picked up -> delivered, never skipped"}},
     {"id": "del-c-schedule", "type": "command", "label": "Schedule Delivery", "context": "del", "properties": {}},
     {"id": "del-e-scheduled", "type": "domainEvent", "label": "Delivery Scheduled", "context": "del", "order": 5, "properties": {}},
     {"id": "del-c-pickup", "type": "command", "label": "Pick Up Order", "context": "del", "properties": {}},
@@ -112,6 +120,7 @@
 
     {"id": "e-acc-11", "source": "acc-e-authorized", "target": "ord-p-onauth", "relation": "triggers"},
     {"id": "e-acc-12", "source": "acc-e-declined", "target": "ord-p-ondecline", "relation": "triggers"},
+    {"id": "e-acc-13", "source": "acc-c-authorize", "target": "acc-cons-standing", "relation": "constrainedBy"},
 
     {"id": "e-del-01", "source": "del-c-schedule", "target": "del-ag-delivery", "relation": "handledBy"},
     {"id": "e-del-02", "source": "del-ag-delivery", "target": "del-e-scheduled", "relation": "emits"},
@@ -127,9 +136,18 @@
     {"id": "e-del-12", "source": "del-rm-route", "target": "del-courier", "relation": "informs"},
     {"id": "e-del-13", "source": "del-p-schedule", "target": "del-c-schedule", "relation": "invokes"},
     {"id": "e-del-14", "source": "del-p-dispatch", "target": "del-c-pickup", "relation": "invokes"},
+    {"id": "e-del-15", "source": "del-c-schedule", "target": "del-cons-onedelivery", "relation": "constrainedBy"},
+    {"id": "e-del-16", "source": "del-c-pickup", "target": "del-cons-steps", "relation": "constrainedBy"},
+    {"id": "e-del-17", "source": "del-c-deliver", "target": "del-cons-steps", "relation": "constrainedBy"},
 
     {"id": "e-ord-18", "source": "ord-e-approved", "target": "del-p-schedule", "relation": "triggers"},
+    {"id": "e-ord-19", "source": "ord-c-create", "target": "ord-cons-minimum", "relation": "constrainedBy"},
+    {"id": "e-ord-20", "source": "ord-c-approve", "target": "ord-cons-pending", "relation": "constrainedBy"},
+    {"id": "e-ord-21", "source": "ord-c-reject", "target": "ord-cons-pending", "relation": "constrainedBy"},
 
-    {"id": "e-kit-16", "source": "kit-e-ready", "target": "del-p-dispatch", "relation": "triggers"}
+    {"id": "e-kit-16", "source": "kit-e-ready", "target": "del-p-dispatch", "relation": "triggers"},
+    {"id": "e-kit-17", "source": "kit-c-create", "target": "kit-cons-open", "relation": "constrainedBy"},
+    {"id": "e-kit-18", "source": "kit-c-accept", "target": "kit-cons-readyby", "relation": "constrainedBy"},
+    {"id": "e-kit-19", "source": "kit-c-ready", "target": "kit-cons-accepted", "relation": "constrainedBy"}
   ]
 }

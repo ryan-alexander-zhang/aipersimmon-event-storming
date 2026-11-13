@@ -1,10 +1,10 @@
 {
-  "version": "5.0",
+  "version": "5.1",
   "meta": {"name": "Agile Project Management", "level": "design", "createdAt": "2026-06-02T00:00:00Z"},
   "contexts": [
-    {"id": "iam", "name": "Identity & Access", "order": 0, "subdomain": {"name": "Identity & Access", "type": "generic"}},
-    {"id": "apm", "name": "Agile Project Management", "order": 1, "subdomain": {"name": "Agile Project Management", "type": "core"}},
-    {"id": "collab", "name": "Collaboration", "order": 2, "subdomain": {"name": "Collaboration", "type": "supporting"}}
+    {"id": "iam", "name": "Identity & Access", "order": 0, "subdomain": {"name": "Identity & Access", "type": "generic"}, "purpose": "Know who each person is, which tenant they belong to, and what they may do.", "language": [{"term": "User", "meaning": "A registered identity in one tenant, with credentials and roles."}]},
+    {"id": "apm", "name": "Agile Project Management", "order": 1, "subdomain": {"name": "Agile Project Management", "type": "core"}, "purpose": "Let Scrum teams plan products, backlogs, releases and sprints.", "language": [{"term": "Team Member", "meaning": "A user acting in a team, known here by identity and name only."}]},
+    {"id": "collab", "name": "Collaboration", "order": 2, "subdomain": {"name": "Collaboration", "type": "supporting"}, "purpose": "Let people discuss work in forums and threads.", "language": [{"term": "Author", "meaning": "Whoever wrote a message, known by name and email, never by account."}]}
   ],
   "contextRelationships": [
     {"id": "cr-01", "source": "iam", "target": "apm", "type": "acl"},
@@ -14,9 +14,13 @@
   "nodes": [
     {"id": "iam-admin", "type": "actor", "label": "System Administrator", "context": "iam", "properties": {}},
     {"id": "iam-ag-tenant", "type": "aggregate", "label": "Tenant", "context": "iam", "properties": {}},
+    {"id": "iam-cons-tenantname", "type": "constraint", "label": "Tenant name unique", "context": "iam", "properties": {"description": "A subscriber is identified by its tenant name at sign-in.", "rule": "no active tenant has the same name"}},
     {"id": "iam-c-provision", "type": "command", "label": "Provision Tenant", "context": "iam", "properties": {}},
     {"id": "iam-e-provisioned", "type": "domainEvent", "label": "Tenant Provisioned", "context": "iam", "order": 0, "properties": {"pivotal": true, "description": "A tenant is created; all users, products and teams live within it."}},
     {"id": "iam-ag-user", "type": "aggregate", "label": "User", "context": "iam", "properties": {}},
+    {"id": "iam-cons-invitation", "type": "constraint", "label": "Registration needs an open invitation", "context": "iam", "properties": {"description": "Tenants control who may register.", "rule": "invitation is open and now is within its validity window"}},
+    {"id": "iam-cons-username", "type": "constraint", "label": "Username unique in tenant", "context": "iam", "properties": {"description": "Sign-in is by tenant and username.", "rule": "no user in the tenant has the same username"}},
+    {"id": "iam-cons-tenantrole", "type": "constraint", "label": "Role from the same tenant", "context": "iam", "properties": {"description": "A tenant's roles never grant access to another tenant.", "rule": "role tenant = user tenant"}},
     {"id": "iam-c-register", "type": "command", "label": "Register User", "context": "iam", "properties": {}},
     {"id": "iam-e-registered", "type": "domainEvent", "label": "User Registered", "context": "iam", "order": 1, "properties": {}},
     {"id": "iam-c-assignrole", "type": "command", "label": "Assign Role", "context": "iam", "properties": {}},
@@ -28,22 +32,28 @@
     {"id": "apm-sm", "type": "actor", "label": "Scrum Master", "context": "apm", "properties": {}},
     {"id": "apm-member", "type": "actor", "label": "Team Member", "context": "apm", "properties": {}},
     {"id": "apm-ag-product", "type": "aggregate", "label": "Product", "context": "apm", "properties": {}},
+    {"id": "apm-cons-productname", "type": "constraint", "label": "Product name unique in tenant", "context": "apm", "properties": {"description": "Teams find products by name.", "rule": "no product in the tenant has the same name"}},
     {"id": "apm-c-planproduct", "type": "command", "label": "Plan Product", "context": "apm", "properties": {}},
     {"id": "apm-e-productplanned", "type": "domainEvent", "label": "Product Planned", "context": "apm", "order": 2, "properties": {"pivotal": true, "description": "A product is created; it owns its backlog items, releases and sprints."}},
     {"id": "apm-ag-backlogitem", "type": "aggregate", "label": "Backlog Item", "context": "apm", "properties": {}},
+    {"id": "apm-cons-points", "type": "constraint", "label": "Story points from the scale", "context": "apm", "properties": {"description": "Estimates use the team's Fibonacci-like scale.", "rule": "story points in {0, 1, 2, 3, 5, 8, 13, 20, 40, 100}"}},
+    {"id": "apm-cons-committable", "type": "constraint", "label": "Only an open item is committed", "context": "apm", "properties": {"description": "Work is committed only to a live sprint of its own product.", "rule": "status != DONE and the sprint belongs to the item's product and has not ended"}},
     {"id": "apm-c-planitem", "type": "command", "label": "Plan Backlog Item", "context": "apm", "properties": {}},
     {"id": "apm-e-itemplanned", "type": "domainEvent", "label": "Backlog Item Planned", "context": "apm", "order": 3, "properties": {}},
     {"id": "apm-c-estimate", "type": "command", "label": "Estimate Backlog Item", "context": "apm", "properties": {}},
     {"id": "apm-e-estimated", "type": "domainEvent", "label": "Backlog Item Estimated", "context": "apm", "order": 3, "properties": {}},
     {"id": "apm-ag-release", "type": "aggregate", "label": "Release", "context": "apm", "properties": {}},
+    {"id": "apm-cons-releasedates", "type": "constraint", "label": "Release dates ordered", "context": "apm", "properties": {"description": "A release cannot end before it begins.", "rule": "begins <= ends"}},
     {"id": "apm-c-schedrelease", "type": "command", "label": "Schedule Release", "context": "apm", "properties": {}},
     {"id": "apm-e-releasesched", "type": "domainEvent", "label": "Release Scheduled", "context": "apm", "order": 4, "properties": {}},
     {"id": "apm-ag-sprint", "type": "aggregate", "label": "Sprint", "context": "apm", "properties": {}},
+    {"id": "apm-cons-sprintdates", "type": "constraint", "label": "Sprint dates ordered", "context": "apm", "properties": {"description": "A sprint is a non-empty timebox.", "rule": "begins < ends"}},
     {"id": "apm-c-schedsprint", "type": "command", "label": "Schedule Sprint", "context": "apm", "properties": {}},
     {"id": "apm-e-sprintsched", "type": "domainEvent", "label": "Sprint Scheduled", "context": "apm", "order": 5, "properties": {}},
     {"id": "apm-c-commit", "type": "command", "label": "Commit Backlog Item to Sprint", "context": "apm", "properties": {}},
     {"id": "apm-e-committed", "type": "domainEvent", "label": "Backlog Item Committed", "context": "apm", "order": 6, "properties": {"pivotal": true, "description": "A backlog item is committed to a sprint for the team to deliver."}},
     {"id": "apm-ag-team", "type": "aggregate", "label": "Team", "context": "apm", "properties": {}},
+    {"id": "apm-cons-teamname", "type": "constraint", "label": "Team name unique in tenant", "context": "apm", "properties": {"description": "Members pick their team by name.", "rule": "no team in the tenant has the same name"}},
     {"id": "apm-c-formteam", "type": "command", "label": "Form Team", "context": "apm", "properties": {}},
     {"id": "apm-e-teamformed", "type": "domainEvent", "label": "Team Formed", "context": "apm", "order": 2, "properties": {}},
     {"id": "apm-rm-backlog", "type": "readModel", "label": "Product Backlog View", "context": "apm", "properties": {}},
@@ -54,6 +64,8 @@
 
     {"id": "collab-member", "type": "actor", "label": "Team Member", "context": "collab", "properties": {}},
     {"id": "collab-ag-discussion", "type": "aggregate", "label": "Discussion", "context": "collab", "properties": {}},
+    {"id": "collab-cons-onediscussion", "type": "constraint", "label": "One discussion per subject", "context": "collab", "properties": {"description": "Everything said about one product or backlog item stays in one thread.", "rule": "no discussion exists for the same owner (product or backlog item)"}},
+    {"id": "collab-cons-open", "type": "constraint", "label": "Only an open discussion takes messages", "context": "collab", "properties": {"description": "A closed discussion is a record, not a conversation.", "rule": "discussion is not closed"}},
     {"id": "collab-c-start", "type": "command", "label": "Start Discussion", "context": "collab", "properties": {}},
     {"id": "collab-e-started", "type": "domainEvent", "label": "Discussion Started", "context": "collab", "order": 3, "properties": {}},
     {"id": "collab-c-post", "type": "command", "label": "Post Message", "context": "collab", "properties": {}},
@@ -75,6 +87,10 @@
     {"id": "e-iam-12", "source": "iam-rm-directory", "target": "iam-admin", "relation": "informs"},
     {"id": "e-iam-13", "source": "iam-e-provisioned", "target": "iam-p-defaultadmin", "relation": "triggers"},
     {"id": "e-iam-14", "source": "iam-p-defaultadmin", "target": "iam-c-register", "relation": "invokes"},
+    {"id": "e-iam-15", "source": "iam-c-provision", "target": "iam-cons-tenantname", "relation": "constrainedBy"},
+    {"id": "e-iam-16", "source": "iam-c-register", "target": "iam-cons-invitation", "relation": "constrainedBy"},
+    {"id": "e-iam-17", "source": "iam-c-register", "target": "iam-cons-username", "relation": "constrainedBy"},
+    {"id": "e-iam-18", "source": "iam-c-assignrole", "target": "iam-cons-tenantrole", "relation": "constrainedBy"},
 
     {"id": "e-apm-01", "source": "apm-po", "target": "apm-c-planproduct", "relation": "issues"},
     {"id": "e-apm-02", "source": "apm-c-planproduct", "target": "apm-ag-product", "relation": "handledBy"},
@@ -115,7 +131,15 @@
     {"id": "e-collab-06", "source": "collab-e-started", "target": "collab-rm-thread", "relation": "updates"},
     {"id": "e-collab-07", "source": "collab-e-posted", "target": "collab-rm-thread", "relation": "updates"},
     {"id": "e-collab-08", "source": "collab-rm-thread", "target": "collab-member", "relation": "informs"},
+    {"id": "e-collab-09", "source": "collab-c-start", "target": "collab-cons-onediscussion", "relation": "constrainedBy"},
+    {"id": "e-collab-10", "source": "collab-c-post", "target": "collab-cons-open", "relation": "constrainedBy"},
 
-    {"id": "e-apm-31", "source": "apm-p-productdiscussion", "target": "collab-c-start", "relation": "invokes"}
+    {"id": "e-apm-31", "source": "apm-p-productdiscussion", "target": "collab-c-start", "relation": "invokes"},
+    {"id": "e-apm-32", "source": "apm-c-planproduct", "target": "apm-cons-productname", "relation": "constrainedBy"},
+    {"id": "e-apm-33", "source": "apm-c-estimate", "target": "apm-cons-points", "relation": "constrainedBy"},
+    {"id": "e-apm-34", "source": "apm-c-commit", "target": "apm-cons-committable", "relation": "constrainedBy"},
+    {"id": "e-apm-35", "source": "apm-c-schedrelease", "target": "apm-cons-releasedates", "relation": "constrainedBy"},
+    {"id": "e-apm-36", "source": "apm-c-schedsprint", "target": "apm-cons-sprintdates", "relation": "constrainedBy"},
+    {"id": "e-apm-37", "source": "apm-c-formteam", "target": "apm-cons-teamname", "relation": "constrainedBy"}
   ]
 }

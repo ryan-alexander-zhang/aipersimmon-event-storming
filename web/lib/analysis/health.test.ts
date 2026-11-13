@@ -115,6 +115,8 @@ describe("analyzeModel", () => {
       // names the aggregate it concerns (us-00011-AC-1.3)
       expect(found[0].elementIds).toEqual(["a"]);
       expect(found[0].message).toContain("Order");
+      // asks the G2 question, not only for a split (plan-00025-AC-6)
+      expect(found[0].message).toContain("which rule do they all share?");
     });
 
     it("does not flag an aggregate at the threshold", () => {
@@ -266,6 +268,7 @@ describe("subdomain findings [decision-00016]", () => {
     id,
     name,
     order: 0,
+    purpose: "p", // keeps missing-purpose out of these cases
     ...(subdomain && { subdomain }),
   });
 
@@ -354,5 +357,49 @@ describe("unbacked-seam [decision-00017, plan-00024-AC-7]", () => {
     expect(out.find((f) => f.type === "unbacked-seam")?.message).toBe(
       "'x' and 'y' are joined by an edge but have no Context Relationship",
     );
+  });
+});
+
+describe("heuristic findings [decision-00018]", () => {
+  const of = (findings: ReturnType<typeof analyzeModel>, t: string) => findings.filter((f) => f.type === t);
+
+  it("warns on an event named by a CRUD or UI verb, at any level [plan-00025-AC-3]", () => {
+    const nodes = [
+      node("a", "domainEvent", "Order Created"),
+      node("b", "domainEvent", "Button  Clicked "),
+      node("c", "domainEvent", "Cargo Loaded"),
+      node("d", "domainEvent", "Item Removed"),
+      node("e", "command", "Order Created"),
+    ];
+    const found = of(analyzeModel(nodes, []), "technical-event");
+    expect(found.map((f) => f.elementIds)).toEqual([["a"], ["b"]]);
+    expect(found[0].message).toBe("Domain Event 'Order Created' names a technical step - what happened in business terms?");
+  });
+
+  it("warns on a design-level context without a purpose [plan-00025-AC-4]", () => {
+    const ctxs: Context[] = [
+      { id: "ord", name: "Ordering", order: 0, purpose: "Take orders." },
+      { id: "pay", name: "Payment", order: 1, purpose: "  " },
+      { id: "shp", name: "Shipping", order: 2 },
+    ];
+    const found = of(analyzeModel([], [], ctxs, "design"), "missing-purpose");
+    expect(found.map((f) => f.id)).toEqual(["missing-purpose:pay", "missing-purpose:shp"]);
+    expect(of(analyzeModel([], [], ctxs, "process"), "missing-purpose")).toEqual([]);
+  });
+
+  it("warns on a design-level aggregate whose commands no constraint guards [plan-00025-AC-5]", () => {
+    const nodes = [
+      node("c1", "command"),
+      node("c2", "command"),
+      node("ag", "aggregate", "Order"),
+      node("bare", "aggregate", "Basket"),
+      node("k", "constraint"),
+    ];
+    const edges = [edge("c1", "ag", "handledBy"), edge("c2", "bare", "handledBy")];
+    const at = (es: ESEdge[], level?: "design" | "process") =>
+      of(analyzeModel(nodes, es, [], level), "unguarded-aggregate").map((f) => f.elementIds[0]);
+    expect(at(edges, "design")).toEqual(["ag", "bare"]);
+    expect(at([...edges, edge("c1", "k", "constrainedBy")], "design")).toEqual(["bare"]);
+    expect(at(edges, "process")).toEqual([]);
   });
 });

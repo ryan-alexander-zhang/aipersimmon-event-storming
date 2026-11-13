@@ -1,15 +1,53 @@
 {
-  "version": "5.0",
-  "meta": { "name": "Context map", "level": "big-picture", "createdAt": "2026-07-22T00:00:00Z" },
+  "version": "5.1",
+  "meta": {
+    "name": "Context map",
+    "level": "big-picture",
+    "createdAt": "2026-07-22T00:00:00Z"
+  },
   "contexts": [
-    { "id": "ord", "name": "Ordering", "order": 0, "subdomain": { "name": "Ordering", "type": "core" } },
-    { "id": "pay", "name": "Payment", "order": 1, "subdomain": { "name": "Payment", "type": "generic" } }
+    {
+      "id": "ord",
+      "name": "Ordering",
+      "order": 0,
+      "subdomain": {
+        "name": "Ordering",
+        "type": "core"
+      },
+      "language": [
+        {
+          "term": "Order",
+          "meaning": "A basket the customer committed to pay."
+        }
+      ]
+    },
+    {
+      "id": "pay",
+      "name": "Payment",
+      "order": 1,
+      "subdomain": {
+        "name": "Payment",
+        "type": "generic"
+      }
+    }
   ],
   "contextRelationships": [
-    { "id": "cr1", "source": "ord", "target": "pay", "type": "customerSupplier" }
+    {
+      "id": "cr1",
+      "source": "ord",
+      "target": "pay",
+      "type": "customerSupplier"
+    }
   ],
   "nodes": [
-    { "id": "e1", "type": "domainEvent", "label": "Order Placed", "context": "ord", "order": 0, "properties": {} }
+    {
+      "id": "e1",
+      "type": "domainEvent",
+      "label": "Order Placed",
+      "context": "ord",
+      "order": 0,
+      "properties": {}
+    }
   ],
   "edges": []
 }
