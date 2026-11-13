@@ -28,7 +28,8 @@ export type SmellType =
   | "missing-execution"
   | "type-above-level"
   | "reversed-dependency"
-  | "mutual-dependency";
+  | "mutual-dependency"
+  | "contradicted-separate-ways";
 
 export interface Finding {
   id: string;
@@ -448,9 +449,31 @@ function seamFindings(
   // reversed-dependency, whose fix (flip the arrow) would not resolve it.
   const accepted = (key: string) =>
     (relsOf.get(key) ?? []).some((r) => r.type === "partnership" || r.type === "sharedKernel");
-  const mutual = [...uppers].filter(([key, ups]) => ups.size === 2 && !accepted(key)).map(([key]) => key);
+  // Separate Ways says the pair does not integrate: a seam or any other relationship
+  // on it says it does (decision-00020). That contradiction is the finding; the
+  // direction findings on the same pair would only restate it.
+  const contradicted = [...relsOf]
+    .filter(([key, rels]) => rels.some((r) => r.type === "separateWays") && (seamIds.has(key) || rels.length > 1))
+    .map(([key, rels]) => ({ key, others: rels.filter((r) => r.type !== "separateWays").map((r) => r.type) }));
+  const settled = new Set(contradicted.map((c) => c.key));
+  const mutual = [...uppers]
+    .filter(([key, ups]) => ups.size === 2 && !accepted(key) && !settled.has(key))
+    .map(([key]) => key);
   for (const key of mutual) reversed.delete(key);
   return [
+    ...contradicted.map(({ key, others }) => {
+      const [a, b] = key.split("|").map(nameOf);
+      const why = [seamIds.has(key) && "an edge joins them", others.length > 0 && `they are also ${others.join(", ")}`]
+        .filter(Boolean)
+        .join(", and ");
+      return {
+        id: `contradicted-separate-ways:${key}`,
+        type: "contradicted-separate-ways" as const,
+        severity: "warning" as const,
+        message: `'${a}' and '${b}' go Separate Ways, but ${why}`,
+        elementIds: [...(seamIds.get(key) ?? [])],
+      };
+    }),
     ...mutual.map((key) => {
       const [a, b] = key.split("|").map(nameOf);
       return {

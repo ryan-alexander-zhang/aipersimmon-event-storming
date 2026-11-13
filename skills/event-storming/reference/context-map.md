@@ -57,7 +57,7 @@ Most models have 1-2 core subdomains. If everything is core, nothing is.
 | `acl` | downstream translates the upstream model to protect its own | upstream -> downstream |
 | `openHostService` | upstream publishes one protocol for many consumers | upstream -> downstream |
 | `publishedLanguage` | integration runs on a shared documented schema | upstream -> downstream |
-| `separateWays` | no integration at all, duplication is cheaper | symmetric |
+| `separateWays` | no integration at all, duplication is cheaper - so no seam and no other relationship between the pair (the validator errors otherwise) | symmetric |
 
 Picking between the near ones:
 - Downstream can ask for changes -> `customerSupplier`. It cannot -> `conformist`.
@@ -84,6 +84,6 @@ Picking between the near ones:
 - [ ] Every term that drew a B1 boundary is in `language` on both sides.
 - [ ] Every context has a `subdomain` with a `name` and a `type`; no two contexts name the same subdomain.
 - [ ] Every context used by a node is declared in `contexts`, with an `order`.
-- [ ] Every pair of contexts with a crossing edge has at least one relationship (else the validator warns `unbacked seam`), pointing the way its seams depend (else `reversed dependency`), and no pair depends both ways unless it is a declared `partnership` or `sharedKernel` (else `mutual dependency`).
+- [ ] Every pair of contexts with a crossing edge has at least one relationship (else the validator warns `unbacked seam`), pointing the way its seams depend (else `reversed dependency`), and no pair depends both ways unless it is a declared `partnership` or `sharedKernel` (else `mutual dependency`); a `separateWays` pair has no seam and no other relationship.
 - [ ] No relationship between a context and itself.
 - [ ] Core subdomains are few and are the ones the business would defend.

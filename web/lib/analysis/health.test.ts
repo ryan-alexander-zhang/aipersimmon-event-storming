@@ -544,3 +544,40 @@ describe("per-context level and integration direction [decision-00019]", () => {
     });
   });
 });
+
+describe("contradicted-separate-ways [decision-00020]", () => {
+  const at = (id: string, type: ElementType, context: string): ESNode => ({ ...node(id, type), data: { label: id, context } });
+  const contexts: Context[] = [
+    { id: "pay", name: "Payment", order: 0 },
+    { id: "shp", name: "Shipping", order: 1 },
+  ];
+  const nodes = [at("captured", "domainEvent", "pay"), at("ship", "policy", "shp"), at("h", "hotspot", "pay"), at("clerk", "actor", "pay")];
+  const rel = (type: ContextRelationship["type"], id = type): ContextRelationship => ({ id, source: "pay", target: "shp", type });
+  const found = (es: ESEdge[], rels: ContextRelationship[]) =>
+    analyzeModel(nodes, es, contexts, "process", rels).filter((f) =>
+      ["contradicted-separate-ways", "mutual-dependency", "reversed-dependency", "unbacked-seam"].includes(f.type),
+    );
+
+  it("reports a seam between a pair that goes Separate Ways", () => {
+    const out = found([edge("captured", "ship", "triggers")], [rel("separateWays")]);
+    expect(out.map((f) => f.type)).toEqual(["contradicted-separate-ways"]);
+    expect(out[0].message).toBe("'Payment' and 'Shipping' go Separate Ways, but an edge joins them");
+    expect([...out[0].elementIds].sort()).toEqual(["captured", "ship"]);
+  });
+
+  it("reports another relationship on the same pair, with or without a seam", () => {
+    const out = found([], [rel("separateWays"), rel("customerSupplier")]);
+    expect(out.map((f) => f.message)).toEqual([
+      "'Payment' and 'Shipping' go Separate Ways, but they are also customerSupplier",
+    ]);
+    expect(found([edge("captured", "ship", "triggers")], [rel("separateWays"), rel("acl")])[0].message).toBe(
+      "'Payment' and 'Shipping' go Separate Ways, but an edge joins them, and they are also acl",
+    );
+  });
+
+  it("is quiet when nothing crosses - commentary and people are not integration", () => {
+    const commentary = [edge("h", "ship", "annotates")];
+    expect(found(commentary, [rel("separateWays")])).toEqual([]);
+    expect(found([], [rel("separateWays")])).toEqual([]);
+  });
+});

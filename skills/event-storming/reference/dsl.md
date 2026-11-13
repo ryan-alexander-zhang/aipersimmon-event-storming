@@ -254,6 +254,7 @@ Everything else that depends on level also uses the effective level, element by 
 - A relation the type pair does not allow (`policy -> domainEvent`, `command -> command`).
 - A node type not allowed at its effective level - for example a command in a context still at `big-picture`.
 - A design-level policy without `execution`.
+- A `separateWays` pair that shares a seam or carries another relationship - the model says both that they do not integrate and that they do (decision-00020). Use the relationship the seams show, or remove the seam.
 - In a split model: a `context` key on a node in a context file, or an edge left in `domain.json` whose both ends are in one context file.
 - `context` id that is not declared in `contexts`.
 - A design-level context without `purpose`, a term listed twice in one context's `language`, or an `avoid` word that is a term of the same context.

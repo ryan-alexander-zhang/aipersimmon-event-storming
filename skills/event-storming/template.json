@@ -24,10 +24,10 @@
     { "id": "cr-02", "source": "ord", "target": "pay", "type": "publishedLanguage" },
     { "id": "cr-03", "source": "cat", "target": "ord", "type": "conformist" },
     { "id": "cr-04", "source": "ord", "target": "shp", "type": "sharedKernel" },
-    { "id": "cr-05", "source": "ord", "target": "shp", "type": "openHostService" },
+    { "id": "cr-05", "source": "ord", "target": "shp", "type": "partnership" },
     { "id": "cr-06", "source": "cat", "target": "shp", "type": "acl" },
-    { "id": "cr-07", "source": "pay", "target": "cat", "type": "partnership" },
-    { "id": "cr-08", "source": "pay", "target": "shp", "type": "separateWays" }
+    { "id": "cr-07", "source": "cat", "target": "pay", "type": "separateWays" },
+    { "id": "cr-08", "source": "pay", "target": "shp", "type": "openHostService" }
   ],
   "nodes": [
     { "id": "cat-merch", "type": "actor", "label": "Merchandiser", "context": "cat", "properties": {} },

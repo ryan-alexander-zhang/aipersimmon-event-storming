@@ -238,7 +238,7 @@ Anticorruption Layer, Open Host Service, Published Language, Separate Ways
 (decision-00007). Whether it runs on API calls or events is never stated on it:
 it is read from the pair's Seams, and so is which side depends on which
 (decision-00019). Two contexts that depend on each other both ways are a declared
-Partnership or Shared Kernel, or a design still to straighten.
+Partnership or Shared Kernel, or a design still to straighten. Separate Ways means no Seam and no other relationship between the pair (decision-00020).
 _Avoid_: dependency, link, connection.
 
 **Context Map**:

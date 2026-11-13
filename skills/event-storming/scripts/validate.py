@@ -361,9 +361,23 @@ def check_seams(model, nodes, edges):
     # A pair depending both ways is a cycle: declared as a partnership or a shared
     # kernel, or a sign the direction or the boundary is wrong. It replaces the
     # reversed-dependency warning, whose fix (flip the arrow) would not resolve it.
+    # Separate Ways says the pair does not integrate: a seam or any other relationship
+    # on it says it does (decision-00020). An error - the model states two
+    # incompatible facts - and the direction warnings on that pair would only restate it.
+    contradicted = set()
+    for key, rs in rels.items():
+        if not any(r.get("type") == "separateWays" for r in rs):
+            continue
+        others = [r.get("type") for r in rs if r.get("type") != "separateWays"]
+        why = [w for w in ["an edge joins them" if styles[key] else "",
+                           f"they are also {', '.join(others)}" if others else ""] if w]
+        if why:
+            contradicted.add(key)
+            reversed_.pop(key, None)
+            err(f"contexts '{name(key[0])}' and '{name(key[1])}' go separate ways, but {', and '.join(why)}")
     for key, ups in uppers.items():
         accepted = any(r.get("type") in ("partnership", "sharedKernel") for r in rels[key])
-        if len(ups) == 2 and not accepted:
+        if len(ups) == 2 and not accepted and key not in contradicted:
             reversed_.pop(key, None)
             warn(f"mutual dependency: '{name(key[0])}' and '{name(key[1])}' depend on each other - "
                  "straighten one direction, declare a partnership, or merge them")
