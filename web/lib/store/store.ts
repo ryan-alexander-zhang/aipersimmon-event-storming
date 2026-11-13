@@ -204,6 +204,8 @@ export interface ESState {
   setContextSubdomainType: (id: string, type: SubdomainType | undefined) => void;
   /** Name the Subdomain a context realises (decision-00016). */
   setContextSubdomainName: (id: string, name: string) => void;
+  /** Set (or clear, with undefined) a context's own level (decision-00019). */
+  setContextLevel: (id: string, level: Level | undefined) => void;
   /** Set (or clear, with undefined) why a context exists (decision-00018). */
   setContextPurpose: (id: string, purpose: string | undefined) => void;
   /** Mark (or clear, with undefined) a Bounded Context as a Big Ball of Mud (decision-00015). */
@@ -465,6 +467,9 @@ const initializer: StateCreator<ESState> = (set, get) => ({
         c.id === id ? { ...c, subdomain: { ...c.subdomain, name } } : c,
       ),
     }),
+
+  setContextLevel: (id, level) =>
+    set({ contexts: get().contexts.map((c) => (c.id === id ? { ...c, level } : c)) }),
 
   setContextPurpose: (id, purpose) =>
     set({ contexts: get().contexts.map((c) => (c.id === id ? { ...c, purpose } : c)) }),

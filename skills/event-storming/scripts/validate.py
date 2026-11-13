@@ -67,7 +67,19 @@ ENUMS = {"state": ["open", "resolved"], "kind": ["conflict", "question", "risk"]
 AGG_MAX_COMMANDS = 5
 AGG_MAX_EVENTS = 5
 
-errors, warns = [], []
+LEVEL_ORDER = ["big-picture", "process", "design"]
+# context id -> its own level, capped by the model's (decision-00019); filled by main
+CTX_LEVEL = {}
+MODEL_LEVEL = ["design"]
+
+
+def level_of(ctx):
+    """The level an element is judged at: its context's, capped by the model's.
+    An Ungrouped element (or an undeclared context) is at the model's level."""
+    return CTX_LEVEL.get(ctx, MODEL_LEVEL[0])
+
+
+errors, warns, infos = [], [], []
 # In a split model, the file each node / edge id was read from, so an error about
 # one names where to fix it (decision-00017).
 ORIGIN = {}
@@ -89,7 +101,7 @@ def as_list(model, key):
     return [x for x in v if isinstance(x, dict)]
 
 
-def check_contexts(model, level):
+def check_contexts(model):
     ids = set()
     subdomains = defaultdict(list)  # lowercased subdomain name -> context ids (decision-00016)
     for c in as_list(model, "contexts"):
@@ -108,7 +120,7 @@ def check_contexts(model, level):
             err(f"context {cid}: classification is gone - write subdomain: {{\"name\": ..., \"type\": ...}}")
         sd = c.get("subdomain")
         if sd is None:
-            if level == "design":
+            if level_of(cid) == "design":
                 err(f"context {cid}: no subdomain - at design every context realises one "
                     "(subdomain: {\"name\": ..., \"type\": core|supporting|generic})")
         elif not isinstance(sd, dict) or not isinstance(sd.get("name"), str) or not sd["name"].strip():
@@ -120,7 +132,7 @@ def check_contexts(model, level):
             t = sd.get("type")
             if t is not None and t not in ("core", "supporting", "generic"):
                 err(f"context {cid}: subdomain type '{t}' - use core|supporting|generic")
-            elif t is None and level == "design":
+            elif t is None and level_of(cid) == "design":
                 err(f"context {cid}: subdomain '{sd['name']}' has no type - core|supporting|generic")
             subdomains[sd["name"].strip().lower()].append(cid)
         if "file" in c and not isinstance(c["file"], str):
@@ -129,12 +141,15 @@ def check_contexts(model, level):
         # (decision-00018)
         purpose = c.get("purpose")
         if purpose is None:
-            if level == "design":
+            if level_of(cid) == "design":
                 err(f"context {cid}: no purpose - at design every context says which "
                     "business problem it solves (purpose: \"...\")")
         elif not isinstance(purpose, str) or not purpose.strip():
             err(f"context {cid}: purpose must be a non-empty string")
         check_language(cid, c.get("language"))
+        lv = c.get("level")
+        if lv is not None and lv not in LEVEL_ORDER:
+            err(f"context {cid}: level '{lv}' - use big-picture|process|design")
         bbm = c.get("bigBallOfMud")
         if bbm is not None and not isinstance(bbm, bool):
             err(f"context {cid}: bigBallOfMud must be true or false")
@@ -150,17 +165,31 @@ def check_language(cid, language):
     if not isinstance(language, list):
         err(f"context {cid}: language must be a list of {{\"term\", \"meaning\"}}")
         return
-    seen = set()
+    seen, avoided = set(), []
     for t in language:
-        if not isinstance(t, dict) or set(t) != {"term", "meaning"} \
+        if not isinstance(t, dict) or not {"term", "meaning"} <= set(t) <= {"term", "meaning", "avoid"} \
                 or not all(isinstance(t[k], str) and t[k].strip() for k in ("term", "meaning")):
-            err(f"context {cid}: language entry {t} must be {{\"term\": ..., \"meaning\": ...}}, both non-empty")
+            err(f"context {cid}: language entry {t} must be {{\"term\": ..., \"meaning\": ...}}, both non-empty, "
+                "plus an optional \"avoid\"")
             continue
         key = t["term"].strip().lower()
         if key in seen:
             err(f"context {cid}: term '{t['term']}' appears twice in its language")
         seen.add(key)
-
+        avoid = t.get("avoid")
+        if avoid is None:
+            continue
+        if not isinstance(avoid, list) or not all(isinstance(w, str) and w.strip() for w in avoid):
+            err(f"context {cid}: term '{t['term']}': avoid must be a list of non-empty words")
+            continue
+        words = [w.strip().lower() for w in avoid]
+        if len(set(words)) != len(words):
+            err(f"context {cid}: term '{t['term']}' avoids a word twice")
+        avoided += [(t["term"], w) for w in avoid]
+    # a context cannot both use a word and avoid it (decision-00019)
+    for term, word in avoided:
+        if word.strip().lower() in seen:
+            err(f"context {cid}: term '{term}' avoids '{word}', which is a term of the same context")
 
 DOMAIN_FILE = "domain.json"
 
@@ -283,17 +312,30 @@ def merge_split(model, base):
     return {**model, "nodes": nodes, "edges": edges}
 
 
+# How a seam integrates and which side depends on which (decision-00019): an event
+# flowing across makes the reacting side downstream; a command or a synchronous read
+# across makes the calling side downstream. Mirrors seamStyle in the editor.
+EVENT_RELATIONS = ("triggers", "updates", "emits")
+SYMMETRIC = ("partnership", "sharedKernel", "separateWays")
+
+
 def check_seams(model, nodes, edges):
     """Every edge crossing two contexts needs a Context Relationship between them, in
-    either direction (decision-00017). An actor's edge is not a seam: a person using
-    two contexts is not the contexts integrating. Nor is commentary: a hotspot or an
-    opportunity pointing across marks an element, it integrates nothing (issue-00040).
-    One warning per pair."""
+    either direction (decision-00017), whose direction the seam does not contradict
+    (decision-00019). An actor's edge is not a seam: a person using two contexts is
+    not the contexts integrating. Nor is commentary: a hotspot or an opportunity
+    pointing across marks an element, it integrates nothing (issue-00040). One
+    warning per pair; one INFO line per relationship with the styles its seams use."""
     pair = lambda a, b: (a, b) if a < b else (b, a)  # noqa: E731
-    backed = {pair(r.get("source"), r.get("target")) for r in as_list(model, "contextRelationships")
-              if isinstance(r.get("source"), str) and isinstance(r.get("target"), str)}
+    rels = defaultdict(list)
+    for r in as_list(model, "contextRelationships"):
+        if isinstance(r.get("source"), str) and isinstance(r.get("target"), str):
+            rels[pair(r["source"], r["target"])].append(r)
     names = {c.get("id"): c.get("name") for c in as_list(model, "contexts")}
-    reported = set()
+    name = lambda c: names.get(c, c)  # noqa: E731
+    unbacked, styles = set(), defaultdict(set)
+    uppers = defaultdict(set)  # pair -> the contexts its seams make upstream
+    reversed_ = {}  # pair -> its first reversed seam, reported unless the pair is mutual
     for s, t, rel in edges:
         if rel in ("annotates", "highlights") or nodes[s]["type"] == "actor" or nodes[t]["type"] == "actor":
             continue
@@ -301,11 +343,36 @@ def check_seams(model, nodes, edges):
         if not isinstance(a, str) or not isinstance(b, str) or a == b:
             continue
         key = pair(a, b)
-        if key in backed or key in reported:
+        events = rel in EVENT_RELATIONS
+        styles[key].add("events" if events else "api")
+        if key not in rels:
+            if key not in unbacked:
+                unbacked.add(key)
+                warn(f"unbacked seam: '{name(key[0])}' and '{name(key[1])}' "
+                     "are joined by an edge but have no Context Relationship")
             continue
-        reported.add(key)
-        warn(f"unbacked seam: '{names.get(key[0], key[0])}' and '{names.get(key[1], key[1])}' "
-             "are joined by an edge but have no Context Relationship")
+        up, down = (a, b) if events else (b, a)
+        uppers[key].add(up)
+        if key in reversed_ or any(r.get("type") in SYMMETRIC or r["source"] == up for r in rels[key]):
+            continue
+        reversed_[key] = (f"reversed dependency: '{name(down)}' depends on '{name(up)}' ({rel} "
+                          f"'{nodes[s]['label']}' -> '{nodes[t]['label']}'), but the Context Relationship "
+                          f"makes '{name(down)}' upstream")
+    # A pair depending both ways is a cycle: declared as a partnership or a shared
+    # kernel, or a sign the direction or the boundary is wrong. It replaces the
+    # reversed-dependency warning, whose fix (flip the arrow) would not resolve it.
+    for key, ups in uppers.items():
+        accepted = any(r.get("type") in ("partnership", "sharedKernel") for r in rels[key])
+        if len(ups) == 2 and not accepted:
+            reversed_.pop(key, None)
+            warn(f"mutual dependency: '{name(key[0])}' and '{name(key[1])}' depend on each other - "
+                 "straighten one direction, declare a partnership, or merge them")
+    for msg in reversed_.values():
+        warn(msg)
+    for key, rs in rels.items():
+        for r in rs:
+            via = " + ".join(sorted(styles[key])) or "no seams yet"
+            infos.append(f"integration: '{name(r['source'])}' -> '{name(r['target'])}' ({r.get('type')}): {via}")
 
 
 def check_context_relationships(model, ctx_ids):
@@ -324,7 +391,7 @@ def check_context_relationships(model, ctx_ids):
             err(f"contextRelationship {rid}: source and target are the same context")
 
 
-def check_nodes(model, ctx_ids, level):
+def check_nodes(model, ctx_ids):
     nodes = {}
     for n in as_list(model, "nodes"):
         nid = n.get("id")
@@ -340,8 +407,10 @@ def check_nodes(model, ctx_ids, level):
         nodes[nid] = n
         if not n.get("label"):
             err(f"node {nid}: label is required")
-        if level in LEVEL_TYPES and t not in LEVEL_TYPES[level]:
-            err(f"node {nid}: type '{t}' is not allowed at level '{level}'")
+        lv = level_of(n.get("context"))
+        if lv in LEVEL_TYPES and t not in LEVEL_TYPES[lv]:
+            where_ = f"its context '{n.get('context')}' is at" if lv != MODEL_LEVEL[0] else "level"
+            err(f"node {nid}: type '{t}' is not allowed - {where_} '{lv}'")
         ctx = n.get("context")
         if ctx is not None and ctx not in ctx_ids:
             err(f"node {nid}: context '{ctx}' is not declared in contexts")
@@ -410,7 +479,7 @@ def check_edges(model, nodes):
     return edges
 
 
-def check_health(nodes, edges, level, ctx_ids):
+def check_health(nodes, edges, ctx_ids):
     out, inc = defaultdict(list), defaultdict(list)
     for s, t, rel in edges:
         out[s].append((t, rel))
@@ -426,7 +495,8 @@ def check_health(nodes, edges, level, ctx_ids):
 
     for nid, n in nodes.items():
         t = n["type"]
-        if t == "domainEvent" and level != "big-picture":
+        lv = level_of(n.get("context"))
+        if t == "domainEvent" and lv != "big-picture":
             if not n.get("properties", {}).get("temporal") \
                     and not any(r in ("produces", "emits") for _, r in inc[nid]):
                 warn(f"orphan event '{n['label']}': nothing produces or emits it")
@@ -445,7 +515,7 @@ def check_health(nodes, edges, level, ctx_ids):
                      "which rule do they all share? If none, it is two aggregates")
             # its boundary is the invariants it protects: the constraints on the
             # commands it handles (decision-00018 G2)
-            if level == "design" and not any(
+            if lv == "design" and not any(
                     r2 == "constrainedBy" for s2, r in inc[nid] if r == "handledBy" for _, r2 in out[s2]):
                 warn(f"unguarded aggregate '{n['label']}': it protects no invariant - "
                      "which rule can refuse its commands?")
@@ -455,7 +525,8 @@ def check_health(nodes, edges, level, ctx_ids):
             if not any(r == "invokes" for _, r in out[nid]):
                 warn(f"policy '{n['label']}': it invokes no command")
             if "execution" not in n.get("properties", {}):
-                warn(f"policy '{n['label']}': no execution - automatic or manual?")
+                # required data at design, a smell before it (decision-00019)
+                (err if lv == "design" else warn)(f"policy '{n['label']}': no execution - automatic or manual?")
 
     sets = defaultdict(list)
     for nid, n in nodes.items():
@@ -572,6 +643,7 @@ def main():
     level = meta.get("level", "design")
     if level not in LEVEL_TYPES:
         err(f"meta.level '{level}' - use big-picture|process|design")
+    MODEL_LEVEL[0] = level
 
     merged = merge_split(model, Path(path).resolve().parent)
     if merged is None:
@@ -581,17 +653,24 @@ def main():
         return 1
     model = merged
 
-    ctx_ids = check_contexts(model, level)
+    # each context's own level, capped by the model's (decision-00019)
+    for c in as_list(model, "contexts"):
+        own = c.get("level")
+        if isinstance(c.get("id"), str) and own in LEVEL_ORDER and level in LEVEL_ORDER:
+            CTX_LEVEL[c["id"]] = min(own, level, key=LEVEL_ORDER.index)
+    ctx_ids = check_contexts(model)
     check_context_relationships(model, ctx_ids)
-    nodes = check_nodes(model, ctx_ids, level)
+    nodes = check_nodes(model, ctx_ids)
     edges = check_edges(model, nodes)
-    check_health(nodes, edges, level, ctx_ids)
+    check_health(nodes, edges, ctx_ids)
     check_seams(model, nodes, edges)
 
     for m in errors:
         print(f"ERROR {where(m)}{m}")
     for m in warns:
         print(f"WARN  {where(m)}{m}")
+    for m in infos:
+        print(f"INFO  {m}")
     print(f"\n{path}: {len(nodes)} nodes, {len(edges)} edges, {len(ctx_ids)} contexts, "
           f"level {level} - {len(errors)} error(s), {len(warns)} warning(s)")
     return 1 if errors else 0

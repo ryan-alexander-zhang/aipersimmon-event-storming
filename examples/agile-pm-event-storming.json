@@ -1,5 +1,5 @@
 {
-  "version": "5.1",
+  "version": "5.2",
   "meta": {"name": "Agile Project Management", "level": "design", "createdAt": "2026-06-02T00:00:00Z"},
   "contexts": [
     {"id": "iam", "name": "Identity & Access", "order": 0, "subdomain": {"name": "Identity & Access", "type": "generic"}, "purpose": "Know who each person is, which tenant they belong to, and what they may do.", "language": [{"term": "User", "meaning": "A registered identity in one tenant, with credentials and roles."}]},

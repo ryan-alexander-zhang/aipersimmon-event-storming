@@ -8,7 +8,7 @@ import { ELEMENT_TYPES } from "@/lib/eventstorming/elements";
 import { LEVELS } from "@/lib/eventstorming/levels";
 import { RELATION_TYPES } from "@/lib/eventstorming/relations";
 
-export const DSL_VERSION = "5.1";
+export const DSL_VERSION = "5.2";
 
 export const propertiesSchema = z.object({
   description: z.string().optional(),
@@ -49,9 +49,20 @@ export const subdomainSchema = z.object({
   type: z.enum(SUBDOMAIN_TYPES).optional(),
 });
 
+const lower = (xs: string[]) => xs.map((x) => x.trim().toLowerCase());
+const unique = (xs: string[]) => new Set(lower(xs)).size === xs.length;
+
 // A term whose meaning is specific to one context - its Ubiquitous Language
 // (decision-00018 B1). The same term in two contexts may mean different things.
-export const termSchema = z.object({ term: z.string().min(1), meaning: z.string().min(1) });
+// `avoid` lists the words the context does not use for it (decision-00019).
+export const termSchema = z.object({
+  term: z.string().min(1),
+  meaning: z.string().min(1),
+  avoid: z
+    .array(z.string().refine((w) => w.trim().length > 0, "an avoided word is empty"))
+    .refine(unique, "a word is avoided twice")
+    .optional(),
+});
 
 // A bounded context: a named region/attribute over the global timeline (decision-00005).
 export const contextSchema = z.object({
@@ -64,8 +75,16 @@ export const contextSchema = z.object({
   purpose: z.string().min(1).optional(),
   language: z
     .array(termSchema)
-    .refine((ts) => new Set(ts.map((t) => t.term.toLowerCase())).size === ts.length, "a term appears twice")
+    .refine((ts) => unique(ts.map((t) => t.term)), "a term appears twice")
+    // a context cannot both use a word and avoid it (decision-00019)
+    .refine((ts) => {
+      const terms = new Set(lower(ts.map((t) => t.term)));
+      return ts.every((t) => lower(t.avoid ?? []).every((w) => !terms.has(w)));
+    }, "an avoided word is a term of the same context")
     .optional(),
+  // How far this context has been taken; absent = the model's level. The model's
+  // level caps it: viewing the model lower must not make it invalid (decision-00019).
+  level: z.enum(LEVELS).optional(),
   // Where this context's elements live when the model is split: a path relative to
   // the domain file (decision-00017). Absent = inline in the domain file.
   file: z.string().min(1).optional(),

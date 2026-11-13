@@ -68,6 +68,7 @@ Ask for the exact form: which field, which comparison, which limit. Undecided ->
 - [ ] Every command has `handledBy` to an aggregate or external system.
 - [ ] Every aggregate emits at least one event, or the `produces` edge from its command still carries the spine.
 - [ ] Every "you cannot X unless Y" rule is a constraint with a `rule`.
+- [ ] Every policy has `execution` - the validator errors without it at `design`.
 - [ ] Every aggregate guards at least one constraint (else the validator warns `unguarded aggregate`), and its commands share a rule (G2).
 - [ ] Every rule spanning two aggregates is a policy (G5); none spans two contexts (G6).
 - [ ] No aggregate over the 5 commands / 5 events threshold unless the user named the rule its commands share.

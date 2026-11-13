@@ -291,6 +291,14 @@ describe("store v2 (RT3)", () => {
     expect(get().contexts.find((c) => c.id === a)?.bigBallOfMud).toBeUndefined();
   });
 
+  it("sets and clears a context's level [decision-00019]", () => {
+    const a = get().addContext("Logistics");
+    get().setContextLevel(a, "big-picture");
+    expect(get().contexts.find((c) => c.id === a)?.level).toBe("big-picture");
+    get().setContextLevel(a, undefined);
+    expect(get().contexts.find((c) => c.id === a)?.level).toBeUndefined();
+  });
+
   it("sets and clears a context's purpose [decision-00018]", () => {
     const a = get().addContext("Ordering");
     get().setContextPurpose(a, "Take orders.");
@@ -1015,7 +1023,7 @@ describe("snapshots + compare [spec-00008]", () => {
 
 describe("the active Project [spec-00012]", () => {
   const model: Model = {
-    version: "5.1",
+    version: "5.2",
     meta: { name: "Ordering", level: "design", createdAt: "2026-01-01T00:00:00.000Z" },
     contexts: [{ id: "ord", name: "Ordering", order: 0 }],
     contextRelationships: [],

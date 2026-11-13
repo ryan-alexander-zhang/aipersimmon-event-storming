@@ -134,8 +134,10 @@ _Avoid_: description, summary, vision.
 
 **Ubiquitous Language**:
 The terms that mean something specific inside one Bounded Context, each with
-its meaning. The same term with different meanings in two contexts is a reason
-for the boundary between them (decision-00018).
+its meaning, and the words the context avoids for it. The same term with
+different meanings in two contexts is a reason for the boundary between them
+(decision-00018); a word avoided for a term is never another term of the same
+context (decision-00019).
 _Avoid_: glossary (for one context's terms), dictionary, vocabulary.
 
 **Subdomain**:
@@ -233,7 +235,10 @@ A typed, directed integration relationship between two Bounded Contexts —
 source = upstream, target = downstream. Uses the canonical DDD context-mapping
 patterns: Partnership, Shared Kernel, Customer/Supplier, Conformist,
 Anticorruption Layer, Open Host Service, Published Language, Separate Ways
-(decision-00007).
+(decision-00007). Whether it runs on API calls or events is never stated on it:
+it is read from the pair's Seams, and so is which side depends on which
+(decision-00019). Two contexts that depend on each other both ways are a declared
+Partnership or Shared Kernel, or a design still to straighten.
 _Avoid_: dependency, link, connection.
 
 **Context Map**:
@@ -298,6 +303,13 @@ _Avoid_: reload, sync, re-import.
 The whole Event Storming diagram — its elements, relations, and hotspots — as
 held on the canvas and persisted locally.
 _Avoid_: diagram, board, graph (when precision matters).
+
+**Level**:
+How far a model has been taken: **Big Picture**, **Process** or **Design**. The
+Model has one - its ceiling, and what the board shows; each Bounded Context may
+sit lower, and every check that depends on level judges an element by its own
+context's level (decision-00019).
+_Avoid_: phase (that is a step of the skill's session), stage, maturity.
 
 **DSL**:
 The structured, validated JSON representation of a Model, used for export,

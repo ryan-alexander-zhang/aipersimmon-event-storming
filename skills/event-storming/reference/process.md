@@ -43,7 +43,7 @@ Ask for the numbers. "Retry a few times" is not an answer: how many, how long be
 - [ ] Every `domainEvent` has an incoming `produces` or `emits`, or is marked `temporal`.
 - [ ] Every `command` has an `issues` from an actor or an external system, or an `invokes` from a policy.
 - [ ] Every actor decision that needs data has a read model informing it.
-- [ ] Every policy has `execution`, plus `condition` and `parameters` where they exist.
+- [ ] Every policy has `execution`, plus `condition` and `parameters` where they exist. (Missing `execution` is a WARN here and an ERROR once the policy's context is at `design`.)
 - [ ] Wherever one moment has several outcomes - a policy invoking several commands, a command producing several events - you asked whether they all happen or one happens instead of the others, and the alternatives share an `alternativeSet`. Nothing warns about this: a fan-out is often legitimate (saga steps all fire), so it is a question to ask, not a smell to flag.
 - [ ] Reaction loops are intentional (the validator flags policy cycles - confirm each one is a real retry loop with a bound).
 - [ ] Validator clean.

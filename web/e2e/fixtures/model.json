@@ -1,5 +1,5 @@
 {
-  "version": "5.0",
+  "version": "5.2",
   "meta": { "name": "Fixture", "level": "process", "createdAt": "2026-07-20T00:00:00Z" },
   "contexts": [
     { "id": "ord", "name": "Ordering", "order": 0, "subdomain": { "name": "Ordering" } },

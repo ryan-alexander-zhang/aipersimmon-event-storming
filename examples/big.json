@@ -1,5 +1,5 @@
 {
-  "version": "5.1",
+  "version": "5.2",
   "meta": {
     "name": "Event Storming",
     "level": "design",
@@ -103,27 +103,21 @@
     },
     {
       "id": "cr-08",
-      "source": "ledg",
-      "target": "recn",
-      "type": "publishedLanguage"
-    },
-    {
-      "id": "cr-09",
-      "source": "pay",
-      "target": "noti",
+      "source": "recn",
+      "target": "ledg",
       "type": "publishedLanguage"
     },
     {
       "id": "cr-10",
-      "source": "invc",
-      "target": "noti",
-      "type": "publishedLanguage"
+      "source": "noti",
+      "target": "invc",
+      "type": "openHostService"
     },
     {
       "id": "cr-11",
-      "source": "disp",
-      "target": "noti",
-      "type": "publishedLanguage"
+      "source": "noti",
+      "target": "disp",
+      "type": "openHostService"
     },
     {
       "id": "cr-12",
@@ -142,6 +136,18 @@
       "source": "conn",
       "target": "ledg",
       "type": "customerSupplier"
+    },
+    {
+      "id": "cr-15",
+      "source": "pay",
+      "target": "invc",
+      "type": "partnership"
+    },
+    {
+      "id": "cr-16",
+      "source": "conn",
+      "target": "pay",
+      "type": "partnership"
     }
   ],
   "nodes": [
@@ -1135,10 +1141,10 @@
       }
     },
     {
-      "id": "noti-p-notify",
+      "id": "invc-p-notify",
       "type": "policy",
       "label": "Collection Notifications",
-      "context": "noti",
+      "context": "invc",
       "properties": {
         "description": "Receipts on success; the opening dunning notice when Dunning starts (per-step notices come from the Dunning Schedule).",
         "execution": "automatic"
@@ -1276,8 +1282,8 @@
       "label": "Unmatched Fact Escalation",
       "context": "recn",
       "properties": {
-        "description": "A provider fact that cannot be attached to anything is a Discrepancy, not a guess — Attempt Resolution never force-matches. Covers chargeback events without a transaction link (NetBilling batch items) and results ambiguous between refund and chargeback (Manifest 'reversed').",
-        "condition": "the fact correlates to no Payment Attempt or Dispute under the Connector's matching rules, or correlates but cannot be classified (refund vs chargeback), and is not a provider-initiated operation the Payment context ingests (currently: refunds only); an Operator-recorded chargeback arrives attached to its Dispute and never escalates",
+        "description": "A provider fact that cannot be attached to anything is a Discrepancy, not a guess — Attempt Resolution never force-matches. Covers chargeback events without a transaction link (NetBilling batch items) and results ambiguous between refund and chargeback (Manifest 'reversed'). Also reacts to a provider-initiated refund recorded beyond refundable headroom: the excess is a Discrepancy.",
+        "condition": "the fact correlates to no Payment Attempt or Dispute under the Connector's matching rules, or correlates but cannot be classified (refund vs chargeback), and is not a provider-initiated operation the Payment context ingests (currently: refunds only); an Operator-recorded chargeback arrives attached to its Dispute and never escalates; or a provider-initiated refund the Payment context recorded beyond refundable headroom (the excess)",
         "execution": "automatic"
       }
     },
@@ -1935,18 +1941,18 @@
     {
       "id": "ed-48",
       "source": "pay-e-succeeded",
-      "target": "noti-p-notify",
+      "target": "invc-p-notify",
       "relation": "triggers"
     },
     {
       "id": "ed-49",
       "source": "invc-e-dunning",
-      "target": "noti-p-notify",
+      "target": "invc-p-notify",
       "relation": "triggers"
     },
     {
       "id": "ed-50",
-      "source": "noti-p-notify",
+      "source": "invc-p-notify",
       "target": "noti-c-send",
       "relation": "invokes"
     },
@@ -2630,9 +2636,9 @@
     },
     {
       "id": "ed-166",
-      "source": "pay-c-recordprovrefund",
-      "target": "recn-e-discrepancy",
-      "relation": "produces"
+      "source": "pay-e-refunded",
+      "target": "recn-p-unmatched",
+      "relation": "triggers"
     },
     {
       "id": "ed-167",

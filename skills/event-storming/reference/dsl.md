@@ -1,4 +1,4 @@
-# DSL v5.1 - full grammar
+# DSL v5.2 - full grammar
 
 `scripts/grammar.json` is the machine-readable copy of the element types, level gating,
 edge rules and context-relationship types below - it is what `scripts/validate.py`
@@ -15,6 +15,7 @@ validator will say so.
 - Relations (edge rules)
 - Alternative sets (things that happen instead of each other)
 - Contexts and context relationships
+- Integration style (read from the seams)
 - Split models (one file per context)
 - Level gating
 - Id and label conventions
@@ -24,19 +25,19 @@ validator will say so.
 
 ```json
 {
-  "version": "5.1",
+  "version": "5.2",
   "meta": { "name": "Order Fulfilment", "level": "design", "createdAt": "2026-08-17T00:00:00Z" },
   "contexts": [{ "id": "ord", "name": "Ordering", "order": 0, "subdomain": { "name": "Ordering", "type": "core" },
                  "purpose": "Turn a customer's intent into a confirmed, payable order.",
-                 "language": [{ "term": "Order", "meaning": "A basket the customer has committed to pay." }] }],
+                 "language": [{ "term": "Order", "meaning": "A basket the customer has committed to pay.", "avoid": ["cart", "basket"] }] }],
   "contextRelationships": [{ "id": "cr-1", "source": "ord", "target": "pay", "type": "customerSupplier" }],
   "nodes": [{ "id": "ord-e-placed", "type": "domainEvent", "label": "Order Placed", "context": "ord", "order": 0, "properties": {} }],
   "edges": [{ "id": "e-1", "source": "ord-c-place", "target": "ord-e-placed", "relation": "produces" }]
 }
 ```
 
-- `version` must be the literal `"5.1"`. The editor still imports older files: a `5.0` file only changes its version; in a `4.0` file each `classification` moves into `subdomain.type`, the subdomain named after its context.
-- `meta.level` is one of `big-picture` | `process` | `design`. It is the view filter: raise it as phases complete.
+- `version` must be the literal `"5.2"`. The editor still imports older files: a `5.0` or `5.1` file only changes its version; in a `4.0` file each `classification` moves into `subdomain.type`, the subdomain named after its context.
+- `meta.level` is one of `big-picture` | `process` | `design`. It is the view filter and the ceiling of every context's level: raise it as phases complete. See Level gating.
 - `meta.createdAt` is an ISO 8601 string.
 - `contexts`, `contextRelationships`, `nodes`, `edges` are arrays; all four may be empty.
 - Every node needs `properties` - use `{}` when empty.
@@ -185,10 +186,23 @@ Edges cross contexts freely - that is how seams show up.
 - `contexts[].order` sets left-to-right reading order of the map, starting at 0.
 - `subdomain` is the business capability the context realises: `{ "name": "...", "type": "core" | "supporting" | "generic" }`. `name` is required and defaults to the context's name; `type` is optional. One context realises one subdomain, and no two contexts may name the same one (compared case-insensitively) - an ERROR at any level. At `design` every context must have a `subdomain` with a `type` - an ERROR; below design both are optional, because the boundaries are not drawn yet.
 - `purpose` is one sentence: the business problem the context solves. At `design` every context must have one - an ERROR. When present it must be a non-empty string.
-- `language` is optional: the terms that mean something specific inside this context, `[{ "term": "...", "meaning": "..." }]`, both non-empty. A term may appear only once per context (compared case-insensitively) - an ERROR. The same term in two contexts with different meanings is allowed: it is the reason the boundary exists (`reference/context-map.md`, B1).
+- `language` is optional: the terms that mean something specific inside this context, `[{ "term": "...", "meaning": "...", "avoid": ["..."] }]`, `term` and `meaning` non-empty. A term may appear only once per context (compared case-insensitively) - an ERROR. The same term in two contexts with different meanings is allowed: it is the reason the boundary exists (`reference/context-map.md`, B1).
+- `avoid` is optional on a term: the words this context does not use for it - rejected synonyms, the names people reach for by mistake. Only words someone can search code and docs for; an explanation of what the term does not mean goes in `meaning`. A word listed twice for one term, or an `avoid` word that is itself a `term` of the same context, is an ERROR (the context would both use and forbid it).
+- `level` is optional on a context: how far that context has been taken (`big-picture` | `process` | `design`). Absent, it is at `meta.level`; above `meta.level`, it is capped there (not an error). See Level gating.
 - `bigBallOfMud` is an optional boolean on a context: Evans's designation for a model that is a recognised mess - draw the boundary, mark it, do not let its model propagate. It marks the context itself, never a relationship; downstreams usually defend with `acl`. Orthogonal to `subdomain`: a muddy context still realises one subdomain, and the other capabilities it covers are recorded as hotspots.
 - `nodes[].context` is optional; a node without it is Ungrouped. Any `context` you use should be declared in `contexts`.
 - `contextRelationships[].type` is one of `partnership`, `sharedKernel`, `customerSupplier`, `conformist`, `acl`, `openHostService`, `publishedLanguage`, `separateWays`. `source` = upstream, `target` = downstream. One pair may carry several. See `reference/context-map.md` for when to use which.
+
+## Integration style - read from the seams
+
+A seam is an edge whose ends lie in two contexts, neither an actor, that is not `annotates` or `highlights`. The style of a Context Relationship is never written on it; the validator derives it from its pair's seams and prints it as `INFO integration: ...`:
+
+| Relation across contexts | Style | Upstream is the context of the |
+| --- | --- | --- |
+| `triggers`, `updates`, `emits` | events | source (the other side reacts to it) |
+| `invokes`, `handledBy`, `produces`, `issues`, `constrainedBy` | api | target (the other side calls it, or reads its state synchronously) |
+
+A directional relationship (`source` = upstream) whose pair has a seam making the declared upstream depend on the declared downstream gets `WARN reversed dependency`. A pair passes when any of its relationships points the derived way; `partnership`, `sharedKernel` and `separateWays` are never checked. A pair whose seams depend both ways gets `WARN mutual dependency` instead, unless it declares `partnership` or `sharedKernel` - DDD's names for mutual reliance, which the teams must accept openly. A relationship in each direction does not silence it: that states the cycle twice. Straighten one direction (one side calls, the other replies on that channel), declare the partnership, or merge the two (B5 in `reference/context-map.md`).
 
 ## Split models - one file per context
 
@@ -211,7 +225,7 @@ Split when the user agrees after the Context Map; Big Picture stays one file, be
 
 ## Level gating
 
-`meta.level` decides which node types are allowed to be on the board:
+Each node is judged at its **effective level**: its context's `level`, capped by `meta.level`; an Ungrouped node is at `meta.level`. The effective level decides which node types it may be:
 
 | level | allowed types |
 | --- | --- |
@@ -220,6 +234,8 @@ Split when the user agrees after the Context Map; Big Picture stays one file, be
 | `design` | + constraint, aggregate |
 
 Levels are cumulative. Raising the level never removes anything.
+
+Everything else that depends on level also uses the effective level, element by element: at `design` a context needs a typed `subdomain` and a `purpose`, a policy needs `execution` (an ERROR at design, a WARN below), and aggregates are checked for guards; at `big-picture` events are never orphans. So a design model can hold a context still at `big-picture` - it is not dragged to the design requirements, and its events, actors and hotspots stay legal. A split model behaves exactly like the same model in one file.
 
 ## Id and label conventions
 
@@ -236,8 +252,9 @@ Levels are cumulative. Raising the level never removes anything.
 - `condition` on a constraint, or `rule` on a policy - swapped.
 - `parameters` values as numbers - both `name` and `value` are strings.
 - A relation the type pair does not allow (`policy -> domainEvent`, `command -> command`).
-- A node type not allowed at `meta.level`.
+- A node type not allowed at its effective level - for example a command in a context still at `big-picture`.
+- A design-level policy without `execution`.
 - In a split model: a `context` key on a node in a context file, or an edge left in `domain.json` whose both ends are in one context file.
 - `context` id that is not declared in `contexts`.
-- A design-level context without `purpose`, or a term listed twice in one context's `language`.
+- A design-level context without `purpose`, a term listed twice in one context's `language`, or an `avoid` word that is a term of the same context.
 - Two events with the same `order` that are not actually concurrent.

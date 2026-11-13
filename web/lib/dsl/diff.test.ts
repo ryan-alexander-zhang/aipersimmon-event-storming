@@ -12,7 +12,7 @@ const node = (id: string, patch: Partial<ModelNode> = {}): ModelNode => ({
 });
 
 const model = (nodes: ModelNode[], edges: ModelEdge[] = []): Model => ({
-  version: "5.1",
+  version: "5.2",
   meta: { name: "m", level: "big-picture", createdAt: "t" },
   contexts: [],
   contextRelationships: [],

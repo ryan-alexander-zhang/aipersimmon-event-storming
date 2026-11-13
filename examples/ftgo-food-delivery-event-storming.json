@@ -1,5 +1,5 @@
 {
-  "version": "5.1",
+  "version": "5.2",
   "meta": {"name": "FTGO Food Delivery", "level": "design", "createdAt": "2026-06-18T00:00:00Z"},
   "contexts": [
     {"id": "ord", "name": "Order", "order": 0, "subdomain": {"name": "Order", "type": "core"}, "purpose": "Take a consumer's order and see it through approval to delivery.", "language": [{"term": "Order", "meaning": "A consumer's request for food from one restaurant, from placement to delivery."}]},
@@ -8,8 +8,8 @@
     {"id": "del", "name": "Delivery", "order": 3, "subdomain": {"name": "Delivery", "type": "supporting"}, "purpose": "Get prepared orders from restaurants to consumers by courier."}
   ],
   "contextRelationships": [
-    {"id": "cr-01", "source": "ord", "target": "kit", "type": "customerSupplier"},
-    {"id": "cr-02", "source": "ord", "target": "acc", "type": "customerSupplier"},
+    {"id": "cr-01", "source": "kit", "target": "ord", "type": "customerSupplier"},
+    {"id": "cr-02", "source": "acc", "target": "ord", "type": "customerSupplier"},
     {"id": "cr-03", "source": "ord", "target": "del", "type": "customerSupplier"},
     {"id": "cr-04", "source": "kit", "target": "del", "type": "partnership"}
   ],
@@ -42,7 +42,7 @@
     {"id": "kit-c-ready", "type": "command", "label": "Mark Ready for Pickup", "context": "kit", "properties": {}},
     {"id": "kit-e-ready", "type": "domainEvent", "label": "Ticket Ready for Pickup", "context": "kit", "order": 6, "properties": {"pivotal": true}},
     {"id": "kit-rm-queue", "type": "readModel", "label": "Kitchen Queue View", "context": "kit", "properties": {}},
-    {"id": "kit-p-onapproved", "type": "policy", "label": "Confirm Ticket Policy", "context": "kit", "properties": {"description": "When the order is approved, accept the kitchen ticket.", "condition": "the restaurant confirms it can fulfil the order", "execution": "manual"}},
+    {"id": "ord-p-confirmticket", "type": "policy", "label": "Confirm Ticket Step", "context": "ord", "properties": {"description": "When the order is approved, the saga asks the restaurant to accept its ticket; the restaurant decides.", "condition": "the restaurant confirms it can fulfil the order", "execution": "manual"}},
     {"id": "kit-h-hold", "type": "hotspot", "label": "How long is a ticket held before it auto-cancels?", "context": "kit", "properties": {"kind": "question", "priority": "medium"}},
 
     {"id": "acc-ag-account", "type": "aggregate", "label": "Consumer Account", "context": "acc", "properties": {}},
@@ -54,7 +54,7 @@
     {"id": "acc-c-charge", "type": "command", "label": "Charge Card", "context": "acc", "properties": {}},
     {"id": "acc-e-charged", "type": "domainEvent", "label": "Card Charged", "context": "acc", "order": 7, "properties": {}},
     {"id": "acc-rm-charges", "type": "readModel", "label": "Charge History View", "context": "acc", "properties": {}},
-    {"id": "acc-p-capture", "type": "policy", "label": "Capture Payment Policy", "context": "acc", "properties": {"description": "When the order is approved, capture payment on the authorized card.", "condition": "the authorization is still valid", "execution": "automatic"}},
+    {"id": "ord-p-capture", "type": "policy", "label": "Capture Payment Step", "context": "ord", "properties": {"description": "When the order is approved, the saga asks accounting to capture payment on the authorized card.", "condition": "the authorization is still valid", "execution": "automatic"}},
 
     {"id": "del-courier", "type": "actor", "label": "Courier", "context": "del", "properties": {}},
     {"id": "del-ag-delivery", "type": "aggregate", "label": "Delivery", "context": "del", "properties": {}},
@@ -99,8 +99,8 @@
     {"id": "e-kit-10", "source": "kit-e-accepted", "target": "kit-rm-queue", "relation": "updates"},
     {"id": "e-kit-11", "source": "kit-e-ready", "target": "kit-rm-queue", "relation": "updates"},
     {"id": "e-kit-12", "source": "kit-rm-queue", "target": "kit-restaurant", "relation": "informs"},
-    {"id": "e-kit-13", "source": "ord-e-approved", "target": "kit-p-onapproved", "relation": "triggers"},
-    {"id": "e-kit-14", "source": "kit-p-onapproved", "target": "kit-c-accept", "relation": "invokes"},
+    {"id": "e-kit-13", "source": "ord-e-approved", "target": "ord-p-confirmticket", "relation": "triggers"},
+    {"id": "e-kit-14", "source": "ord-p-confirmticket", "target": "kit-c-accept", "relation": "invokes"},
     {"id": "e-kit-15", "source": "kit-h-hold", "target": "kit-c-create", "relation": "annotates"},
 
     {"id": "e-ord-16", "source": "ord-p-saga", "target": "kit-c-create", "relation": "invokes"},
@@ -113,8 +113,8 @@
     {"id": "e-acc-06", "source": "acc-e-authorized", "target": "acc-rm-charges", "relation": "updates"},
     {"id": "e-acc-07", "source": "acc-e-charged", "target": "acc-rm-charges", "relation": "updates"},
     {"id": "e-acc-08", "source": "acc-rm-charges", "target": "ord-consumer", "relation": "informs"},
-    {"id": "e-acc-09", "source": "ord-e-approved", "target": "acc-p-capture", "relation": "triggers"},
-    {"id": "e-acc-10", "source": "acc-p-capture", "target": "acc-c-charge", "relation": "invokes"},
+    {"id": "e-acc-09", "source": "ord-e-approved", "target": "ord-p-capture", "relation": "triggers"},
+    {"id": "e-acc-10", "source": "ord-p-capture", "target": "acc-c-charge", "relation": "invokes"},
 
     {"id": "e-ord-17", "source": "ord-p-saga", "target": "acc-c-authorize", "relation": "invokes"},
 

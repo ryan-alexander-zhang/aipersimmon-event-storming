@@ -1,5 +1,5 @@
 {
-  "version": "5.1",
+  "version": "5.2",
   "meta": {"name": "Cargo Shipping", "level": "design", "createdAt": "2026-05-10T00:00:00Z"},
   "contexts": [
     {"id": "book", "name": "Booking", "order": 0, "subdomain": {"name": "Booking", "type": "core"}, "purpose": "Accept cargo from shippers and commit to a delivery we can keep.", "language": [{"term": "Itinerary", "meaning": "The voyage legs one booked cargo is assigned to travel."}]},
@@ -8,7 +8,7 @@
     {"id": "trak", "name": "Tracking", "order": 3, "subdomain": {"name": "Tracking", "type": "supporting"}, "purpose": "Tell cargo owners where their cargo is and when it will arrive."}
   ],
   "contextRelationships": [
-    {"id": "cr-01", "source": "rout", "target": "book", "type": "openHostService"},
+    {"id": "cr-01", "source": "book", "target": "rout", "type": "publishedLanguage"},
     {"id": "cr-02", "source": "book", "target": "hand", "type": "sharedKernel"},
     {"id": "cr-03", "source": "hand", "target": "trak", "type": "customerSupplier"},
     {"id": "cr-04", "source": "book", "target": "trak", "type": "publishedLanguage"}

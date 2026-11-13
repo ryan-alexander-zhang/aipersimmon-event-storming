@@ -7,10 +7,10 @@ Runs any time after phase 1. It never changes the timeline; it only fills `conte
 ## Steps
 
 1. **Cut the contexts.** Draw a boundary where several of the signals B1-B6 below agree, and check the cut against the anti-patterns A1-A3. A boundary backed by one weak signal alone is a hotspot, not a context. One team can own several contexts; one context should not be owned by several teams. Tell the user which signals drew each boundary.
-2. **Say why each one exists.** Write `purpose`: one sentence naming the business problem the context solves. The validator errors without it at `design`. A context whose purpose you cannot state in one sentence is probably two contexts, or none. Where B1 drew the boundary, write the terms that differ into `language` (`[{"term", "meaning"}]`), on both sides.
+2. **Say why each one exists.** Write `purpose`: one sentence naming the business problem the context solves. The validator errors without it at `design`. A context whose purpose you cannot state in one sentence is probably two contexts, or none. Where B1 drew the boundary, write the terms that differ into `language` (`[{"term", "meaning"}]`), on both sides. Give a term `avoid` - the words this context must not use for it - wherever people reach for a wrong one (the other context's word, a technical name, a near-synonym). Only searchable words; what the term does not mean goes in `meaning`.
 3. **Name and type the subdomain each one realises** in `subdomain: {name, type}`. One context, one subdomain, and no two contexts share one. The name defaults to the context's; change it only when the business calls the capability something else. A context whose model is a recognised mess gets `bigBallOfMud: true` on top - the point of the mark is to not let that model propagate; its downstreams usually defend with `acl`. A muddy context still realises one subdomain, named and typed by its dominant value; that it also covers other capabilities goes on the board as a `hotspot` - a split waiting to happen.
 4. **Find the seams.** Every edge that crosses a context is a seam - except an actor's (a person working in two contexts is not the contexts integrating) and commentary (`annotates`, `highlights`: a hotspot or opportunity pointing across marks an element, it integrates nothing). Each pair of contexts with at least one seam needs a relationship.
-5. **Type each relationship.** `source` = upstream (the one that sets the terms), `target` = downstream. One pair may carry several.
+5. **Type each relationship.** `source` = upstream (the one that sets the terms), `target` = downstream. One pair may carry several. Do not write how they integrate: the validator reads it from the seams (`INFO integration: ... api | events`), and warns `reversed dependency` when a seam makes the declared upstream depend on its downstream - an event of the downstream that the upstream reacts to, or a command of the downstream the upstream calls. Fix the direction. When the seams go both ways the validator warns `mutual dependency` instead: straighten one direction if the domain allows, declare `partnership` if both teams truly succeed or fail together, or ask whether they are one context (B5). Never add a relationship each way to quiet it.
 6. Validate, run the gate.
 
 ## Where a context ends
@@ -84,6 +84,6 @@ Picking between the near ones:
 - [ ] Every term that drew a B1 boundary is in `language` on both sides.
 - [ ] Every context has a `subdomain` with a `name` and a `type`; no two contexts name the same subdomain.
 - [ ] Every context used by a node is declared in `contexts`, with an `order`.
-- [ ] Every pair of contexts with a crossing edge has at least one relationship (else the validator warns `unbacked seam`).
+- [ ] Every pair of contexts with a crossing edge has at least one relationship (else the validator warns `unbacked seam`), pointing the way its seams depend (else `reversed dependency`), and no pair depends both ways unless it is a declared `partnership` or `sharedKernel` (else `mutual dependency`).
 - [ ] No relationship between a context and itself.
 - [ ] Core subdomains are few and are the ones the business would defend.

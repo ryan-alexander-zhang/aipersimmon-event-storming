@@ -12,7 +12,7 @@ import {
   ELEMENT_DEFINITIONS,
 } from "@/lib/eventstorming/elements";
 import { contextTint, MUD_STYLE, SUBDOMAIN_STYLE } from "@/lib/eventstorming/context-color";
-import { LEVEL_TYPES } from "@/lib/eventstorming/levels";
+import { type Level, LEVEL_LABEL, LEVEL_TYPES, LEVELS } from "@/lib/eventstorming/levels";
 import { computeBandTops } from "@/lib/layout/layout";
 import { useESStore } from "@/lib/store/store";
 import type { ESNode } from "@/lib/store/types";
@@ -60,6 +60,7 @@ export function BoardChrome({
   const setContextSubdomainType = useESStore((s) => s.setContextSubdomainType);
   const setContextSubdomainName = useESStore((s) => s.setContextSubdomainName);
   const setContextPurpose = useESStore((s) => s.setContextPurpose);
+  const setContextLevel = useESStore((s) => s.setContextLevel);
   const setContextBigBallOfMud = useESStore((s) => s.setContextBigBallOfMud);
   const removeContext = useESStore((s) => s.removeContext);
   const setSelected = useESStore((s) => s.setSelected);
@@ -345,6 +346,27 @@ export function BoardChrome({
                     {MUD_STYLE.label}
                     {menuCtx.bigBallOfMud && <Check size={13} className="ml-auto" />}
                   </button>
+                  {/* How far this context has been taken (decision-00019); the
+                      model's level caps it, so every level is offered. */}
+                  <label className="flex items-center gap-1.5 px-2 py-1 text-zinc-700">
+                    Level
+                    <select
+                      aria-label="Context level"
+                      className="ml-auto rounded border border-zinc-200 bg-white px-1 py-0.5 text-xs"
+                      value={menuCtx.level ?? ""}
+                      onChange={(e) => {
+                        setContextLevel(menuCtx.id, (e.target.value || undefined) as Level | undefined);
+                        setMenu(null);
+                      }}
+                    >
+                      <option value="">Model&apos;s level</option>
+                      {LEVELS.map((l) => (
+                        <option key={l} value={l}>
+                          {LEVEL_LABEL[l]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <div className="my-1 border-t border-zinc-100" />
                   <button
                     type="button"

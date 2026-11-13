@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { Context } from "@/lib/dsl/schema";
+import type { Context, ContextRelationship } from "@/lib/dsl/schema";
 import type { ElementType } from "@/lib/eventstorming/elements";
 import type { RelationType } from "@/lib/eventstorming/relations";
 import type { ESEdge, ESNode } from "@/lib/store/types";
-import { AGG_MAX_COMMANDS, analyzeModel } from "./health";
+import { AGG_MAX_COMMANDS, analyzeModel, seamStyle } from "./health";
 
 const node = (id: string, type: ElementType, label = id): ESNode => ({
   id,
@@ -410,5 +410,137 @@ describe("heuristic findings [decision-00018]", () => {
     expect(at(edges, "design")).toEqual(["ag", "bare"]);
     expect(at([...edges, edge("c1", "k", "constrainedBy")], "design")).toEqual(["bare"]);
     expect(at(edges, "process")).toEqual([]);
+  });
+});
+
+describe("per-context level and integration direction [decision-00019]", () => {
+  const at = (id: string, type: ElementType, context?: string, data: Partial<ESNode["data"]> = {}): ESNode => ({
+    ...node(id, type),
+    data: { label: id, ...(context && { context }), ...data },
+  });
+  const of = (findings: ReturnType<typeof analyzeModel>, t: string) => findings.filter((f) => f.type === t);
+  const ctx = (id: string, extra: Partial<Context> = {}): Context => ({
+    id,
+    name: id.toUpperCase(),
+    order: 0,
+    subdomain: { name: id, type: "core" },
+    purpose: "p",
+    ...extra,
+  });
+
+  it("judges design requirements by each context's own level [plan-00026-AC-8]", () => {
+    const contexts = [ctx("ord"), { id: "new", name: "NEW", order: 1, level: "big-picture" as const }];
+    const nodes = [
+      at("e-ord", "domainEvent", "ord"),
+      at("e-new", "domainEvent", "new"),
+      at("ag", "aggregate", "ord"),
+      at("p-ord", "policy", "ord"),
+      at("p-new", "policy", "new"),
+    ];
+    const out = analyzeModel(nodes, [], contexts, "design");
+    expect(of(out, "missing-subdomain")).toEqual([]); // NEW is not designed yet
+    expect(of(out, "missing-purpose")).toEqual([]);
+    expect(of(out, "orphan-event").map((f) => f.elementIds[0])).toEqual(["e-ord"]); // e-new exempt
+    expect(of(out, "unguarded-aggregate").map((f) => f.elementIds[0])).toEqual(["ag"]);
+    expect(of(out, "missing-execution").map((f) => f.elementIds[0])).toEqual(["p-ord"]);
+  });
+
+  it("caps a context's level at the model's [plan-00026-AC-6]", () => {
+    const out = analyzeModel([at("p", "policy", "ord")], [], [ctx("ord", { level: "design" })], "process");
+    expect(of(out, "missing-execution")).toEqual([]);
+    // with no model level, the declared one applies
+    expect(of(analyzeModel([at("p", "policy", "ord")], [], [ctx("ord", { level: "design" })]), "missing-execution")).toHaveLength(1);
+  });
+
+  it("exempts events from orphan-event at Big Picture, as the validator does", () => {
+    expect(of(analyzeModel([at("e", "domainEvent")], [], [], "big-picture"), "orphan-event")).toEqual([]);
+    expect(of(analyzeModel([at("e", "domainEvent")], [], [], "process"), "orphan-event")).toHaveLength(1);
+  });
+
+  it("warns on a node its context's declared level does not allow [plan-00026-AC-7]", () => {
+    const contexts = [ctx("new", { level: "big-picture" }), ctx("ord")];
+    const nodes = [at("c-new", "command", "new"), at("c-ord", "command", "ord"), at("c-free", "command")];
+    const out = of(analyzeModel(nodes, [], contexts, "design"), "type-above-level");
+    expect(out.map((f) => f.elementIds[0])).toEqual(["c-new"]);
+    expect(out[0].message).toBe("'c-new' is a command, but its context is at big-picture");
+    // a type above the model's level is the view's business
+    expect(of(analyzeModel(nodes, [], [ctx("ord")], "big-picture"), "type-above-level")).toEqual([]);
+  });
+
+  describe("reversed-dependency [plan-00026-AC-4]", () => {
+    const contexts = [ctx("ord"), ctx("pay")];
+    // Ordering's saga calls Payment's command; Payment's event feeds Ordering's policy.
+    const nodes = [
+      at("saga", "policy", "ord", { execution: "automatic" }),
+      at("charge", "command", "pay"),
+      at("charged", "domainEvent", "pay"),
+      at("react", "policy", "ord", { execution: "automatic" }),
+    ];
+    const calls = [edge("saga", "charge", "invokes")];
+    const listens = [edge("charged", "react", "triggers")];
+    const rel = (source: string, target: string, type = "customerSupplier") =>
+      ({ id: `${source}-${target}`, source, target, type }) as ContextRelationship;
+    const reversedFor = (es: ESEdge[], rels: Parameters<typeof analyzeModel>[4]) =>
+      of(analyzeModel(nodes, es, contexts, "process", rels), "reversed-dependency");
+
+    it("warns once per pair when the seams make the declared upstream depend on its downstream", () => {
+      const out = reversedFor([...calls, ...listens], [rel("ord", "pay")]);
+      expect(out).toHaveLength(1);
+      expect(out[0].message).toBe(
+        "'ORD' depends on 'PAY' (invokes 'saga' -> 'charge'), but the Context Relationship makes 'ORD' upstream",
+      );
+      expect([...out[0].elementIds].sort()).toEqual(["charge", "charged", "react", "saga"]);
+    });
+
+    it("passes when a relationship points the derived way, or is symmetric", () => {
+      expect(reversedFor([...calls, ...listens], [rel("pay", "ord")])).toEqual([]);
+      expect(reversedFor(calls, [rel("ord", "pay"), rel("pay", "ord", "conformist")])).toEqual([]);
+      expect(reversedFor(calls, [rel("ord", "pay", "partnership")])).toEqual([]);
+    });
+  });
+
+  describe("mutual-dependency [plan-00026-AC-4b]", () => {
+    const contexts = [ctx("ord"), ctx("pay")];
+    // Ordering calls Payment's command, and Payment reacts to Ordering's event.
+    const nodes = [
+      at("saga", "policy", "ord", { execution: "automatic" }),
+      at("charge", "command", "pay"),
+      at("placed", "domainEvent", "ord"),
+      at("hold", "policy", "pay", { execution: "automatic" }),
+    ];
+    const both = [edge("saga", "charge", "invokes"), edge("placed", "hold", "triggers")];
+    const rel = (source: string, target: string, type = "customerSupplier") =>
+      ({ id: `${source}-${target}-${type}`, source, target, type }) as ContextRelationship;
+    const run = (es: ESEdge[], rels: ContextRelationship[]) => analyzeModel(nodes, es, contexts, "process", rels);
+
+    it("warns once for a pair depending both ways, instead of reversed-dependency", () => {
+      const out = run(both, [rel("ord", "pay")]);
+      expect(of(out, "reversed-dependency")).toEqual([]);
+      const mutual = of(out, "mutual-dependency");
+      expect(mutual).toHaveLength(1);
+      expect(mutual[0].message).toBe(
+        "'ORD' and 'PAY' depend on each other - straighten one direction, declare a Partnership, or merge them",
+      );
+      expect([...mutual[0].elementIds].sort()).toEqual(["charge", "hold", "placed", "saga"]);
+    });
+
+    it("is not silenced by a relationship each way, only by a Partnership or Shared Kernel", () => {
+      expect(of(run(both, [rel("ord", "pay"), rel("pay", "ord")]), "mutual-dependency")).toHaveLength(1);
+      expect(of(run(both, [rel("ord", "pay", "partnership")]), "mutual-dependency")).toEqual([]);
+      expect(of(run(both, [rel("pay", "ord", "sharedKernel")]), "mutual-dependency")).toEqual([]);
+    });
+
+    it("does not fire on a one-way pair", () => {
+      expect(of(run([both[0]], [rel("pay", "ord")]), "mutual-dependency")).toEqual([]);
+    });
+
+    it("classifies events by their source and calls by their target", () => {
+      expect(seamStyle("triggers")).toEqual({ style: "events", upstream: "source" });
+      expect(seamStyle("updates")).toEqual({ style: "events", upstream: "source" });
+      expect(seamStyle("emits")).toEqual({ style: "events", upstream: "source" });
+      for (const r of ["invokes", "handledBy", "produces", "issues", "constrainedBy"] as const) {
+        expect(seamStyle(r)).toEqual({ style: "api", upstream: "target" });
+      }
+    });
   });
 });

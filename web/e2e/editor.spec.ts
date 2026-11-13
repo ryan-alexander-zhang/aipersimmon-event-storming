@@ -1139,7 +1139,7 @@ test("types and names the subdomain a Bounded Context realises; export carries i
     page.getByRole("button", { name: "Export" }).click(),
   ]);
   const exported = JSON.parse(readFileSync(await download.path(), "utf8"));
-  expect(exported.version).toBe("5.1");
+  expect(exported.version).toBe("5.2");
   // the subdomain is named after its context by default (decision-00016)
   expect(exported.contexts[0].subdomain).toEqual({ name: exported.contexts[0].name, type: "core" });
 
@@ -1183,6 +1183,26 @@ test("marks a context as a Big Ball of Mud and shows it on the Context Map [deci
   await page.getByRole("button", { name: "Context options" }).click();
   await page.getByRole("button", { name: "Big Ball of Mud", exact: true }).click();
   await expect(badge).toHaveCount(0);
+});
+
+test("sets a context's own level from its menu, and clears it [plan-00026-AC-10]", async ({ page }) => {
+  await openBoard(page);
+  await addContext(page);
+  const exportNow = async () => {
+    await openFileMenu(page);
+    const [d] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export" }).click()]);
+    return JSON.parse(readFileSync(await d.path(), "utf8"));
+  };
+
+  await page.getByRole("button", { name: "Context options" }).click();
+  const select = page.getByRole("combobox", { name: "Context level" });
+  await expect(select.locator("option")).toHaveText(["Model's level", "Big Picture", "Process", "Design"]);
+  await select.selectOption("big-picture");
+  expect((await exportNow()).contexts[0].level).toBe("big-picture");
+
+  await page.getByRole("button", { name: "Context options" }).click();
+  await page.getByRole("combobox", { name: "Context level" }).selectOption("");
+  expect((await exportNow()).contexts[0]).not.toHaveProperty("level");
 });
 
 test("sets a context's purpose and shows it with its terms on the Context Map [plan-00025-AC-7]", async ({ page }) => {

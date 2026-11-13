@@ -251,7 +251,7 @@ describe("serialize v2 (T2/RT1)", () => {
     const result = importJSON(v2);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.model.version).toBe("5.1");
+      expect(result.model.version).toBe("5.2");
       const o = Object.fromEntries(result.model.nodes.map((n) => [n.id, n.order]));
       // dense-rank by (context.order, per-context order): {A, A2} concurrent → 0,
       // C → 1, then Payment's B → 2 (block-sequential, design-00005 §2).
@@ -265,7 +265,7 @@ describe("serialize v2 (T2/RT1)", () => {
   it("export omits position and includes contexts + order + level [us-00004]", () => {
     const { nodes, edges } = sampleCanvas();
     const out = JSON.parse(exportJSON(nodes, edges, CONTEXTS, META));
-    expect(out.version).toBe("5.1");
+    expect(out.version).toBe("5.2");
     expect(out.contexts).toEqual(CONTEXTS);
     expect(out.meta.level).toBe("design");
     expect(out.nodes[0].position).toBeUndefined();
@@ -303,7 +303,7 @@ describe("serialize v2 (T2/RT1)", () => {
     const result = importJSON(v1);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.model.version).toBe("5.1"); // chained v1 → v2 → v3 → v4 → v5 → v5.1
+      expect(result.model.version).toBe("5.2"); // chained v1 → v2 → v3 → v4 → v5 → v5.1 → v5.2
       expect(result.model.contexts).toEqual([
         { id: "default", name: "Default", order: 0, subdomain: { name: "Default" } },
       ]);
@@ -354,7 +354,7 @@ describe("serialize v2 (T2/RT1)", () => {
     const result = importJSON(v4);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.model.version).toBe("5.1");
+      expect(result.model.version).toBe("5.2");
       expect(result.model.contexts).toEqual([
         { id: "ord", name: "Ordering", order: 0, bigBallOfMud: true, subdomain: { name: "Ordering", type: "core" } },
         { id: "pay", name: "Payment", order: 1, subdomain: { name: "Payment" } },
@@ -381,7 +381,7 @@ describe("serialize v2 (T2/RT1)", () => {
   });
 
   describe("a context's purpose and language [decision-00018, plan-00025-AC-1, AC-2]", () => {
-    const withContext = (ctx: Record<string, unknown>, version = "5.1") =>
+    const withContext = (ctx: Record<string, unknown>, version = "5.2") =>
       JSON.stringify({
         version,
         meta: { name: "m", level: "design", createdAt: "t" },
@@ -415,9 +415,52 @@ describe("serialize v2 (T2/RT1)", () => {
     it("migrates a 5.0 file by its version alone", () => {
       const r = importJSON(withContext({ subdomain: { name: "Ordering" } }, "5.0"));
       expect(r.ok && r.model).toMatchObject({
-        version: "5.1",
+        version: "5.2",
         contexts: [{ id: "ord", name: "Ordering", order: 0, subdomain: { name: "Ordering" } }],
       });
+    });
+  });
+
+  describe("avoided words and a context's level [decision-00019, plan-00026-AC-1, AC-2, AC-6]", () => {
+    const model = (ctx: Record<string, unknown>, level = "design", version = "5.2") =>
+      JSON.stringify({
+        version,
+        meta: { name: "m", level, createdAt: "t" },
+        contexts: [{ id: "ord", name: "Ordering", order: 0, ...ctx }],
+        nodes: [],
+        edges: [],
+      });
+    const PROXY = { term: "Proxy", meaning: "An endpoint minted from a Pool.", avoid: ["gateway", "reverse proxy"] };
+
+    it("keeps avoided words and the level through import and export", () => {
+      const r = importJSON(model({ language: [PROXY], level: "process" }));
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(r.model.contexts[0]).toMatchObject({ language: [PROXY], level: "process" });
+      const back = importJSON(exportJSON([], [], r.model.contexts, r.model.meta));
+      expect(back.ok && back.model.contexts[0]).toMatchObject({ language: [PROXY], level: "process" });
+    });
+
+    it.each([
+      ["an empty avoided word", { language: [{ ...PROXY, avoid: [""] }] }],
+      ["a blank avoided word", { language: [{ ...PROXY, avoid: ["   "] }] }],
+      ["a word avoided twice, in any case", { language: [{ ...PROXY, avoid: ["gateway", "Gateway"] }] }],
+      [
+        "an avoided word that is a term of the same context",
+        { language: [PROXY, { term: "Gateway", meaning: "The ingress." }] },
+      ],
+    ])("rejects %s", (_, ctx) => {
+      expect(importJSON(model(ctx)).ok).toBe(false);
+    });
+
+    it("keeps a context above the model's level - the model's level caps it, it is not an error", () => {
+      const r = importJSON(model({ level: "design" }, "process"));
+      expect(r.ok && r.model.contexts[0].level).toBe("design");
+    });
+
+    it("migrates a 5.1 file by its version alone", () => {
+      const r = importJSON(model({ purpose: "p" }, "design", "5.1"));
+      expect(r.ok && r.model).toMatchObject({ version: "5.2", contexts: [{ id: "ord", purpose: "p" }] });
     });
   });
 
@@ -432,7 +475,7 @@ describe("serialize v2 (T2/RT1)", () => {
     const result = importJSON(v3);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.model.version).toBe("5.1"); // v3 → v4 → v5 → v5.1
+      expect(result.model.version).toBe("5.2"); // v3 → v4 → v5 → v5.1 → v5.2
       expect(result.model.contexts[0].subdomain).toEqual({ name: "Ordering" }); // untyped
     }
   });

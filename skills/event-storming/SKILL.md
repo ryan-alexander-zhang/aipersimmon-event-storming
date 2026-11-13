@@ -1,6 +1,6 @@
 ---
 name: event-storming
-description: Builds and edits Event Storming models as validated DSL v5.1 JSON for the event-storming editor. Runs the session phase by phase - Big Picture, then Process, then Design, plus the Context Map - interviews the user to fill gaps, and validates every write. Use when the user wants to model a domain, run an event storming, create or extend a board, or write, repair, or review an event storming model JSON.
+description: Builds and edits Event Storming models as validated DSL v5.2 JSON for the event-storming editor. Runs the session phase by phase - Big Picture, then Process, then Design, plus the Context Map - interviews the user to fill gaps, and validates every write. Use when the user wants to model a domain, run an event storming, create or extend a board, or write, repair, or review an event storming model JSON.
 ---
 
 # Event Storming
@@ -34,7 +34,7 @@ Stop at the level the user asked for. Big Picture always runs first - every leve
 
 ## Rules
 
-1. **One model, grown in place.** Each phase edits the same model and raises `meta.level`. Never restart from scratch. It starts as one file; once the Context Map has cut the contexts, offer to split it into a `domain.json` plus one file per context (`reference/dsl.md`, Split models). From then on, edit only the files a change touches - usually one context file, plus `domain.json` for a seam.
+1. **One model, grown in place.** Each phase edits the same model and raises `meta.level`. Never restart from scratch. It starts as one file; once the Context Map has cut the contexts, offer to split it into a `domain.json` plus one file per context (`reference/dsl.md`, Split models). From then on, edit only the files a change touches - usually one context file, plus `domain.json` for a seam. Contexts mature at their own pace: when one context goes on to Process or Design while another is still being discovered, raise `meta.level` and set the slower context's `level` (`reference/dsl.md`, Level gating) - it is then judged at its own level, not dragged to the model's.
 2. **Validate every write:** `python3 <skill-dir>/scripts/validate.py <file>` - for a split model, pass its `domain.json`; the linked files are read with it. Fix all ERRORs, re-run until clean, report WARNs to the user. Python 3, no packages needed.
 3. **Ask, don't invent.** A domain fact you cannot read from the repo or the brief is a question. Still unknown after asking? Write a `hotspot`, not a guess. If the user answers it later, set `state: "resolved"` **and** write the answer into `resolution` - a hotspot closed with nothing written down loses why it was closed.
 4. **Use the user's words** as labels, in their language. Do not rename their concepts.
@@ -56,8 +56,8 @@ Grill on: gaps in the story, unhappy paths, who acts, what triggers what, exact 
 
 - **Big Picture**: every event passes E1-E5 and every sticky that failed was moved, not deleted; ordered; story has no gap; pivotal events marked by P1; alternative outcomes of one moment share an `alternativeSet`, every unknown captured as a hotspot.
 - **Process**: every event has a producing command or external system, or is marked `temporal` (raised by time); every command has an issuing actor or external system, or an invoking policy; every actor decision has a read model.
-- **Design**: every command is handled by an aggregate or external system; every rule that can block a command is a constraint; every aggregate guards at least one constraint and its commands share a rule (G2), and rules across aggregates are policies (G5); every policy has `condition`, `execution`, and `parameters` where they exist; every context realises its own typed `subdomain` and has a `purpose` (the validator errors otherwise at `design`).
-- **Context Map**: every boundary is backed by at least two of B1-B6 and no context is A1-A3; every context has a one-sentence `purpose`, and terms that drew a B1 boundary are in `language`; every context realises one named, typed subdomain, no two the same; every cross-context seam backed by a typed relationship (the validator warns `unbacked seam` otherwise).
+- **Design**: every command is handled by an aggregate or external system; every rule that can block a command is a constraint; every aggregate guards at least one constraint and its commands share a rule (G2), and rules across aggregates are policies (G5); every policy has `execution` (the validator errors otherwise at `design`), and `condition` and `parameters` where they exist; every context realises its own typed `subdomain` and has a `purpose` (the validator errors otherwise at `design`).
+- **Context Map**: every boundary is backed by at least two of B1-B6 and no context is A1-A3; every context has a one-sentence `purpose`, and terms that drew a B1 boundary are in `language`; every context realises one named, typed subdomain, no two the same; every cross-context seam backed by a typed relationship whose direction the seams agree with (the validator warns `unbacked seam`, `reversed dependency` or `mutual dependency` otherwise); terms carry the words to `avoid` where people reach for a wrong one.
 
 Then ask: "Move on to <next phase>?" Do not continue on your own.
 

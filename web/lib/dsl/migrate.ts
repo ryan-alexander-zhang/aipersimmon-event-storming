@@ -101,6 +101,11 @@ function migrateV5toV51(v5: Record<string, unknown>): unknown {
   return { ...v5, version: "5.1" };
 }
 
+// v5.1 → v5.2: terms gain `avoid`, contexts gain `level` (decision-00019).
+function migrateV51toV52(v51: Record<string, unknown>): unknown {
+  return { ...v51, version: "5.2" };
+}
+
 /** Migrate any supported older document to the latest shape (chained). */
 export function migrateToLatest(raw: unknown): unknown {
   if (!raw || typeof raw !== "object") return raw;
@@ -110,5 +115,6 @@ export function migrateToLatest(raw: unknown): unknown {
   if (r.version === "3.0") r = migrateV3toV4(r) as Record<string, unknown>;
   if (r.version === "4.0") r = migrateV4toV5(r) as Record<string, unknown>;
   if (r.version === "5.0") r = migrateV5toV51(r) as Record<string, unknown>;
+  if (r.version === "5.1") r = migrateV51toV52(r) as Record<string, unknown>;
   return r;
 }
