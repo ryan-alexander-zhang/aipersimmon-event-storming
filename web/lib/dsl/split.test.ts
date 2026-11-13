@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Model } from "./schema";
-import { importJSON } from "./serialize";
+import { importJSON, parseModel } from "./serialize";
 import { defaultLink, linkAll, linkProblem, mergeFiles, splitModel } from "./split";
 
 const META = { name: "m", level: "design" as const, createdAt: "t" };
@@ -48,7 +48,7 @@ const MODEL = {
 };
 
 const model = (): Model => {
-  const r = importJSON(JSON.stringify(MODEL));
+  const r = parseModel(MODEL); // a model in memory keeps its links; importJSON refuses them (issue-00042)
   if (!r.ok) throw new Error(r.error);
   return r.model;
 };

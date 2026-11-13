@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Context } from "@/lib/dsl/schema";
 import type { ESEdge, ESNode } from "@/lib/store/types";
@@ -531,5 +533,16 @@ describe("serialize v2 (T2/RT1)", () => {
       JSON.stringify({ version: "9.9", meta: { name: "x", level: "process", createdAt: "t" }, nodes: [], edges: [] }),
     );
     expect(r.ok).toBe(false);
+  });
+});
+
+describe("a split model's domain file on its own [issue-00042]", () => {
+  it("is refused, naming its linked files and the folder import", () => {
+    const domain = readFileSync(path.join(__dirname, "../../../examples/ride-hailing/domain.json"), "utf8");
+    const r = importJSON(domain);
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.error).toBe(
+      "This is the domain file of a split model - its contexts live in contexts/ord.json, contexts/dsp.json, contexts/trp.json, contexts/bil.json. Use Import a model folder… and pick the folder that holds it.",
+    );
   });
 });

@@ -139,6 +139,19 @@ export function importJSON(json: string): ImportResult {
   } catch {
     return { ok: false, error: "The file is not valid JSON." };
   }
+  // A domain file whose contexts link files is one part of a split model, not a
+  // whole one: on its own it would open without any of its contexts' elements
+  // (issue-00042). Only mergeFiles follows links, so a single file must refuse.
+  const contexts = (raw as { contexts?: unknown } | null)?.contexts;
+  const links = Array.isArray(contexts)
+    ? contexts.flatMap((c) => (typeof c?.file === "string" ? [c.file as string] : []))
+    : [];
+  if (links.length > 0) {
+    return {
+      ok: false,
+      error: `This is the domain file of a split model - its contexts live in ${links.join(", ")}. Use Import a model folder… and pick the folder that holds it.`,
+    };
+  }
   return parseModel(raw);
 }
 
