@@ -87,7 +87,8 @@ export function ProjectsDialog() {
     await refresh();
   };
 
-  // Import as a new Project: the file names it, so a board arrives already labelled.
+  // Import as a new Project: the model names it (decision-00021), the file when the
+  // model has no name, so a board arrives already labelled.
   const importFile = async (e: ChangeEvent<HTMLInputElement>) => {
     setError(null);
     const file = e.target.files?.[0];
@@ -101,7 +102,9 @@ export function ProjectsDialog() {
       setError(result.error);
       return;
     }
-    const record = await createProject(projectName);
+    // The model's own name first: Export writes the Project's name there, so export
+    // then import keeps it (decision-00021). The file or folder name is the fallback.
+    const record = await createProject(result.model.meta.name.trim() || projectName);
     const imported = { ...record, model: result.model, ...(source ? { source } : {}) };
     openProject(imported);
     setActiveProjectId(imported.id);

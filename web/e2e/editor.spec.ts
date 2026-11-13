@@ -2311,7 +2311,7 @@ const modelPlusEvent = () => {
 };
 
 const importSourceFile = async (page: Page) => {
-  await page.getByRole("button", { name: "Import" }).click();
+  await page.getByRole("button", { name: "Import", exact: true }).click();
   await expect(page.getByRole("button", { name: "Refresh" })).toBeVisible();
 };
 
@@ -2674,4 +2674,54 @@ test("Save to folder writes a domain file and one file per context [plan-00024-A
   expect(contextFile.nodes.map((n: { type: string }) => n.type)).toEqual(["domainEvent"]);
   expect(contextFile.nodes[0]).not.toHaveProperty("context");
   await expect(page.getByTitle("ride-hailing")).toBeVisible(); // the folder became the source
+});
+
+// A folder imports like a file (decision-00021): into the current Project from the
+// toolbar, keeping its name; as a new Project, named after the model.
+test("imports a folder into the current Project from the toolbar, keeping its name [decision-00021]", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    // @ts-expect-error the directory input path, as in Firefox and Safari
+    delete window.showDirectoryPicker;
+  });
+  await openBoard(page, "Ride ops");
+  await expect(page.getByRole("button", { name: "Import folder…" })).toBeVisible();
+  await page.getByTestId("toolbar-folder-input").setInputFiles(RIDE);
+  await expect(nodes(page, "domainEvent")).toHaveCount(13);
+  await expect(page.getByTitle("Ride ops")).toBeVisible(); // the Project keeps its name
+  // read once: no source to refresh, and a board with work offers a reload
+  await expect(page.getByRole("button", { name: "Refresh" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Reload from folder…" })).toBeVisible();
+});
+
+test("a folder imported from the toolbar on Chromium becomes the Project's source [decision-00021]", async ({
+  page,
+}) => {
+  await withStubbedFolder(page, rideFiles());
+  await openBoard(page, "Ride ops");
+  await page.getByRole("button", { name: "Import folder…" }).click();
+  await expect(nodes(page, "domainEvent")).toHaveCount(13);
+  await expect(page.getByTitle("Ride ops")).toBeVisible();
+  await expect(page.getByTitle("ride-hailing")).toBeVisible(); // the folder is the source
+  await expect(page.getByRole("button", { name: "Refresh" })).toBeVisible();
+});
+
+test("a folder without a domain file is refused from the toolbar too [decision-00021]", async ({ page }) => {
+  await openBoard(page);
+  await page.getByTestId("toolbar-folder-input").setInputFiles(path.join(RIDE, "contexts"));
+  await expect(page.getByTestId("import-error")).toHaveText("That folder has no domain.json at its top.");
+});
+
+test("a new Project from an imported folder or file is named after its model [decision-00021]", async ({ page }) => {
+  await page.goto("/");
+  await page.getByTestId("folder-input").setInputFiles(RIDE);
+  await expect(page.getByTitle("Ride-Hailing Platform")).toBeVisible(); // meta.name, not "ride-hailing"
+
+  await openProjects(page);
+  await page
+    .getByTestId("projects-dialog")
+    .locator('input[accept="application/json,.json"]')
+    .setInputFiles(path.join(__dirname, "../../examples/cargo-shipping-event-storming.json"));
+  await expect(page.getByTitle("Cargo Shipping")).toBeVisible(); // not the file name
 });

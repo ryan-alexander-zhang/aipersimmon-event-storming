@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCw, Upload } from "lucide-react";
+import { FolderInput, RefreshCw, Upload } from "lucide-react";
 import { type ChangeEvent, useRef, useState } from "react";
 import { fromModel, type ImportResult, importJSON } from "@/lib/dsl/serialize";
 import { mergeFiles } from "@/lib/dsl/split";
@@ -11,7 +11,7 @@ import {
   READ_FAILURE_MESSAGE,
   readHandle,
 } from "@/lib/store/source-file";
-import { readFolder } from "@/lib/store/source-folder";
+import { canRetainFolderAccess, pickFolder, readFolder, readFolderInput } from "@/lib/store/source-folder";
 import { useESStore } from "@/lib/store/store";
 
 const shortTime = (iso: string) => {
@@ -23,6 +23,12 @@ const shortTime = (iso: string) => {
  *  re-read it on demand. Where the browser cannot retain access to a chosen file the
  *  Project keeps no handle and the same action re-picks it — one extra click, same
  *  validate → confirm → replace (decision-00011 §3). */
+// What a pick hands over to become the Project's source: a file or a split model's
+// folder (decision-00021).
+type Picked =
+  | { kind?: undefined; handle: FileSystemFileHandle; name: string }
+  | { kind: "folder"; handle: FileSystemDirectoryHandle; name: string };
+
 export function SourceFileControls() {
   const nodes = useESStore((s) => s.nodes);
   const edges = useESStore((s) => s.edges);
@@ -31,6 +37,7 @@ export function SourceFileControls() {
   const setModel = useESStore((s) => s.setModel);
   const markSynced = useESStore((s) => s.markSynced);
   const fileRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const source = activeProject?.source;
 
@@ -42,17 +49,18 @@ export function SourceFileControls() {
     );
 
   // Replace the Model from a freshly read one, keeping the current one on any failure
-  // (spec-00001-XFR-2). `file` present = this file becomes the source.
-  const apply = (result: ImportResult, file?: { handle: FileSystemFileHandle; name: string }) => {
+  // (spec-00001-XFR-2). `picked` present = that file or folder becomes the source.
+  const apply = (result: ImportResult, picked?: Picked) => {
     if (!result.ok) {
       setError(result.error);
       return;
     }
     setError(null);
     setModel(fromModel(result.model));
-    const nextSource: ProjectSource | undefined = file
-      ? { handle: file.handle, name: file.name, lastRefreshedAt: new Date().toISOString() }
-      : source && { ...source, lastRefreshedAt: new Date().toISOString() };
+    const now = new Date().toISOString();
+    const nextSource: ProjectSource | undefined = picked
+      ? { ...picked, lastRefreshedAt: now }
+      : source && { ...source, lastRefreshedAt: now };
     markSynced(nextSource ?? undefined);
     const project = useESStore.getState().activeProject;
     if (!project) return;
@@ -80,6 +88,37 @@ export function SourceFileControls() {
     const picked = await pickFile();
     if (!picked) return;
     apply(importJSON(picked.text), { handle: picked.handle, name: picked.name });
+  };
+
+  // A split model's folder goes into this Project the way a file does - same
+  // confirmation, same replace, the Project keeps its name (decision-00021). Where
+  // the browser can keep the folder it becomes the source; elsewhere it is read once.
+  const chooseFolder = async () => {
+    if (source !== undefined && !confirmOverwrite()) return;
+    if (!canRetainFolderAccess()) {
+      folderRef.current?.click();
+      return;
+    }
+    const handle = await pickFolder();
+    if (!handle) return;
+    const folder = await readFolder(handle);
+    if (!folder.ok) {
+      setError(READ_FAILURE_MESSAGE[folder.failure]);
+      return;
+    }
+    apply(mergeFiles(folder.domain, folder.files), { kind: "folder", handle, name: handle.name });
+  };
+
+  const onInputFolder = async (e: ChangeEvent<HTMLInputElement>) => {
+    const chosen = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (chosen.length === 0) return;
+    const folder = await readFolderInput(chosen);
+    if (!folder) {
+      setError("That folder has no domain.json at its top.");
+      return;
+    }
+    apply(mergeFiles(folder.domain, folder.files));
   };
 
   const onInputFile = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -112,6 +151,7 @@ export function SourceFileControls() {
     apply(importJSON(result.text), { handle: source.handle, name: source.name });
   };
 
+  const hasWork = nodes.length + edges.length + contexts.length > 0;
   const btn =
     "flex items-center gap-1.5 rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100";
 
@@ -132,12 +172,18 @@ export function SourceFileControls() {
           </button>
         </>
       ) : (
-        <button type="button" className={btn} onClick={() => void choose()}>
-          <Upload size={14} />
-          {/* An empty board is importing; a board with work on it is reloading, which
-              is the browser-without-handles form of Refresh (us-00031-FR-7). */}
-          {nodes.length + edges.length + contexts.length > 0 ? "Reload from file…" : "Import"}
-        </button>
+        <>
+          <button type="button" className={btn} onClick={() => void choose()}>
+            <Upload size={14} />
+            {/* An empty board is importing; a board with work on it is reloading, which
+                is the browser-without-handles form of Refresh (us-00031-FR-7). */}
+            {hasWork ? "Reload from file…" : "Import"}
+          </button>
+          <button type="button" className={btn} onClick={() => void chooseFolder()}>
+            <FolderInput size={14} />
+            {hasWork ? "Reload from folder…" : "Import folder…"}
+          </button>
+        </>
       )}
       {error && (
         <span
@@ -155,6 +201,17 @@ export function SourceFileControls() {
         accept="application/json,.json"
         className="hidden"
         onChange={(e) => void onInputFile(e)}
+      />
+      <input
+        ref={(el) => {
+          folderRef.current = el;
+          // a directory input: React has no prop for it (decision-00017)
+          el?.setAttribute("webkitdirectory", "");
+        }}
+        type="file"
+        className="hidden"
+        data-testid="toolbar-folder-input"
+        onChange={(e) => void onInputFolder(e)}
       />
     </div>
   );
