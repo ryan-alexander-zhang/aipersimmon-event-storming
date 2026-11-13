@@ -286,14 +286,16 @@ def merge_split(model, base):
 def check_seams(model, nodes, edges):
     """Every edge crossing two contexts needs a Context Relationship between them, in
     either direction (decision-00017). An actor's edge is not a seam: a person using
-    two contexts is not the contexts integrating. One warning per pair."""
+    two contexts is not the contexts integrating. Nor is commentary: a hotspot or an
+    opportunity pointing across marks an element, it integrates nothing (issue-00040).
+    One warning per pair."""
     pair = lambda a, b: (a, b) if a < b else (b, a)  # noqa: E731
     backed = {pair(r.get("source"), r.get("target")) for r in as_list(model, "contextRelationships")
               if isinstance(r.get("source"), str) and isinstance(r.get("target"), str)}
     names = {c.get("id"): c.get("name") for c in as_list(model, "contexts")}
     reported = set()
-    for s, t, _ in edges:
-        if nodes[s]["type"] == "actor" or nodes[t]["type"] == "actor":
+    for s, t, rel in edges:
+        if rel in ("annotates", "highlights") or nodes[s]["type"] == "actor" or nodes[t]["type"] == "actor":
             continue
         a, b = nodes[s].get("context"), nodes[t].get("context")
         if not isinstance(a, str) or not isinstance(b, str) or a == b:

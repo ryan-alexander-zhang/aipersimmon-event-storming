@@ -347,6 +347,15 @@ describe("unbacked-seam [decision-00017, plan-00024-AC-7]", () => {
     expect(actorOnly.filter((f) => f.type === "unbacked-seam")).toEqual([]);
   });
 
+  it("does not count a Hotspot's or Opportunity's edge as a seam [issue-00040]", () => {
+    const commentary = analyzeModel(
+      [inCtx("h", "hotspot", "pay"), inCtx("o", "opportunity", "pay"), inCtx("c", "command", "ord")],
+      [edge("h", "c", "annotates"), edge("o", "c", "highlights")],
+      contexts,
+    );
+    expect(commentary.filter((f) => f.type === "unbacked-seam")).toEqual([]);
+  });
+
   it("is satisfied by a relationship in either direction", () => {
     expect(seams([{ id: "r", source: "pay", target: "ord", type: "conformist" }])).toEqual([]);
     expect(seams([{ id: "r", source: "ord", target: "pay", type: "acl" }])).toEqual([]);

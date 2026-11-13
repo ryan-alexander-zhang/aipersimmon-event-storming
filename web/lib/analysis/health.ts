@@ -339,7 +339,11 @@ function subdomainFindings(contexts: Context[], level?: Level): Finding[] {
 // Every edge crossing two contexts is a seam, and every seam is backed by a Context
 // Relationship between the pair, in either direction (decision-00017) - the Context
 // Map gate's rule, checked. An Actor's edge is not one: a person using two contexts
-// is not the contexts integrating. One finding per pair, pointing at its elements.
+// is not the contexts integrating. Nor is commentary: a Hotspot or Opportunity
+// pointing across marks an element, it does not integrate anything (issue-00040).
+// One finding per pair, pointing at its elements.
+const COMMENTARY: RelationType[] = ["annotates", "highlights"];
+
 function seamFindings(
   nodes: ESNode[],
   edges: ESEdge[],
@@ -352,6 +356,7 @@ function seamFindings(
   const backed = new Set(relationships.map((r) => pair(r.source, r.target)));
   const seams = new Map<string, Set<string>>();
   for (const e of edges) {
+    if (e.data?.relation && COMMENTARY.includes(e.data.relation)) continue;
     const s = ctxOf.get(e.source);
     const t = ctxOf.get(e.target);
     if (!s || !t || s === t || backed.has(pair(s, t))) continue;

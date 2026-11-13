@@ -244,7 +244,9 @@ _Avoid_: architecture diagram, system map.
 
 **Seam**:
 An edge whose two ends lie in different Bounded Contexts, neither of them an
-Actor — a person working in two contexts is not the contexts integrating. Every
+Actor — a person working in two contexts is not the contexts integrating — and
+which is not commentary (`annotates`, `highlights`): a Hotspot or Opportunity
+pointing across marks an element, it integrates nothing (issue-00040). Every
 pair of contexts joined by a seam is backed by at least one Context Relationship
 (decision-00017).
 _Avoid_: integration point, crossing (as a noun).
