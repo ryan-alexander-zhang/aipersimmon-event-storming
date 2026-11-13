@@ -39,13 +39,17 @@ export const propertiesSchema = z.object({
   rule: z.string().optional(),
 });
 
+// Required written text - a name, a sentence, a word - has content, not just length.
+// The one definition the editor uses; validate.py's is `.strip()` (issue-00041).
+const text = () => z.string().refine((s) => s.trim().length > 0, "is blank");
+
 export const SUBDOMAIN_TYPES = ["core", "supporting", "generic"] as const;
 
 // The named business capability a context realises - one per context, never shared
 // by two (decision-00016). Its name defaults to the context's; its type is the
 // strategic classification (spec-00004 FR4). Required at design, optional before.
 export const subdomainSchema = z.object({
-  name: z.string().min(1),
+  name: text(),
   type: z.enum(SUBDOMAIN_TYPES).optional(),
 });
 
@@ -56,10 +60,10 @@ const unique = (xs: string[]) => new Set(lower(xs)).size === xs.length;
 // (decision-00018 B1). The same term in two contexts may mean different things.
 // `avoid` lists the words the context does not use for it (decision-00019).
 export const termSchema = z.object({
-  term: z.string().min(1),
-  meaning: z.string().min(1),
+  term: text(),
+  meaning: text(),
   avoid: z
-    .array(z.string().refine((w) => w.trim().length > 0, "an avoided word is empty"))
+    .array(text())
     .refine(unique, "a word is avoided twice")
     .optional(),
 });
@@ -72,7 +76,7 @@ export const contextSchema = z.object({
   subdomain: subdomainSchema.optional(),
   // Why the context exists: the business problem it solves, in one sentence.
   // Required at design (decision-00018).
-  purpose: z.string().min(1).optional(),
+  purpose: text().optional(),
   language: z
     .array(termSchema)
     .refine((ts) => unique(ts.map((t) => t.term)), "a term appears twice")

@@ -369,6 +369,25 @@ describe("serialize v2 (T2/RT1)", () => {
     expect(importJSON(json).ok).toBe(true);
   });
 
+  // Required written text has content, not just length: the validator strips it, so
+  // the schema must reject a blank one too (issue-00041). One case per field.
+  it.each([
+    ["a blank purpose", { purpose: "   " }],
+    ["a blank term", { language: [{ term: "  ", meaning: "m" }] }],
+    ["a blank meaning", { language: [{ term: "Order", meaning: " \t" }] }],
+    ["a blank avoided word", { language: [{ term: "Order", meaning: "m", avoid: [" "] }] }],
+    ["a blank subdomain name", { subdomain: { name: "  " } }],
+  ])("rejects %s, as the validator does [issue-00041]", (_, ctx) => {
+    const bad = JSON.stringify({
+      version: "5.2",
+      meta: { name: "m", level: "design", createdAt: "t" },
+      contexts: [{ id: "ord", name: "Ordering", order: 0, ...ctx }],
+      nodes: [],
+      edges: [],
+    });
+    expect(importJSON(bad).ok).toBe(false);
+  });
+
   it("rejects a subdomain with an empty name [decision-00016]", () => {
     const bad = JSON.stringify({
       version: "5.0",
